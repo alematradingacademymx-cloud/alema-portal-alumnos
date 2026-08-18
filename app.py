@@ -1,3 +1,4 @@
+Python
 import streamlit as st
 
 # Configuración de página con estética de ALEMA Trading Academy
@@ -45,7 +46,7 @@ with col1:
     # Detección de Par JPY
     es_jpy = "JPY" in par_seleccionado
     divisor_pip = 100.0 if es_jpy else 10000.0
-    valor_pip_defecto = 7.0 if es_jpy else 10.0
+    valor_pip_sugerido = 7.0 if es_jpy else 10.0
     
     balance = st.number_input("Balance de la Cuenta ($)", value=200.0, step=10.0)
     riesgo_pct = st.number_input("Porcentaje de Riesgo (%)", value=5.0, step=0.5)
@@ -54,19 +55,20 @@ with col1:
 with col2:
     tipo_orden = st.selectbox("Tipo de Orden", ["Compra", "Venta"])
     
-    # Valores por defecto e incrementos según si es JPY o no
+    # Valores por defecto y pasos según si es JPY o no
     precio_defecto = 155.20 if es_jpy else 1.0850
     paso_precio = 0.01 if es_jpy else 0.0001
     
     precio_entrada = st.number_input("Precio de Entrada", value=precio_defecto, step=paso_precio)
-    valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_defecto, step=0.5)
+    # Valor del pip se ajusta dinámicamente en automático ($7.00 si es JPY, $10.00 si no)
+    valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_sugerido, step=0.5)
     ratio = st.number_input("Ratio (Riesgo:Beneficio)", value=3.0, step=0.5)
 
 # Indicar al usuario si se detectó JPY
 if es_jpy:
-    st.info("💡 **Modo Par JPY Detectado:** Se aplica divisor de 100 para pips en el 2º decimal.")
+    st.info("💡 **Modo Par JPY Detectado:** Valor del pip ajustado a **$7.00 USD** y divisor de 100 para pips en el 2º decimal.")
 else:
-    st.info("💡 **Modo Par Estándar Detectado:** Se aplica divisor de 10,000 para pips en el 4º decimal.")
+    st.info("💡 **Modo Par Estándar Detectado:** Valor del pip ajustado a **$10.00 USD** y divisor de 10,000 para pips en el 4º decimal.")
 
 # --- SECCIÓN 2: CÁLCULOS MATEMÁTICOS ---
 # 1. Dinero máximo a arriesgar
@@ -99,7 +101,7 @@ st.subheader("📊 Resultados de Ejecución")
 
 res_col1, res_col2 = st.columns(2)
 
-# Formateo de precios limpio segun tipo de par
+# Formateo de precios limpio según el tipo de par
 str_sl = f"{precio_sl:.2f}" if es_jpy else f"{precio_sl:.5f}"
 str_tp = f"{precio_tp:.2f}" if es_jpy else f"{precio_tp:.5f}"
 
