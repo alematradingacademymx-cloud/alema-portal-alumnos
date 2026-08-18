@@ -54,11 +54,11 @@ with col1:
 with col2:
     tipo_orden = st.selectbox("Tipo de Orden", ["Compra", "Venta"])
     
-    # Formato dinámico del precio de entrada según si es JPY o no
-    formato_precio = "%.2f" if es_jpy else "%.5f"
+    # Valores por defecto e incrementos según si es JPY o no
     precio_defecto = 155.20 if es_jpy else 1.0850
+    paso_precio = 0.01 if es_jpy else 0.0001
     
-    precio_entrada = st.number_input("Precio de Entrada", value=precio_defecto, format=formato_precio)
+    precio_entrada = st.number_input("Precio de Entrada", value=precio_defecto, step=paso_precio)
     valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_defecto, step=0.5)
     ratio = st.number_input("Ratio (Riesgo:Beneficio)", value=3.0, step=0.5)
 
@@ -81,8 +81,7 @@ tp_pips = sl_pips * ratio
 # 4. Ganancia ($) -> Lotaje * TP Pips * Valor Pip
 ganancia = lotaje * tp_pips * valor_pip
 
-# 5. Precios de Salida (Aplicando exactamente tu fórmula)
-# Distancia en precio = Pips / (100 si es JPY, 10000 si no)
+# 5. Precios de Salida
 distancia_sl_precio = sl_pips / divisor_pip
 distancia_tp_precio = tp_pips / divisor_pip
 
@@ -100,14 +99,18 @@ st.subheader("📊 Resultados de Ejecución")
 
 res_col1, res_col2 = st.columns(2)
 
+# Formateo de precios limpio segun tipo de par
+str_sl = f"{precio_sl:.2f}" if es_jpy else f"{precio_sl:.5f}"
+str_tp = f"{precio_tp:.2f}" if es_jpy else f"{precio_tp:.5f}"
+
 with res_col1:
     st.metric(label="Riesgo Máximo ($)", value=f"${dinero_arriesgar:.2f}")
     st.metric(label="Lotaje Exacto", value=f"{lotaje:.2f}")
-    st.metric(label="Precio Stop Loss", value=f"{precio_sl:{formato_precio}}")
+    st.metric(label="Precio Stop Loss", value=str_sl)
 
 with res_col2:
     st.metric(label="Ganancia Potencial ($)", value=f"${ganancia:.2f}")
     st.metric(label="Tamaño TP (PIPS)", value=f"{tp_pips:.0f} pips")
-    st.metric(label="Precio Take Profit", value=f"{precio_tp:{formato_precio}}")
+    st.metric(label="Precio Take Profit", value=str_tp)
 
 st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
