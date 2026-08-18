@@ -1,4 +1,3 @@
-Python
 import streamlit as st
 
 # Configuración de página con estética de ALEMA Trading Academy
