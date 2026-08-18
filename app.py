@@ -1,9 +1,9 @@
 import streamlit as st
 
-# Configuración de página con estética de ALEMA Trading Academy
+# Configuración de página
 st.set_page_config(page_title="ALEMA Trading Academy", page_icon="📈", layout="centered")
 
-# Estilos CSS personalizados
+# Estilos CSS
 st.markdown("""
     <style>
     .main-title {
@@ -18,12 +18,6 @@ st.markdown("""
         font-size: 18px;
         color: #64748B;
         margin-bottom: 25px;
-    }
-    .stButton>button {
-        width: 100%;
-        background-color: #00E676;
-        color: black;
-        font-weight: bold;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -42,6 +36,13 @@ col1, col2 = st.columns(2)
 with col1:
     par_seleccionado = st.text_input("Par de Divisas / Activo", value="EUR/USD").strip().upper()
     
+    # Limpiar el nombre del par para el enlace de TradingView (ej: "EUR/USD" -> "EURUSD")
+    symbol_tv = par_seleccionado.replace("/", "").replace("-", "").replace(" ", "")
+    tv_url = f"https://es.tradingview.com/chart/?symbol=FX:{symbol_tv}"
+    
+    # Botón dinámico para abrir el gráfico en TradingView
+    st.link_button(f"📈 Ver Gráfico de {par_seleccionado} en TradingView", tv_url)
+    
     # Detección de Par JPY
     es_jpy = "JPY" in par_seleccionado
     divisor_pip = 100.0 if es_jpy else 10000.0
@@ -54,12 +55,10 @@ with col1:
 with col2:
     tipo_orden = st.selectbox("Tipo de Orden", ["Compra", "Venta"])
     
-    # Valores por defecto y pasos según si es JPY o no
     precio_defecto = 155.20 if es_jpy else 1.0850
     paso_precio = 0.01 if es_jpy else 0.0001
     
     precio_entrada = st.number_input("Precio de Entrada", value=precio_defecto, step=paso_precio)
-    # Valor del pip se ajusta dinámicamente en automático ($7.00 si es JPY, $10.00 si no)
     valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_sugerido, step=0.5)
     ratio = st.number_input("Ratio (Riesgo:Beneficio)", value=3.0, step=0.5)
 
@@ -70,26 +69,18 @@ else:
     st.info("💡 **Modo Par Estándar Detectado:** Valor del pip ajustado a **$10.00 USD** y divisor de 10,000 para pips en el 4º decimal.")
 
 # --- SECCIÓN 2: CÁLCULOS MATEMÁTICOS ---
-# 1. Dinero máximo a arriesgar
 dinero_arriesgar = balance * (riesgo_pct / 100.0)
-
-# 2. Lotaje Exacto
 lotaje = dinero_arriesgar / (sl_pips * valor_pip) if sl_pips > 0 and valor_pip > 0 else 0.0
-
-# 3. Pips de TP
 tp_pips = sl_pips * ratio
-
-# 4. Ganancia ($) -> Lotaje * TP Pips * Valor Pip
 ganancia = lotaje * tp_pips * valor_pip
 
-# 5. Precios de Salida
 distancia_sl_precio = sl_pips / divisor_pip
 distancia_tp_precio = tp_pips / divisor_pip
 
 if tipo_orden == "Compra":
     precio_sl = precio_entrada - distancia_sl_precio
     precio_tp = precio_entrada + distancia_tp_precio
-else: # Venta
+else:
     precio_sl = precio_entrada + distancia_sl_precio
     precio_tp = precio_entrada - distancia_tp_precio
 
@@ -100,7 +91,6 @@ st.subheader("📊 Resultados de Ejecución")
 
 res_col1, res_col2 = st.columns(2)
 
-# Formateo de precios limpio según el tipo de par
 str_sl = f"{precio_sl:.2f}" if es_jpy else f"{precio_sl:.5f}"
 str_tp = f"{precio_tp:.2f}" if es_jpy else f"{precio_tp:.5f}"
 
