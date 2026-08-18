@@ -1,9 +1,9 @@
 import streamlit as st
 
-# Configuración de página con estética de la Academia
+# Configuración de página con estética de ALEMA Trading Academy
 st.set_page_config(page_title="ALEMA Trading Academy", page_icon="📈", layout="centered")
 
-# Estilos CSS personalizados para la marca
+# Estilos CSS personalizados
 st.markdown("""
     <style>
     .main-title {
@@ -30,7 +30,7 @@ st.markdown("""
 
 # Encabezado principal
 st.markdown('<div class="main-title">ALEMA Trading Academy</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Calculadora Operativa & Gestión de Riesgo</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">Calculadora Operativa & Gestión de Riesgo Multi-Activo</div>', unsafe_allow_html=True)
 
 st.divider()
 
@@ -40,15 +40,33 @@ st.subheader("⚙️ Parámetros de la Operación")
 col1, col2 = st.columns(2)
 
 with col1:
+    par_seleccionado = st.text_input("Par de Divisas / Activo", value="EUR/USD").strip().upper()
+    
+    # Detección de Par JPY
+    es_jpy = "JPY" in par_seleccionado
+    divisor_pip = 100.0 if es_jpy else 10000.0
+    valor_pip_defecto = 7.0 if es_jpy else 10.0
+    
     balance = st.number_input("Balance de la Cuenta ($)", value=200.0, step=10.0)
     riesgo_pct = st.number_input("Porcentaje de Riesgo (%)", value=5.0, step=0.5)
     sl_pips = st.number_input("Tamaño del Stop Loss (Pips)", value=15.0, step=1.0)
-    valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=10.0, step=1.0)
 
 with col2:
-    precio_entrada = st.number_input("Precio de Entrada", value=1.1522, format="%.5f")
+    tipo_orden = st.selectbox("Tipo de Orden", ["Compra", "Venta"])
+    
+    # Formato dinámico del precio de entrada según si es JPY o no
+    formato_precio = "%.2f" if es_jpy else "%.5f"
+    precio_defecto = 155.20 if es_jpy else 1.0850
+    
+    precio_entrada = st.number_input("Precio de Entrada", value=precio_defecto, format=formato_precio)
+    valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_defecto, step=0.5)
     ratio = st.number_input("Ratio (Riesgo:Beneficio)", value=3.0, step=0.5)
-    tipo_orden = st.selectbox("Tipo de Orden", ["Venta", "Compra"])
+
+# Indicar al usuario si se detectó JPY
+if es_jpy:
+    st.info("💡 **Modo Par JPY Detectado:** Se aplica divisor de 100 para pips en el 2º decimal.")
+else:
+    st.info("💡 **Modo Par Estándar Detectado:** Se aplica divisor de 10,000 para pips en el 4º decimal.")
 
 # --- SECCIÓN 2: CÁLCULOS MATEMÁTICOS ---
 # 1. Dinero máximo a arriesgar
@@ -60,16 +78,20 @@ lotaje = dinero_arriesgar / (sl_pips * valor_pip) if sl_pips > 0 and valor_pip >
 # 3. Pips de TP
 tp_pips = sl_pips * ratio
 
-# 4. Ganancia ($) -> Fórmula original: Lotaje * TP Pips * Valor Pip
+# 4. Ganancia ($) -> Lotaje * TP Pips * Valor Pip
 ganancia = lotaje * tp_pips * valor_pip
 
-# 5. Precios de Salida
-if tipo_orden == "Venta":
-    precio_sl = precio_entrada + (sl_pips * 0.0001)
-    precio_tp = precio_entrada - (tp_pips * 0.0001)
-else:
-    precio_sl = precio_entrada - (sl_pips * 0.0001)
-    precio_tp = precio_entrada + (tp_pips * 0.0001)
+# 5. Precios de Salida (Aplicando exactamente tu fórmula)
+# Distancia en precio = Pips / (100 si es JPY, 10000 si no)
+distancia_sl_precio = sl_pips / divisor_pip
+distancia_tp_precio = tp_pips / divisor_pip
+
+if tipo_orden == "Compra":
+    precio_sl = precio_entrada - distancia_sl_precio
+    precio_tp = precio_entrada + distancia_tp_precio
+else: # Venta
+    precio_sl = precio_entrada + distancia_sl_precio
+    precio_tp = precio_entrada - distancia_tp_precio
 
 st.divider()
 
@@ -81,11 +103,11 @@ res_col1, res_col2 = st.columns(2)
 with res_col1:
     st.metric(label="Riesgo Máximo ($)", value=f"${dinero_arriesgar:.2f}")
     st.metric(label="Lotaje Exacto", value=f"{lotaje:.2f}")
-    st.metric(label="Precio Stop Loss", value=f"{precio_sl:.5f}")
+    st.metric(label="Precio Stop Loss", value=f"{precio_sl:{formato_precio}}")
 
 with res_col2:
     st.metric(label="Ganancia Potencial ($)", value=f"${ganancia:.2f}")
     st.metric(label="Tamaño TP (PIPS)", value=f"{tp_pips:.0f} pips")
-    st.metric(label="Precio Take Profit", value=f"{precio_tp:.5f}")
+    st.metric(label="Precio Take Profit", value=f"{precio_tp:{formato_precio}}")
 
 st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
