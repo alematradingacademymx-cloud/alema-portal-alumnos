@@ -1,5 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import plotly.graph_objects as go
 
 # Configuración de página
 st.set_page_config(page_title="ALEMA Trading Academy", page_icon="📈", layout="centered")
@@ -191,10 +192,26 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# --- INDICADOR VISUAL DE DISTRIBUCIÓN DE RIESGO ---
-st.subheader("📉 Exposición de Capital")
-porcentaje_pantalla = min(max(int(riesgo_pct), 0), 100)
-st.write(f"Riesgo asignado a esta operación: **{riesgo_pct}% del balance total**")
-st.progress(porcentaje_pantalla)
+# --- GRÁFICO VISUAL DE DONA (DISTRIBUCIÓN DE CUENTA) ---
+st.subheader("📉 Distribución de Balance")
+capital_seguro = max(0.0, balance - dinero_arriesgar)
+
+fig = go.Figure(data=[go.Pie(
+    labels=['Capital Seguro', 'Capital en Riesgo'],
+    values=[capital_seguro, dinero_arriesgar],
+    hole=.5,
+    marker_colors=['#10B981', '#FF6B00']
+)])
+
+fig.update_layout(
+    margin=dict(t=0, b=0, l=0, r=0),
+    height=220,
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    font=dict(color='#F1F5F9'),
+    showlegend=True
+)
+
+st.plotly_chart(fig, use_container_width=True)
 
 st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
