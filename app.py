@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
 # Configuración de página
-st.set_page_config(page_title="ALEMA Trading Academy", page_icon="📈", layout="centered")
+st.set_page_config(page_title="ALEMA Trading Academy - Acceso Alumnos", page_icon="📈", layout="centered")
 
 # Estilos CSS personalizados con Fondo Azul Oscuro Elegante
 st.markdown("""
@@ -43,8 +43,65 @@ st.markdown("""
         margin-top: 10px;
         margin-bottom: 15px;
     }
+    
+    /* Estilo Caja de Login */
+    .login-box {
+        background-color: #1E293B;
+        padding: 25px;
+        border-radius: 12px;
+        border: 1px solid #334155;
+        margin-top: 15px;
+        margin-bottom: 20px;
+    }
     </style>
 """, unsafe_allow_html=True)
+
+# ==========================================
+# 🔑 BASE DE DATOS DE USUARIOS AUTORIZADOS
+# ==========================================
+USUARIOS_AUTORIZADOS = {
+    # --- DIRECCIÓN GENERAL ---
+    "DIRALEX": "Alema123",
+    
+    # --- ALUMNOS CERTIFICADOS ---
+    "ALEMA2026DUMARAO2": "Dulcetrader$357",
+    "ALEMA2026FERMAFLO1": "Fernandotrader$951"
+}
+
+# --- CONTROL DE SESIÓN ---
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
+# --- PANTALLA DE INICIO DE SESIÓN ---
+if not st.session_state.autenticado:
+    st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados</div>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="login-box">', unsafe_allow_html=True)
+    st.subheader("🔒 Acceso a la Calculadora Operativa")
+    st.write("Ingresa tus credenciales institucionales para continuar:")
+    
+    matricula_input = st.text_input("Matrícula / Usuario").strip().upper()
+    password_input = st.text_input("Contraseña", type="password")
+    
+    col_btn, _ = st.columns([1, 1])
+    with col_btn:
+        if st.button("🔑 Iniciar Sesión", use_container_width=True):
+            if matricula_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[matricula_input] == password_input:
+                st.session_state.autenticado = True
+                st.session_state.usuario_actual = matricula_input
+                st.success("¡Acceso concedido!")
+                st.rerun()
+            else:
+                st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.caption("© ALEMA Trading Academy. Área protegida.")
+    st.stop() # Bloquea la carga del contenido si no ha iniciado sesión
+
+# ==========================================
+# 🚀 CONTENIDO DE LA CALCULADORA (AUTENTICADO)
+# ==========================================
 
 # --- CARRUSEL SUPERIOR TIPO TICKER ---
 ticker_html = """
@@ -82,9 +139,17 @@ ticker_html = """
 
 components.html(ticker_html, height=78)
 
-# Encabezado principal
-st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Calculadora Operativa & Gestión de Riesgo Multi-Activo</div>', unsafe_allow_html=True)
+# Encabezado principal y bienvenida
+col_header, col_logout = st.columns([3, 1])
+with col_header:
+    st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
+    st.caption(f"Sesión activa: **{st.session_state.usuario_actual}**")
+with col_logout:
+    if st.button("🚪 Cerrar Sesión"):
+        st.session_state.autenticado = False
+        st.rerun()
+
+st.markdown('<div class="sub-title" style="text-align: left;">Calculadora Operativa & Gestión de Riesgo Multi-Activo</div>', unsafe_allow_html=True)
 
 # --- GUÍA RÁPIDA PLEGABLE ---
 with st.expander("📖 Guía Rápida de Uso para Alumnos"):
@@ -192,7 +257,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# --- GRÁFICO VISUAL DE DONA (DISTRIBUCIÓN DE CUENTA) ---
+# --- GRÁFICO VISUAL DE DONA ---
 st.subheader("📉 Distribución de Balance")
 capital_seguro = max(0.0, balance - dinero_arriesgar)
 
