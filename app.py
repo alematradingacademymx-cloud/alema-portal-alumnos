@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Configuración de página
 st.set_page_config(page_title="ALEMA Trading Academy", page_icon="📈", layout="centered")
@@ -23,6 +24,44 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- CARRUSEL SUPERIOR TIPO TICKER (Fondo Naranja / Letras Blancas) ---
+ticker_html = """
+<!-- TradingView Widget BEGIN -->
+<div class="tradingview-widget-container">
+  <div class="tradingview-widget-container__widget"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+  {
+  "symbols": [
+    {"proName": "FX_IDC:EURUSD", "title": "EUR/USD"},
+    {"proName": "FX_IDC:GBPUSD", "title": "GBP/USD"},
+    {"proName": "FX_IDC:USDJPY", "title": "USD/JPY"},
+    {"proName": "FX_IDC:AUDUSD", "title": "AUD/USD"},
+    {"proName": "FX_IDC:USDCAD", "title": "USD/CAD"},
+    {"proName": "FX_IDC:USDCHF", "title": "USD/CHF"},
+    {"proName": "BITSTAMP:BTCUSD", "title": "BTC/USD"}
+  ],
+  "showSymbolLogo": true,
+  "isTransparent": false,
+  "displayMode": "adaptive",
+  "colorTheme": "dark",
+  "locale": "es"
+}
+  </script>
+</div>
+<style>
+  /* Personalización del carrusel a Naranja ALEMA */
+  .tradingview-widget-container {
+    background-color: #FF6B00 !important;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+</style>
+<!-- TradingView Widget END -->
+"""
+
+# Renderizado de la franja carrusel arriba del todo
+components.html(ticker_html, height=50)
+
 # Encabezado principal
 st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Calculadora Operativa & Gestión de Riesgo Multi-Activo</div>', unsafe_allow_html=True)
@@ -43,7 +82,7 @@ with col1:
     investing_url = "https://es.investing.com/economic-calendar/"
     
     # Botones de herramientas externas
-    st.link_button(f"📈 Ver Gráfico en TradingView", tv_url)
+    st.link_button("📈 Ver Gráfico en TradingView", tv_url)
     st.link_button("📅 Ver Calendario Económico (Investing)", investing_url)
     
     # Detección de Par JPY
