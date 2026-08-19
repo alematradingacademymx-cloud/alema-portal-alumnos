@@ -12,6 +12,7 @@ st.markdown("""
         font-size: 32px;
         font-weight: 800;
         color: #FF6B00; /* Color Naranja Institucional */
+        margin-top: 10px;
         margin-bottom: 0px;
         letter-spacing: 1px;
     }
@@ -59,8 +60,8 @@ ticker_html = """
 <!-- TradingView Widget END -->
 """
 
-# Renderizado de la franja carrusel arriba del todo
-components.html(ticker_html, height=50)
+# Renderizado de la franja carrusel ajustado a altura 78px para celulares
+components.html(ticker_html, height=78)
 
 # Encabezado principal
 st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
