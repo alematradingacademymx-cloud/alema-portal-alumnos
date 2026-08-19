@@ -286,15 +286,15 @@ if opcion_menu == "🧮 Calculadoras Operativas":
 
 
 # ==========================================
-# SECCIÓN 2: BIBLIOTECA DE GUÍAS (VISOR PDF)
+# SECCIÓN 2: BIBLIOTECA DE GUÍAS (VISOR MEJORADO)
 # ==========================================
 elif opcion_menu == "📚 Biblioteca de Guías":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Biblioteca Digital Exclusiva para Alumnos</div>', unsafe_allow_html=True)
 
-    st.subheader("📖 Visor de Materiales de Estudio")
+    st.subheader("📖 Lectura y Descarga de Materiales")
     
-    # Nombres exactos de los archivos subidos al repositorio
+    # Nombres exactos de los archivos en el repositorio
     GUIAS_DISPONIBLES = {
         "📙 Acción del Precio y Estructura": "Nueva guia Accion del precio.pdf",
         "📗 Manual del Trader (Básico)": "Manual del Trader (Básico).pdf"
@@ -307,23 +307,32 @@ elif opcion_menu == "📚 Biblioteca de Guías":
     
     archivo_pdf = GUIAS_DISPONIBLES[guia_seleccionada]
     
-    st.info(f"📄 Mostrando: **{guia_seleccionada}**")
-    
-    # Renderizado seguro del PDF en pantalla
     if os.path.exists(archivo_pdf):
         with open(archivo_pdf, "rb") as f:
-            base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+            pdf_bytes = f.read()
             
+        st.success(f"📄 Documento cargado correctamente: **{guia_seleccionada}**")
+        
+        # Botón para descargar / abrir nativamente en dispositivos móviles
+        st.download_button(
+            label=f"📥 Descargar o Abrir Guía Completa ({guia_seleccionada})",
+            data=pdf_bytes,
+            file_name=archivo_pdf,
+            mime="application/pdf",
+            use_container_width=True
+        )
+        
+        st.caption("💡 *Tip para celulares:* Si el visor embebido abajo no desplaza todas las páginas, presiona el botón naranja superior para abrir el documento completo en la app de archivos o visor nativo de tu teléfono.*")
+        
+        # Visor embebido adaptable
+        base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
         pdf_display = f'''
-            <iframe src="data:application/pdf;base64,{base64_pdf}#toolbar=0" 
-                    width="100%" 
-                    height="750" 
-                    type="application/pdf"
-                    style="border: 1px solid #334155; border-radius: 8px;">
-            </iframe>
+            <object data="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="700px">
+                <embed src="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="700px" />
+            </object>
         '''
         st.markdown(pdf_display, unsafe_allow_html=True)
     else:
-        st.warning(f"⚠️ El archivo `{archivo_pdf}` no se encuentra en la raíz del repositorio.")
+        st.warning(f"⚠️ El archivo `{archivo_pdf}` no se encuentra en el repositorio.")
 
 st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
