@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
-import base64
 import os
 
 # Configuración de página
@@ -76,9 +75,12 @@ USUARIOS_AUTORIZADOS = {
     "ALEMA2026FERMAFLO1": "Fernandotrader$951"
 }
 
-# --- CONTROL DE SESIÓN ---
+# --- CONTROL Y PERSISTENCIA DE SESIÓN ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
+
+if "usuario_actual" not in st.session_state:
+    st.session_state.usuario_actual = ""
 
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
@@ -89,8 +91,8 @@ if not st.session_state.autenticado:
     st.subheader("🔒 Acceso al Portal Privado")
     st.write("Ingresa tus credenciales institucionales para ingresar a las herramientas y guías:")
     
-    matricula_input = st.text_input("Matrícula / Usuario").strip().upper()
-    password_input = st.text_input("Contraseña", type="password")
+    matricula_input = st.text_input("Matrícula / Usuario", key="login_user").strip().upper()
+    password_input = st.text_input("Contraseña", type="password", key="login_pass")
     
     col_btn, _ = st.columns([1, 1])
     with col_btn:
@@ -116,11 +118,13 @@ st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 
 opcion_menu = st.sidebar.radio(
     "Selecciona una sección:",
-    ["🧮 Calculadoras Operativas", "📚 Biblioteca de Guías"]
+    ["🧮 Calculadoras Operativas", "📚 Biblioteca de Guías"],
+    key="navegacion_principal"
 )
 
 if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state.autenticado = False
+    st.session_state.usuario_actual = ""
     st.rerun()
 
 # --- TICKER DE TRADINGVIEW SUPERIOR ---
@@ -178,7 +182,7 @@ if opcion_menu == "🧮 Calculadoras Operativas":
     col1, col2 = st.columns(2)
 
     with col1:
-        par_seleccionado = st.text_input("Par de Divisas / Activo", value="EUR/USD").strip().upper()
+        par_seleccionado = st.text_input("Par de Divisas / Activo", value="EUR/USD", key="par_input").strip().upper()
         
         symbol_tv = par_seleccionado.replace("/", "").replace("-", "").replace(" ", "")
         tv_url = f"https://es.tradingview.com/chart/?symbol=FX:{symbol_tv}"
@@ -191,12 +195,12 @@ if opcion_menu == "🧮 Calculadoras Operativas":
         divisor_pip = 100.0 if es_jpy else 10000.0
         valor_pip_sugerido = 7.0 if es_jpy else 10.0
         
-        balance = st.number_input("Balance de la Cuenta ($)", value=200.0, step=10.0)
-        riesgo_pct = st.number_input("Porcentaje de Riesgo (%)", value=2.0, step=0.5)
-        sl_pips = st.number_input("Tamaño del Stop Loss (Pips)", value=15.0, step=1.0)
+        balance = st.number_input("Balance de la Cuenta ($)", value=200.0, step=10.0, key="balance_input")
+        riesgo_pct = st.number_input("Porcentaje de Riesgo (%)", value=2.0, step=0.5, key="riesgo_input")
+        sl_pips = st.number_input("Tamaño del Stop Loss (Pips)", value=15.0, step=1.0, key="sl_input")
 
     with col2:
-        tipo_orden = st.selectbox("Tipo de Orden", ["Compra", "Venta"])
+        tipo_orden = st.selectbox("Tipo de Orden", ["Compra", "Venta"], key="tipo_orden_input")
         
         precio_defecto = 155.200 if es_jpy else 1.08500
         paso_precio = 0.001 if es_jpy else 0.00001
@@ -206,11 +210,12 @@ if opcion_menu == "🧮 Calculadoras Operativas":
             "Precio de Entrada", 
             value=precio_defecto, 
             step=paso_precio, 
-            format=formato_precio
+            format=formato_precio,
+            key="entrada_input"
         )
         
-        valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_sugerido, step=0.5)
-        ratio = st.number_input("Ratio (Riesgo:Beneficio)", value=3.0, step=0.5)
+        valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_sugerido, step=0.5, key="pip_val_input")
+        ratio = st.number_input("Ratio (Riesgo:Beneficio)", value=3.0, step=0.5, key="ratio_input")
 
     # Cálculos
     dinero_arriesgar = balance * (riesgo_pct / 100.0)
@@ -286,15 +291,14 @@ if opcion_menu == "🧮 Calculadoras Operativas":
 
 
 # ==========================================
-# SECCIÓN 2: BIBLIOTECA DE GUÍAS (VISOR MEJORADO)
+# SECCIÓN 2: BIBLIOTECA DE GUÍAS (OPTIMIZADA)
 # ==========================================
 elif opcion_menu == "📚 Biblioteca de Guías":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Biblioteca Digital Exclusiva para Alumnos</div>', unsafe_allow_html=True)
 
-    st.subheader("📖 Lectura y Descarga de Materiales")
+    st.subheader("📖 Lectura y Consulta de Materiales")
     
-    # Nombres exactos de los archivos en el repositorio
     GUIAS_DISPONIBLES = {
         "📙 Acción del Precio y Estructura": "Nueva guia Accion del precio.pdf",
         "📗 Manual del Trader (Básico)": "Manual del Trader (Básico).pdf"
@@ -302,36 +306,34 @@ elif opcion_menu == "📚 Biblioteca de Guías":
     
     guia_seleccionada = st.selectbox(
         "Selecciona la guía que deseas consultar:",
-        list(GUIAS_DISPONIBLES.keys())
+        list(GUIAS_DISPONIBLES.keys()),
+        key="selector_guias_pdf"
     )
     
     archivo_pdf = GUIAS_DISPONIBLES[guia_seleccionada]
     
     if os.path.exists(archivo_pdf):
-        with open(archivo_pdf, "rb") as f:
-            pdf_bytes = f.read()
-            
-        st.success(f"📄 Documento cargado correctamente: **{guia_seleccionada}**")
+        st.success(f"📄 Documento seleccionado: **{guia_seleccionada}**")
         
-        # Botón para descargar / abrir nativamente en dispositivos móviles
+        # Lectura eficiente en caché
+        @st.cache_data
+        def cargar_bytes_pdf(ruta):
+            with open(ruta, "rb") as f:
+                return f.read()
+
+        pdf_bytes = cargar_bytes_pdf(archivo_pdf)
+
+        # Botón de apertura/descarga fluida (Funciona perfecto en móviles y escritorio)
         st.download_button(
-            label=f"📥 Descargar o Abrir Guía Completa ({guia_seleccionada})",
+            label=f"📥 Abrir / Descargar Guía Completa ({guia_seleccionada})",
             data=pdf_bytes,
             file_name=archivo_pdf,
             mime="application/pdf",
-            use_container_width=True
+            use_container_width=True,
+            key="btn_descarga_pdf"
         )
         
-        st.caption("💡 *Tip para celulares:* Si el visor embebido abajo no desplaza todas las páginas, presiona el botón naranja superior para abrir el documento completo en la app de archivos o visor nativo de tu teléfono.*")
-        
-        # Visor embebido adaptable
-        base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
-        pdf_display = f'''
-            <object data="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="700px">
-                <embed src="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="700px" />
-            </object>
-        '''
-        st.markdown(pdf_display, unsafe_allow_html=True)
+        st.info("💡 **Recomendación para Celulares:** Presiona el botón naranja superior para abrir el manual directamente en el visor HD de tu teléfono con desplazamiento fluido.")
     else:
         st.warning(f"⚠️ El archivo `{archivo_pdf}` no se encuentra en el repositorio.")
 
