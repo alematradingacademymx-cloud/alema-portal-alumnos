@@ -1,9 +1,9 @@
 import streamlit as st
 
-# Configuración de página
+# Configuración de página con estética de ALEMA Trading Academy
 st.set_page_config(page_title="ALEMA Trading Academy", page_icon="📈", layout="centered")
 
-# Estilos CSS
+# Estilos CSS personalizados
 st.markdown("""
     <style>
     .main-title {
@@ -36,7 +36,7 @@ col1, col2 = st.columns(2)
 with col1:
     par_seleccionado = st.text_input("Par de Divisas / Activo", value="EUR/USD").strip().upper()
     
-    # Limpiar el nombre del par para el enlace de TradingView (ej: "EUR/USD" -> "EURUSD")
+    # Limpiar el nombre del par para el enlace de TradingView
     symbol_tv = par_seleccionado.replace("/", "").replace("-", "").replace(" ", "")
     tv_url = f"https://es.tradingview.com/chart/?symbol=FX:{symbol_tv}"
     
@@ -55,18 +55,27 @@ with col1:
 with col2:
     tipo_orden = st.selectbox("Tipo de Orden", ["Compra", "Venta"])
     
-    precio_defecto = 155.20 if es_jpy else 1.0850
-    paso_precio = 0.01 if es_jpy else 0.0001
+    # Configuración precisa de decimales según el tipo de activo
+    precio_defecto = 155.200 if es_jpy else 1.08500
+    paso_precio = 0.001 if es_jpy else 0.00001
+    formato_precio = "%.3f" if es_jpy else "%.5f"
     
-    precio_entrada = st.number_input("Precio de Entrada", value=precio_defecto, step=paso_precio)
+    # AQUÍ ESTÁ EL CAMBIO CRÍTICO: Se añade 'format=formato_precio'
+    precio_entrada = st.number_input(
+        "Precio de Entrada", 
+        value=precio_defecto, 
+        step=paso_precio, 
+        format=formato_precio
+    )
+    
     valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_sugerido, step=0.5)
     ratio = st.number_input("Ratio (Riesgo:Beneficio)", value=3.0, step=0.5)
 
 # Indicar al usuario si se detectó JPY
 if es_jpy:
-    st.info("💡 **Modo Par JPY Detectado:** Valor del pip ajustado a **$7.00 USD** y divisor de 100 para pips en el 2º decimal.")
+    st.info("💡 **Modo Par JPY Detectado:** Valor del pip ajustado a **$7.00 USD** y precios con 3 decimales.")
 else:
-    st.info("💡 **Modo Par Estándar Detectado:** Valor del pip ajustado a **$10.00 USD** y divisor de 10,000 para pips en el 4º decimal.")
+    st.info("💡 **Modo Par Estándar Detectado:** Valor del pip ajustado a **$10.00 USD** y precios con 5 decimales.")
 
 # --- SECCIÓN 2: CÁLCULOS MATEMÁTICOS ---
 dinero_arriesgar = balance * (riesgo_pct / 100.0)
@@ -80,7 +89,7 @@ distancia_tp_precio = tp_pips / divisor_pip
 if tipo_orden == "Compra":
     precio_sl = precio_entrada - distancia_sl_precio
     precio_tp = precio_entrada + distancia_tp_precio
-else:
+else: # Venta
     precio_sl = precio_entrada + distancia_sl_precio
     precio_tp = precio_entrada - distancia_tp_precio
 
@@ -91,8 +100,9 @@ st.subheader("📊 Resultados de Ejecución")
 
 res_col1, res_col2 = st.columns(2)
 
-str_sl = f"{precio_sl:.2f}" if es_jpy else f"{precio_sl:.5f}"
-str_tp = f"{precio_tp:.2f}" if es_jpy else f"{precio_tp:.5f}"
+# Formateo de precios exacto
+str_sl = f"{precio_sl:.3f}" if es_jpy else f"{precio_sl:.5f}"
+str_tp = f"{precio_tp:.3f}" if es_jpy else f"{precio_tp:.5f}"
 
 with res_col1:
     st.metric(label="Riesgo Máximo ($)", value=f"${dinero_arriesgar:.2f}")
