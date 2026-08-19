@@ -1,6 +1,6 @@
 import streamlit as st
 
-# Configuración de página con estética de ALEMA Trading Academy
+# Configuración de página
 st.set_page_config(page_title="ALEMA Trading Academy", page_icon="📈", layout="centered")
 
 # Estilos CSS personalizados
@@ -8,10 +8,11 @@ st.markdown("""
     <style>
     .main-title {
         text-align: center;
-        font-size: 28px;
-        font-weight: bold;
-        color: #1E293B;
+        font-size: 32px;
+        font-weight: 800;
+        color: #FF6B00; /* Color Naranja Institucional */
         margin-bottom: 0px;
+        letter-spacing: 1px;
     }
     .sub-title {
         text-align: center;
@@ -23,7 +24,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Encabezado principal
-st.markdown('<div class="main-title">ALEMA Trading Academy</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Calculadora Operativa & Gestión de Riesgo Multi-Activo</div>', unsafe_allow_html=True)
 
 st.divider()
@@ -39,9 +40,11 @@ with col1:
     # Limpiar el nombre del par para el enlace de TradingView
     symbol_tv = par_seleccionado.replace("/", "").replace("-", "").replace(" ", "")
     tv_url = f"https://es.tradingview.com/chart/?symbol=FX:{symbol_tv}"
+    investing_url = "https://es.investing.com/economic-calendar/"
     
-    # Botón dinámico para abrir el gráfico en TradingView
-    st.link_button(f"📈 Ver Gráfico de {par_seleccionado} en TradingView", tv_url)
+    # Botones de herramientas externas
+    st.link_button(f"📈 Ver Gráfico en TradingView", tv_url)
+    st.link_button("📅 Ver Calendario Económico (Investing)", investing_url)
     
     # Detección de Par JPY
     es_jpy = "JPY" in par_seleccionado
@@ -55,12 +58,11 @@ with col1:
 with col2:
     tipo_orden = st.selectbox("Tipo de Orden", ["Compra", "Venta"])
     
-    # Configuración precisa de decimales según el tipo de activo
+    # Configuración precisa de decimales
     precio_defecto = 155.200 if es_jpy else 1.08500
     paso_precio = 0.001 if es_jpy else 0.00001
     formato_precio = "%.3f" if es_jpy else "%.5f"
     
-    # AQUÍ ESTÁ EL CAMBIO CRÍTICO: Se añade 'format=formato_precio'
     precio_entrada = st.number_input(
         "Precio de Entrada", 
         value=precio_defecto, 
@@ -71,7 +73,7 @@ with col2:
     valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_sugerido, step=0.5)
     ratio = st.number_input("Ratio (Riesgo:Beneficio)", value=3.0, step=0.5)
 
-# Indicar al usuario si se detectó JPY
+# Cartel informativo dinámico
 if es_jpy:
     st.info("💡 **Modo Par JPY Detectado:** Valor del pip ajustado a **$7.00 USD** y precios con 3 decimales.")
 else:
