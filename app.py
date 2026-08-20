@@ -124,10 +124,26 @@ if not st.session_state.autenticado:
             else:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
     
+    # --- SECCIÓN DE VENTA / SUSCRIPCIÓN EN PANTALLA DE LOGIN ---
+    st.markdown("---")
+    st.markdown("### 🚀 ¿Aún no tienes tu acceso al Portal?")
+    st.write(
+        "Obtén acceso a las **Calculadoras Operativas**, **Biblioteca de Guías en PDF** "
+        "y **Cápsulas de Psicotrading** por solo **$150 MXN / mes**."
+    )
+
+    num_whatsapp = "528136462129"
+    mensaje_preset = (
+        "¡Hola Daniela! 👋 Vengo del portal web y me gustaría adquirir mi suscripción "
+        "a la Membresía ALEMA Suite ($150 MXN/mes) para obtener mis credenciales de acceso."
+    )
+
+    url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
+    st.link_button("📲 Solicitar Membresía por WhatsApp", url_wa, use_container_width=True)
+
     st.markdown('</div>', unsafe_allow_html=True)
     st.caption("© ALEMA Trading Academy. Área protegida.")
     st.stop()
-
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN
 # ==========================================
