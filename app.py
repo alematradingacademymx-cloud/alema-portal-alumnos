@@ -191,7 +191,7 @@ components.html(ticker_html, height=78)
 # ==========================================
 if opcion_menu == "🧮 Calculadoras de Lotes":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title" style="text-align: left;">Módulo Institucional de Gestión de Riesgo y Lotaes</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title" style="text-align: left;">Módulo Institucional de Gestión de Riesgo y Lotajes</div>', unsafe_allow_html=True)
 
     # --- PESTAÑAS DE SELECCIÓN DE CALCULADORA ---
     tab_operativa, tab_rapida = st.tabs(["⚡ Calculadora Operativa Completa", "🛡️ Calculadora de Lotes Rápidos (Riesgo)"])
