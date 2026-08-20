@@ -229,24 +229,13 @@ if opcion_menu == "🧮 Calculadoras de Lotes":
             divisor_pip = 100.0 if es_jpy else 10000.0
             valor_pip_sugerido = 7.0 if es_jpy else 10.0
 
-            # --- ALERTA VISUAL Y RECORDATORIO DE PRECIO DE ENTRADA ---
+            # --- ALERTA EN PANTALLA ---
             if es_jpy:
-                st.warning(
-                    "⚠️ **Par JPY Detectado:**\n"
-                    "• El valor del pip se ajustó a **$7.0 USD/lote**.\n"
-                    "• 📌 **Importante:** No olvides verificar y actualizar tu **Precio de Entrada** al valor actual del par en TradingView."
-                )
+                st.warning("⚠️ **Par JPY Detectado:** El valor del pip se ajustó automáticamente a $7.0 USD/lote para mantener la precisión en la gestión de riesgo del Yen.")
             
             balance = st.number_input("Balance de la Cuenta ($)", value=200.0, step=10.0, key="op_balance")
             riesgo_pct = st.number_input("Porcentaje de Riesgo (%)", value=2.0, step=0.5, key="op_riesgo")
             sl_pips = st.number_input("Tamaño del Stop Loss (Pips)", value=15.0, step=1.0, key="op_sl_pips")
-
-    
-            
-            balance = st.number_input("Balance de la Cuenta ($)", value=200.0, step=10.0, key="op_balance")
-            riesgo_pct = st.number_input("Porcentaje de Riesgo (%)", value=2.0, step=0.5, key="op_riesgo")
-            sl_pips = st.number_input("Tamaño del Stop Loss (Pips)", value=15.0, step=1.0, key="op_sl_pips")
-
         with col2:
             tipo_orden = st.selectbox("Tipo de Orden", ["Compra", "Venta"], key="op_tipo_orden")
             
