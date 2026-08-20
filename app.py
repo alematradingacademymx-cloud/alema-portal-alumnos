@@ -215,7 +215,7 @@ if opcion_menu == "🧮 Calculadoras de Lotes":
         st.subheader("⚙️ Parámetros de la Operación")
         col1, col2 = st.columns(2)
 
-        with col1:
+       with col1:
             par_seleccionado = st.text_input("Par de Divisas / Activo", value="EUR/USD", key="op_par").strip().upper()
             
             symbol_tv = par_seleccionado.replace("/", "").replace("-", "").replace(" ", "")
@@ -228,10 +228,18 @@ if opcion_menu == "🧮 Calculadoras de Lotes":
             es_jpy = "JPY" in par_seleccionado
             divisor_pip = 100.0 if es_jpy else 10000.0
             valor_pip_sugerido = 7.0 if es_jpy else 10.0
-            
-            # 🟡 ALERTA VISUAL PARA EL ALUMNO CUANDO ES UN PAR JPY
+
+            # --- ALERTA VISUAL Y RECORDATORIO DE PRECIO DE ENTRADA ---
             if es_jpy:
-                st.warning("⚠️ **Par JPY Detectado:** El valor sugerido del pip cambia a $7.0 USD por lote estándar para ajustar la volatilidad del Yen.")
+                st.warning(
+                    "⚠️ **Par JPY Detectado:**\n"
+                    "• El valor del pip se ajustó a **$7.0 USD/lote**.\n"
+                    "• 📌 **Importante:** No olvides verificar y actualizar tu **Precio de Entrada** al valor actual del par en TradingView."
+                )
+            
+            balance = st.number_input("Balance de la Cuenta ($)", value=200.0, step=10.0, key="op_balance")
+            riesgo_pct = st.number_input("Porcentaje de Riesgo (%)", value=2.0, step=0.5, key="op_riesgo")
+            sl_pips = st.number_input("Tamaño del Stop Loss (Pips)", value=15.0, step=1.0, key="op_sl_pips")
 
     
             
