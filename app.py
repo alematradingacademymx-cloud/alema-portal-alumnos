@@ -62,7 +62,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
 # --- SECCIÓN DE VENTA / SUSCRIPCIÓN EN PANTALLA DE LOGIN ---
 st.markdown("---")
 st.markdown("### 🚀 ¿Aún no tienes tu acceso al Portal?")
