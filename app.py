@@ -87,8 +87,19 @@ if not st.session_state.autenticado:
     st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados</div>', unsafe_allow_html=True)
     
     st.markdown('<div class="login-box">', unsafe_allow_html=True)
+    
+    # --- MENSAJE DE BIENVENIDA DENTRO DEL CUADRO ---
+    st.markdown("### 👋 ¡Bienvenido al Portal Institucional!")
+    st.write(
+        "Este es tu ecosistema de herramientas operativas, calculadoras de gestión de riesgo "
+        "y biblioteca digital de aprendizaje. Ingresa tus credenciales para comenzar a operar con disciplina."
+    )
+    
+    st.markdown("---")
+    
+    # --- FORMULARIO DE INGRESO ---
     st.subheader("🔒 Acceso al Portal Privado")
-    st.write("Ingresa tus credenciales institucionales para ingresar a las herramientas y guías:")
+    st.write("Ingresa tus credenciales institucionales:")
     
     matricula_input = st.text_input("Matrícula / Usuario", key="login_user").strip().upper()
     password_input = st.text_input("Contraseña", type="password", key="login_pass")
