@@ -86,9 +86,9 @@ if not st.session_state.autenticado:
     st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados</div>', unsafe_allow_html=True)
     
-    st.markdown('<div class="login-box">', unsafe_allow_html=True)
+    st.markdown("---")
     
-    # --- MENSAJE DE BIENVENIDA DENTRO DEL CUADRO ---
+    # --- MENSAJE DE BIENVENIDA ---
     st.markdown("### 👋 ¡Bienvenido al Portal Institucional!")
     st.write(
         "Este es tu ecosistema de herramientas operativas, calculadoras de gestión de riesgo "
@@ -115,7 +115,7 @@ if not st.session_state.autenticado:
             else:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
     
-    # --- SECCIÓN DE VENTA / SUSCRIPCIÓN EN PANTALLA DE LOGIN ---
+    # --- SECCIÓN DE VENTA / SUSCRIPCIÓN ---
     st.markdown("---")
     st.markdown("### 🚀 ¿Aún no tienes tu acceso al Portal?")
     st.write(
@@ -132,7 +132,6 @@ if not st.session_state.autenticado:
     url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
     st.link_button("📲 Solicitar Membresía por WhatsApp", url_wa, use_container_width=True)
 
-    st.markdown('</div>', unsafe_allow_html=True)
     st.caption("© ALEMA Trading Academy. Área protegida.")
     st.stop()
 # ==========================================
