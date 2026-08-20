@@ -254,7 +254,7 @@ if opcion_menu == "🧮 Calculadoras de Lotes":
                 key="op_entrada"
             )
             
-            valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_sugerido, step=0.5, key="op_val_pip")
+            valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_sugerido, step=0.5, key=f"op_val_pip_{es_jpy}")
             ratio = st.number_input("Ratio (Riesgo:Beneficio)", value=3.0, step=0.5, key="op_ratio")
 
         # Cálculos Operativa
