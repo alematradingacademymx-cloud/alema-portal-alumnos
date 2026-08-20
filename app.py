@@ -215,9 +215,6 @@ if opcion_menu == "🧮 Calculadoras de Lotes":
         st.subheader("⚙️ Parámetros de la Operación")
         col1, col2 = st.columns(2)
 
-st.subheader("⚙️ Parámetros de la Operación")
-        col1, col2 = st.columns(2)
-
         with col1:
             par_seleccionado = st.text_input("Par de Divisas / Activo", value="EUR/USD", key="op_par").strip().upper()
             
