@@ -480,20 +480,49 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SECCIÓN: TRADING JOURNAL (SOLO ALUMNOS/ADMIN)
+# SECCIÓN: TRADING JOURNAL (PERSISTENTE VÍA GOOGLE SHEETS)
 # ==========================================
 elif opcion_menu == "📓 Trading Journal":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Journal Institucional de Operaciones y Bitácora Psicológica</div>', unsafe_allow_html=True)
 
-    # --- DASHBOARD DE MÉTRICAS ---
-    trades = st.session_state.journal_trades
-    total_trades = len(trades)
-    
+    # 🔗 ENLACE A TU GOOGLE FORM Y PESTAÑA CSV DE GOOGLE SHEETS
+    URL_FORMULARIO = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/viewform" 
+    URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Journal"
+
+    # --- CARGA Y FILTRADO DE DATOS DESDE GOOGLE SHEETS ---
+    @st.cache_data(ttl=5)
+    def cargar_journal_persiste(matricula_usuario):
+        try:
+            df = pd.read_csv(URL_JOURNAL_CSV, dtype=str)
+            df.columns = df.columns.str.strip()
+            
+            # Buscar la columna donde se almacena la matrícula
+            col_mat = [c for c in df.columns if 'Matricula' in c or 'Matrícula' in c]
+            if col_mat:
+                nombre_col_mat = col_mat[0]
+                df_user = df[df[nombre_col_mat].str.strip().str.upper() == matricula_usuario].copy()
+            else:
+                df_user = pd.DataFrame()
+
+            # Convertir la columna de resultados a valores numéricos para calcular métricas
+            col_res = [c for c in df.columns if 'Resultado' in c or 'USD' in c or 'pnl' in c.lower()]
+            if col_res:
+                df_user['Resultado_Num'] = pd.to_numeric(df_user[col_res[0]], errors='coerce').fillna(0.0)
+            else:
+                df_user['Resultado_Num'] = 0.0
+
+            return df_user
+        except Exception:
+            return pd.DataFrame()
+
+    df_user_journal = cargar_journal_persiste(st.session_state.usuario_actual)
+    total_trades = len(df_user_journal)
+
+    # --- MÉTRICAS GENERALES DEL TRADER ---
     if total_trades > 0:
-        df_j = pd.DataFrame(trades)
-        pnl_total = df_j['Resultado_USD'].sum()
-        wins = len(df_j[df_j['Resultado_USD'] > 0])
+        pnl_total = df_user_journal['Resultado_Num'].sum()
+        wins = len(df_user_journal[df_user_journal['Resultado_Num'] > 0])
         win_rate = (wins / total_trades) * 100
     else:
         pnl_total = 0.0
@@ -509,62 +538,31 @@ elif opcion_menu == "📓 Trading Journal":
 
     st.divider()
 
-    # --- FORMULARIO DE REGISTRO ---
+    # --- BOTÓN DE REGISTRO PERMANENTE ---
     st.subheader("✍️ Registrar Nueva Operación")
-    
-    with st.form("form_journal", clear_on_submit=True):
-        col_j1, col_j2 = st.columns(2)
-        
-        with col_j1:
-            j_fecha = st.date_input("Fecha", value=datetime.now())
-            j_activo = st.text_input("Activo / Par", value="EUR/USD").strip().upper()
-            j_tipo = st.selectbox("Tipo", ["BUY", "SELL"])
-            j_lotes = st.number_input("Lotes Operados", value=0.10, step=0.01)
-            
-        with col_j2:
-            j_pips = st.number_input("Pips (+/-)", value=20.0, step=1.0)
-            j_pnl = st.number_input("Resultado ($ USD)", value=20.0, step=1.0)
-            j_emocion = st.selectbox("Estado Emocional / Psicotrading", [
-                "🟢 Disciplinado (Plan Cumplido)",
-                "🟡 Ansiedad / Dudas",
-                "🔴 Impulsivo / FOMO",
-                "🔴 Revancha (Overtrading)"
-            ])
-            j_link = st.text_input("Enlace / Captura de TradingView", value="")
+    st.write(
+        "Para garantizar la **persistencia permanente** de tus datos y evitar que se borren "
+        "al actualizar la página o cerrar sesión, tus operaciones se guardan directamente en el servidor seguro de la Academia."
+    )
 
-        j_notas = st.text_area("Observaciones / Conclusión Técnica", placeholder="¿Por qué entraste? ¿Qué confirmó tu setup?")
-        
-        submitted = st.form_submit_button("💾 Guardar en Journal", use_container_width=True)
-        if submitted:
-            nuevo_trade = {
-                "Fecha": str(j_fecha),
-                "Activo": j_activo,
-                "Tipo": j_tipo,
-                "Lotes": j_lotes,
-                "Pips": j_pips,
-                "Resultado_USD": j_pnl,
-                "Emoción": j_emocion,
-                "Notas": j_notas,
-                "Link": j_link
-            }
-            st.session_state.journal_trades.insert(0, nuevo_trade)
-            st.success("✅ Trade registrado con éxito en tu bitácora.")
+    col_form1, col_form2 = st.columns([2, 1])
+    with col_form1:
+        st.link_button("📝 Abrir Formulario para Registrar Trade", URL_FORMULARIO, use_container_width=True)
+    with col_form2:
+        if st.button("🔄 Actualizar Bitácora", use_container_width=True):
+            st.cache_data.clear()
             st.rerun()
 
     st.divider()
 
-    # --- HISTORIAL DE TRADES ---
-    st.subheader("📋 Bitácora de Trades Registrados")
-    if len(st.session_state.journal_trades) > 0:
-        df_display = pd.DataFrame(st.session_state.journal_trades)
-        st.dataframe(df_display, use_container_width=True)
-        
-        if st.button("🗑️ Borrar Historial del Journal"):
-            st.session_state.journal_trades = []
-            st.rerun()
+    # --- TABLA DE HISTORIAL PERMANENTE ---
+    st.subheader("📋 Bitácora Histórica Permanente")
+    if not df_user_journal.empty:
+        # Ocultar la columna auxiliar de cálculos numéricos en la vista del usuario
+        df_mostrar = df_user_journal.drop(columns=['Resultado_Num'], errors='ignore')
+        st.dataframe(df_mostrar, use_container_width=True)
     else:
-        st.info("💡 Aún no has registrado ninguna operación hoy. Utiliza el formulario superior para comenzar tu seguimiento.")
-
+        st.info("💡 Aún no tienes operaciones registradas en tu historial permanente. Presiona el botón superior para registrar tu primer trade.")
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
