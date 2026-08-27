@@ -204,7 +204,7 @@ if not st.session_state.autenticado:
     st.markdown("---")
     st.markdown("### 🚀 ¿Aún no tienes tu acceso al Portal?")
     st.write(
-        "Obtén acceso a las **Calculadoras Operativas**, **Trading Journal**, **Biblioteca de Guías en PDF** "
+        "Obtén acceso a las **Calculadoras Operativas**, **Biblioteca de Guías en PDF** "
         "y **Cápsulas de Psicotrading** por solo **$150 MXN / mes**."
     )
 
@@ -227,10 +227,12 @@ st.sidebar.markdown("### 🎓 ALEMA PORTAL")
 st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 
+# El Journal ahora es EXCLUSIVO para ADMIN y ALUMNO
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
     opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📚 Biblioteca de Guías"]
 else:
-    opciones_disponibles = ["🧮 Calculadoras de Lotes", "📓 Trading Journal", "📚 Biblioteca de Guías"]
+    # Para SUSCRIPTOR comercial
+    opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
 
 opcion_menu = st.sidebar.radio(
     "Selecciona una sección:",
@@ -278,7 +280,7 @@ ticker_html = """
 components.html(ticker_html, height=78)
 
 # ==========================================
-# SECCIÓN: MI AVANCE ACADÉMICO
+# SECCIÓN: MI AVANCE ACADÉMICO (ALUMNOS/ADMIN)
 # ==========================================
 if opcion_menu == "📊 Mi Avance Académico":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
@@ -478,7 +480,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SECCIÓN: TRADING JOURNAL (DIARIO)
+# SECCIÓN: TRADING JOURNAL (SOLO ALUMNOS/ADMIN)
 # ==========================================
 elif opcion_menu == "📓 Trading Journal":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
