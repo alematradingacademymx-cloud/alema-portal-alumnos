@@ -224,9 +224,15 @@ if not st.session_state.autenticado:
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
+
+# 1. LOGO EN LA PARTE SUPERIOR DEL SIDEBAR
+st.sidebar.image("logo.png", width=180)
+
+# 2. DATOS DEL USUARIO
 st.sidebar.markdown("### 🎓 ALEMA PORTAL")
 st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
+st.sidebar.markdown("---")  # Línea divisoria elegante
 
 # El Journal ahora es EXCLUSIVO para ADMIN y ALUMNO
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
