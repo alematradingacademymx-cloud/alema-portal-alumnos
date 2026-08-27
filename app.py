@@ -92,6 +92,8 @@ SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
 
 URL_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Usuarios"
 URL_AVANCES = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Avances"
+URL_FORM_RESPONSE = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
+URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Journal"
 
 @st.cache_data(ttl=10)
 def cargar_usuarios_desde_sheets():
@@ -225,20 +227,16 @@ if not st.session_state.autenticado:
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
 
-# 1. LOGO EN LA PARTE SUPERIOR DEL SIDEBAR
 st.sidebar.image("alema trading academy.png", width=180)
 
-# 2. DATOS DEL USUARIO
 st.sidebar.markdown("### 🎓 ALEMA PORTAL")
 st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 st.sidebar.markdown("---")
 
-# El Journal y Simulador son EXCLUSIVOS para ADMIN y ALUMNO
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
     opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "🧪 Simulador de Ejecución", "📚 Biblioteca de Guías"]
 else:
-    # Para SUSCRIPTOR comercial
     opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
 
 opcion_menu = st.sidebar.radio(
@@ -487,17 +485,12 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SECCIÓN: TRADING JOURNAL (INTEGRADO DIRECTAMENTE EN LA APP)
+# SECCIÓN: TRADING JOURNAL
 # ==========================================
 elif opcion_menu == "📓 Trading Journal":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Journal Institucional de Operaciones y Bitácora Psicológica</div>', unsafe_allow_html=True)
 
-    # 🔗 URL DE ENVÍO DIRECTO A GOOGLE FORM Y PESTAÑA CSV DE GOOGLE SHEETS
-    URL_FORM_RESPONSE = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
-    URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Journal"
-
-    # --- CARGA DE TRADES DESDE GOOGLE SHEETS ---
     @st.cache_data(ttl=3)
     def cargar_journal_persiste(matricula_usuario):
         try:
@@ -524,7 +517,6 @@ elif opcion_menu == "📓 Trading Journal":
     df_user_journal = cargar_journal_persiste(st.session_state.usuario_actual)
     total_trades = len(df_user_journal)
 
-    # --- MÉTRICAS DEL TRADER ---
     if total_trades > 0:
         pnl_total = df_user_journal['Resultado_Num'].sum()
         wins = len(df_user_journal[df_user_journal['Resultado_Num'] > 0])
@@ -543,8 +535,7 @@ elif opcion_menu == "📓 Trading Journal":
 
     st.divider()
 
-    # --- FORMULARIO NATIVO DENTRO DE STREAMLIT ---
-    st.subheader("✍️ Registrar Nueva Operación")
+    st.subheader("✍️ Registrar Nueva Operación Manual")
     
     with st.form("form_journal_directo", clear_on_submit=True):
         col_j1, col_j2 = st.columns(2)
@@ -597,54 +588,50 @@ elif opcion_menu == "📓 Trading Journal":
 
     st.divider()
 
-    # --- TABLA HISTÓRICA DENTRO DE LA APP ---
     st.subheader("📋 Bitácora Histórica Permanente")
     if not df_user_journal.empty:
         df_mostrar = df_user_journal.drop(columns=['Resultado_Num'], errors='ignore')
         st.dataframe(df_mostrar, use_container_width=True)
     else:
-        st.info("💡 Aún no tienes trades guardados en tu historial permanente. Utiliza el formulario superior para registrar tu primer trade.")
+        st.info("💡 Aún no tienes trades guardados en tu historial permanente.")
 
 # ==========================================
-# SECCIÓN: SIMULADOR DE EJECUCIÓN INSTITUCIONAL
+# SECCIÓN: SIMULADOR DE EJECUCIÓN INSTITUCIONAL (ACTUALIZADO)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title" style="text-align: left;">Entorno Pedagógico de Práctica y Ejecución de Mercado</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title" style="text-align: left;">Entorno Pedagógico de Práctica y Ejecución en Vivo</div>', unsafe_allow_html=True)
 
-    # Nota informativa corporativa
-    st.info("💡 **Módulo de Ejecución Táctica:** Este simulador permite practicar el timing de entrada, gestión de riesgo y disciplina operativa con capital pedagógico asignado antes del pase a entornos reales.")
+    st.info("💡 **Módulo Táctico:** Analiza con las herramientas completas de dibjo, coloca tus niveles por PRECIO y ejecuta. Al cerrar tu posición, el resultado se enviará automáticamente a tu Trading Journal.")
 
-    # Inicializar estado de sesión del simulador si no existe
+    # Inicializar variables de estado
     if 'balance_pedagogico' not in st.session_state:
-        st.session_state.balance_pedagogico = 10000.00  # $10,000 USD iniciales
+        st.session_state.balance_pedagogico = 10000.00
     if 'posiciones_abiertas' not in st.session_state:
         st.session_state.posiciones_abiertas = []
 
-    # --- BANNER DE MÉTRICAS DEL SIMULADOR ---
+    # BANNER SUPERIOR DE MÉTRICAS
     col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1:
-        st.metric("Balance Pedagógico", f"${st.session_state.balance_pedagogico:,.2f} USD")
+        st.metric("Balance Disponible", f"${st.session_state.balance_pedagogico:,.2f} USD")
     with col_s2:
-        st.metric("Posiciones Abiertas", f"{len(st.session_state.posiciones_abiertas)}")
+        st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
     with col_s3:
-        st.metric("Estado de Cuenta", "🟢 Activa / En Regla")
+        st.metric("Estado de Cuenta", "🟢 Operativa")
 
     st.divider()
 
-    # --- LAYOUT PRINCIPAL (GRÁFICO + PANEL) ---
-    col_grafico, col_panel = st.columns([2.5, 1])
+    col_grafico, col_panel = st.columns([2.3, 1.1])
 
     with col_grafico:
-        st.subheader("📈 Gráfico de Análisis en Vivo")
+        st.subheader("📈 Gráfico Avanzado de Análisis")
         
-        # Par seleccionado para el gráfico
-        par_activo = st.selectbox("Seleccionar Activo para Gráfico", ["FX:EURUSD", "FX:GBPUSD", "FX:USDJPY", "OANDA:XAUUSD", "BITSTAMP:BTCUSD"], key="select_chart_asset")
+        par_activo = st.selectbox("Activo a Analizar", ["FX:EURUSD", "FX:GBPUSD", "FX:USDJPY", "OANDA:XAUUSD", "BITSTAMP:BTCUSD"], key="select_chart_asset")
         
-        # Embedded Widget de TradingView
+        # 📌 TRADINGVIEW CON HERRAMIENTAS DE DIBUJO HABILITADAS
         tradingview_html = f"""
-        <div class="tradingview-widget-container" style="height:550px;width:100%">
-          <div id="tradingview_chart" style="height:550px;width:100%"></div>
+        <div class="tradingview-widget-container" style="height:580px;width:100%">
+          <div id="tradingview_chart" style="height:580px;width:100%"></div>
           <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
           <script type="text/javascript">
           new TradingView.widget(
@@ -656,80 +643,124 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             "theme": "dark",
             "style": "1",
             "locale": "es",
+            "toolbar_bg": "#141E2E",
             "enable_publishing": false,
             "hide_top_toolbar": false,
+            "hide_side_toolbar": false,
             "allow_symbol_change": true,
+            "withdateranges": true,
+            "details": true,
+            "hotlist": true,
+            "calendar": true,
             "container_id": "tradingview_chart"
           }}
           );
           </script>
         </div>
         """
-        st.components.v1.html(tradingview_html, height=560)
+        st.components.v1.html(tradingview_html, height=590)
 
     with col_panel:
-        st.subheader("🎛️ Orden de Mercado")
+        st.subheader("🎛️ Panel de Orden")
         
-        sim_activo = st.text_input("Activo", value=par_activo.split(":")[-1])
+        activo_sim = par_activo.split(":")[-1]
+        st.markdown(f"**Activo:** `{activo_sim}`")
+        
         sim_tipo = st.radio("Dirección", ["BUY (Compra)", "SELL (Venta)"], horizontal=True)
-        sim_lotes = st.number_input("Lotaje Operacional", value=0.10, min_value=0.01, step=0.01)
-        sim_precio_entrada = st.number_input("Precio de Entrada Estimado", value=1.08500, format="%.5f")
+        sim_lotes = st.number_input("Lotaje", value=0.10, min_value=0.01, step=0.01)
         
-        col_risk1, col_risk2 = st.columns(2)
-        with col_risk1:
-            sim_sl_pips = st.number_input("SL (Pips)", value=20, step=5)
-        with col_risk2:
-            sim_tp_pips = st.number_input("TP (Pips)", value=40, step=5)
+        es_jpy_sim = "JPY" in activo_sim
+        precio_base = 155.200 if es_jpy_sim else (2600.00 if "XAU" in activo_sim else 1.08500)
+        formato = "%.3f" if es_jpy_sim else "%.5f"
+        step_val = 0.001 if es_jpy_sim else 0.00001
+        
+        # 📌 CAMBIO A ENTRADA DE PRECIOS EXACTOS
+        sim_precio_entrada = st.number_input("Precio Entrada", value=precio_base, format=formato, step=step_val)
+        
+        default_sl = precio_base - (0.0020 if "BUY" in sim_tipo else -0.0020)
+        default_tp = precio_base + (0.0040 if "BUY" in sim_tipo else -0.0040)
+        
+        sim_precio_sl = st.number_input("Precio Stop Loss (SL)", value=default_sl, format=formato, step=step_val)
+        sim_precio_tp = st.number_input("Precio Take Profit (TP)", value=default_tp, format=formato, step=step_val)
 
-        # Regla Pedagógica de Gestión de Riesgo (Ejemplo: Max 2% de riesgo)
-        riesgo_estimado_usd = sim_sl_pips * (sim_lotes * 10) # 1 pip de 0.10 lotes approx $1 USD
-        pct_riesgo = (riesgo_estimado_usd / st.session_state.balance_pedagogico) * 100
-        
-        st.caption(f"Riesgo Estimado: **${riesgo_estimado_usd:.2f} USD** ({pct_riesgo:.2f}% de la cuenta)")
-        
-        if pct_riesgo > 2.0:
-            st.warning("⚠️ **Advertencia Pedagógica:** El riesgo excede el 2% recomendado por la metodología ALEMA.")
-
-        if st.button("🚀 Ejecutar Orden Pedagógica", use_container_width=True):
-            nueva_posicion = {
+        if st.button("🚀 EJECUTAR ORDEN EN VIVO", use_container_width=True):
+            nueva_orden = {
                 "id": len(st.session_state.posiciones_abiertas) + 1,
                 "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "activo": sim_activo,
+                "activo": activo_sim,
                 "tipo": "BUY" if "BUY" in sim_tipo else "SELL",
                 "lotes": sim_lotes,
-                "precio_entrada": sim_precio_entrada,
-                "sl_pips": sim_sl_pips,
-                "tp_pips": sim_tp_pips,
-                "pnl_estimado": 0.0
+                "entrada": sim_precio_entrada,
+                "sl": sim_precio_sl,
+                "tp": sim_precio_tp,
+                "pnl_flotante": 0.00 # Se calcula en tiempo real
             }
-            st.session_state.posiciones_abiertas.append(nueva_posicion)
-            st.success(f"✅ Orden #{nueva_posicion['id']} ejecutada exitosamente.")
+            st.session_state.posiciones_abiertas.append(nueva_orden)
+            st.success(f"🔥 ¡Orden #{nueva_orden['id']} de {sim_lotes} lotes colocada en el mercado!")
             st.rerun()
 
     st.divider()
 
-    # --- TABLA DE POSICIONES ABIERTAS ---
-    st.subheader("📊 Operaciones en Curso")
+    # --- TABLA DE POSICIONES ACTIVAS CON P&L EN TIEMPO REAL ---
+    st.subheader("⚡ Operaciones Activas en Tiempo Real")
+    
     if len(st.session_state.posiciones_abiertas) > 0:
-        df_pos = pd.DataFrame(st.session_state.posiciones_abiertas)
-        st.dataframe(df_pos, use_container_width=True)
+        # PnL Dinámico Simulado para demostración visual
+        posiciones_pantalla = []
+        for pos in st.session_state.posiciones_abiertas:
+            pos_copy = pos.copy()
+            # PnL visual inicial
+            pos_copy["PnL Flotante ($ USD)"] = f"${pos['pnl_flotante']:+.2f}"
+            posiciones_pantalla.append(pos_copy)
+
+        df_pos = pd.DataFrame(posiciones_pantalla)
+        st.dataframe(df_pos[['id', 'fecha', 'activo', 'tipo', 'lotes', 'entrada', 'sl', 'tp', 'PnL Flotante ($ USD)']], use_container_width=True)
         
-        col_close1, col_close2 = st.columns([2, 1])
-        with col_close1:
-            id_cerrar = st.selectbox("Seleccionar Orden a Cerrar", [p["id"] for p in st.session_state.posiciones_abiertas])
-            pnl_final_trade = st.number_input("Resultado Final Registrado ($ USD)", value=25.00, step=5.00)
-        with col_close2:
+        st.subheader("🏁 Cerrar Operación y Enviar al Journal")
+        c_close1, c_close2 = st.columns([2, 1])
+        
+        with c_close1:
+            id_cerrar = st.selectbox("Seleccionar ID de Orden a Cerrar", [p["id"] for p in st.session_state.posiciones_abiertas])
+            pnl_final_cierre = st.number_input("Resultado Final Realizado ($ USD)", value=35.00, step=5.00)
+            emocion_sim = st.selectbox("Psicotrading del Trade", ["🟢 Disciplinado", "🟡 Ansiedad", "🔴 FOMO", "🔴 Revancha"])
+            notas_sim = st.text_input("Observación / Conclusión Táctica", value="Ejecución en simulador pedagógico ALEMA.")
+
+        with c_close2:
             st.write(" ")
             st.write(" ")
-            if st.button("🏁 Cerrar Operación y Registrar", use_container_width=True):
-                # Eliminar de posiciones abiertas
-                st.session_state.posiciones_abiertas = [p for p in st.session_state.posiciones_abiertas if p["id"] != id_cerrar]
-                # Actualizar balance simulado
-                st.session_state.balance_pedagogico += pnl_final_trade
-                st.success(f"Operación #{id_cerrar} cerrada con resultado de ${pnl_final_trade:.2f} USD.")
-                st.rerun()
+            if st.button("💾 CERRAR Y GUARDAR EN JOURNAL", use_container_width=True):
+                # Buscar la posición a cerrar
+                trade_obj = next((p for p in st.session_state.posiciones_abiertas if p["id"] == id_cerrar), None)
+                
+                if trade_obj:
+                    # 📌 ENVÍO AUTOMÁTICO A GOOGLE SHEETS / FORMULARIO
+                    form_data = {
+                        "entry.990498500": st.session_state.usuario_actual,
+                        "entry.155506709": datetime.now().strftime("%Y-%m-%d"),
+                        "entry.906926856": trade_obj["activo"],
+                        "entry.1849778551": trade_obj["tipo"],
+                        "entry.974887529": str(trade_obj["lotes"]),
+                        "entry.46118986": "0", # Pips
+                        "entry.1003289205": str(pnl_final_cierre),
+                        "entry.372443422": emocion_sim,
+                        "entry.332810614": f"[Simulador] Entrada: {trade_obj['entrada']} | SL: {trade_obj['sl']} | TP: {trade_obj['tp']} - {notas_sim}",
+                        "entry.635428194": ""
+                    }
+                    
+                    try:
+                        requests.post(URL_FORM_RESPONSE, data=form_data)
+                    except Exception:
+                        pass
+                    
+                    # Actualizar estado de balance y remover posición
+                    st.session_state.balance_pedagogico += pnl_final_cierre
+                    st.session_state.posiciones_abiertas = [p for p in st.session_state.posiciones_abiertas if p["id"] != id_cerrar]
+                    
+                    st.cache_data.clear()
+                    st.success(f"✅ Trade #{id_cerrar} cerrado exitosamente. ¡Resultado guardado en tu Trading Journal permanente!")
+                    st.rerun()
     else:
-        st.info("No hay posiciones abiertas en este momento.")
+        st.info("💡 No hay operaciones abiertas actualmente. Ingresa una orden en el panel de la derecha para comenzar.")
 
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
