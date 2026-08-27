@@ -479,25 +479,26 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         </div>
         """, unsafe_allow_html=True)
 
+import requests  # Asegúrate de incluir 'requests' en tu requirements.txt
+
 # ==========================================
-# SECCIÓN: TRADING JOURNAL (PERSISTENTE VÍA GOOGLE SHEETS)
+# SECCIÓN: TRADING JOURNAL (INTEGRADO DIRECTAMENTE EN LA APP)
 # ==========================================
 elif opcion_menu == "📓 Trading Journal":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Journal Institucional de Operaciones y Bitácora Psicológica</div>', unsafe_allow_html=True)
 
-    # 🔗 ENLACE A TU GOOGLE FORM Y PESTAÑA CSV DE GOOGLE SHEETS
-    URL_FORMULARIO = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/viewform" 
+    # 🔗 URL DE ENVÍO DIRECTO A GOOGLE FORM Y PESTAÑA CSV DE GOOGLE SHEETS
+    URL_FORM_RESPONSE = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
     URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Journal"
 
-    # --- CARGA Y FILTRADO DE DATOS DESDE GOOGLE SHEETS ---
-    @st.cache_data(ttl=5)
+    # --- CARGA DE TRADES DESDE GOOGLE SHEETS ---
+    @st.cache_data(ttl=3)
     def cargar_journal_persiste(matricula_usuario):
         try:
             df = pd.read_csv(URL_JOURNAL_CSV, dtype=str)
             df.columns = df.columns.str.strip()
             
-            # Buscar la columna donde se almacena la matrícula
             col_mat = [c for c in df.columns if 'Matricula' in c or 'Matrícula' in c]
             if col_mat:
                 nombre_col_mat = col_mat[0]
@@ -505,7 +506,6 @@ elif opcion_menu == "📓 Trading Journal":
             else:
                 df_user = pd.DataFrame()
 
-            # Convertir la columna de resultados a valores numéricos para calcular métricas
             col_res = [c for c in df.columns if 'Resultado' in c or 'USD' in c or 'pnl' in c.lower()]
             if col_res:
                 df_user['Resultado_Num'] = pd.to_numeric(df_user[col_res[0]], errors='coerce').fillna(0.0)
@@ -519,7 +519,7 @@ elif opcion_menu == "📓 Trading Journal":
     df_user_journal = cargar_journal_persiste(st.session_state.usuario_actual)
     total_trades = len(df_user_journal)
 
-    # --- MÉTRICAS GENERALES DEL TRADER ---
+    # --- MÉTRICAS DEL TRADER ---
     if total_trades > 0:
         pnl_total = df_user_journal['Resultado_Num'].sum()
         wins = len(df_user_journal[df_user_journal['Resultado_Num'] > 0])
@@ -538,31 +538,68 @@ elif opcion_menu == "📓 Trading Journal":
 
     st.divider()
 
-    # --- BOTÓN DE REGISTRO PERMANENTE ---
+    # --- FORMULARIO NATIVO DENTRO DE STREAMLIT ---
     st.subheader("✍️ Registrar Nueva Operación")
-    st.write(
-        "Para garantizar la **persistencia permanente** de tus datos y evitar que se borren "
-        "al actualizar la página o cerrar sesión, tus operaciones se guardan directamente en el servidor seguro de la Academia."
-    )
+    
+    with st.form("form_journal_directo", clear_on_submit=True):
+        col_j1, col_j2 = st.columns(2)
+        
+        with col_j1:
+            j_fecha = st.date_input("Fecha", value=datetime.now())
+            j_activo = st.text_input("Activo / Par", value="EUR/USD").strip().upper()
+            j_tipo = st.selectbox("Tipo", ["BUY", "SELL"])
+            j_lotes = st.number_input("Lotes Operados", value=0.10, step=0.01)
+            
+        with col_j2:
+            j_pips = st.number_input("Pips (+/-)", value=20.0, step=1.0)
+            j_pnl = st.number_input("Resultado ($ USD)", value=20.0, step=1.0)
+            j_emocion = st.selectbox("Estado Emocional / Psicotrading", [
+                "🟢 Disciplinado",
+                "🟡 Ansiedad",
+                "🔴 Impulsivo / FOMO",
+                "🔴 Revancha"
+            ])
+            j_link = st.text_input("Enlace / Captura de TradingView", value="")
 
-    col_form1, col_form2 = st.columns([2, 1])
-    with col_form1:
-        st.link_button("📝 Abrir Formulario para Registrar Trade", URL_FORMULARIO, use_container_width=True)
-    with col_form2:
-        if st.button("🔄 Actualizar Bitácora", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
+        j_notas = st.text_area("Observaciones / Conclusión Técnica", placeholder="¿Por qué entraste? ¿Qué confirmó tu setup?")
+        
+        submitted = st.form_submit_button("💾 Guardar en Journal", use_container_width=True)
+        
+        if submitted:
+            # MAPEO DE CAMPOS GOOGLE FORM CON SUS IDs REALES
+            form_data = {
+                "entry.990498500": st.session_state.usuario_actual, # Matricula
+                "entry.155506709": str(j_fecha),                    # Fecha
+                "entry.906926856": j_activo,                        # Activo
+                "entry.1849778551": j_tipo,                         # Tipo
+                "entry.974887529": str(j_lotes),                    # Lotes
+                "entry.46118986": str(j_pips),                      # Pips
+                "entry.1003289205": str(j_pnl),                     # Resultado USD
+                "entry.372443422": j_emocion,                       # Emoción
+                "entry.332810614": j_notas,                         # Notas
+                "entry.635428194": j_link                           # Link
+            }
+            
+            try:
+                res = requests.post(URL_FORM_RESPONSE, data=form_data)
+                if res.status_code == 200 or res.status_code == 0:
+                    st.success("✅ Operación registrada exitosamente en tu bitácora permanente.")
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("⚠️ Error al registrar la operación en Google Sheets.")
+            except Exception as e:
+                st.error(f"Error de conexión: {e}")
 
     st.divider()
 
-    # --- TABLA DE HISTORIAL PERMANENTE ---
+    # --- TABLA HISTÓRICA DENTRO DE LA APP ---
     st.subheader("📋 Bitácora Histórica Permanente")
     if not df_user_journal.empty:
-        # Ocultar la columna auxiliar de cálculos numéricos en la vista del usuario
         df_mostrar = df_user_journal.drop(columns=['Resultado_Num'], errors='ignore')
         st.dataframe(df_mostrar, use_container_width=True)
     else:
-        st.info("💡 Aún no tienes operaciones registradas en tu historial permanente. Presiona el botón superior para registrar tu primer trade.")
+        st.info("💡 Aún no tienes trades guardados en tu historial permanente. Utiliza el formulario superior para registrar tu primer trade.")
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
