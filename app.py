@@ -765,7 +765,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.success(f"🔥 ¡Orden #{nueva_orden['id']} enviada correctamente!")
             st.rerun()
 
-   # --- MONITOREO DE POSICIONES EN TIEMPO REAL ---
+  # --- MONITOREO DE POSICIONES EN TIEMPO REAL ---
     st.divider()
     st.subheader("📊 Posiciones Abiertas en Tiempo Real")
 
@@ -778,20 +778,17 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             is_jpy = "JPY" in pos["activo"]
             is_metal_crypto = "XAU" in pos["activo"] or "BTC" in pos["activo"]
             
-            # Definir formato visual exacto
+            # Formateadores directos
             fmt = "%.3f" if is_jpy else ("%.2f" if is_metal_crypto else "%.5f")
             
-            # Formatear números para evitar decimales infinitos
             entrada_fmt = fmt % pos["entrada"]
             actual_fmt = fmt % precio_actual_raw
             sl_fmt = fmt % pos["sl"]
             tp_fmt = fmt % pos["tp"]
 
-            # Factor multiplicador para pips y valor en USD
             mult_pip = 100.0 if is_jpy else (1.0 if is_metal_crypto else 10000.0)
             val_pip_lote = 7.0 if is_jpy else 10.0
 
-            # Cálculo exacto según dirección
             if pos["tipo"] == "BUY":
                 pips = (precio_actual_raw - pos["entrada"]) * mult_pip
                 toco_tp = precio_actual_raw >= pos["tp"]
@@ -803,58 +800,64 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
             pnl = pips * val_pip_lote * pos["lotes"]
 
-            # Evaluación estricta de salida por TP / SL
+            # 1. Cierre Automático por TP o SL
             if toco_tp:
                 st.session_state.balance_pedagogico += pnl
                 posiciones_a_eliminar.append(idx)
                 st.balloons()
-                st.success(f"🎯 **Take Profit Alcanzado!** Posición #{pos['id']} ({pos['activo']}) cerrada en TP con ganancia de +${pnl:.2f} USD")
+                st.success(f"🎯 **Take Profit Alcanzado!** Posición #{pos['id']} ({pos['activo']}) cerrada con +${pnl:.2f} USD")
+                st.rerun()
             elif toco_sl:
                 st.session_state.balance_pedagogico += pnl
                 posiciones_a_eliminar.append(idx)
-                st.error(f"🛑 **Stop Loss Alcanzado.** Posición #{pos['id']} ({pos['activo']}) cerrada en SL con resultado de ${pnl:.2f} USD")
+                st.error(f"🛑 **Stop Loss Alcanzado.** Posición #{pos['id']} ({pos['activo']}) cerrada con ${pnl:.2f} USD")
+                st.rerun()
+            
+            # 2. Renderizado Nativo de Tarjeta Activa (100% Visible)
             else:
-                # Renderizado limpio con columnas organizadas
-                color_pnl = "🟢" if pnl >= 0 else "🔴"
-                
-                # Creado de tarjeta visual estilizada
-                st.markdown(f"""
-                <div class="card-box" style="padding: 12px 20px; margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                        <div>
-                            <span style="font-size: 16px; font-weight: bold; color: #38BDF8;">#{pos['id']} {pos['activo']}</span> 
-                            <span style="font-size: 14px; font-weight: bold; color: {'#10B981' if pos['tipo']=='BUY' else '#FF6B00'}; margin-left: 8px;">{pos['tipo']} ({pos['lotes']} L)</span>
-                        </div>
-                        <div style="font-size: 14px;">
-                            🔹 <b>Entrada:</b> <code>{entrada_fmt}</code> | 📈 <b>Actual:</b> <code>{actual_fmt}</code>
-                        </div>
-                        <div style="font-size: 14px;">
-                            🛑 <b>SL:</b> <code style="color:#EF4444;">{sl_fmt}</code> | 🎯 <b>TP:</b> <code style="color:#10B981;">{tp_fmt}</code>
-                        </div>
-                        <div style="font-size: 16px; font-weight: bold;">
-                            {color_pnl} ${pnl:.2f} USD <span style="font-size: 13px; color: #94A3B8;">({pips:.1f} pips)</span>
-                        </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                with st.container(border=True):
+                    # Fila 1: Encabezado de la orden
+                    col_h1, col_h2, col_h3 = st.columns([2, 2, 2])
+                    with col_h1:
+                        st.markdown(f"### #{pos['id']} **{pos['activo']}**")
+                    with col_h2:
+                        color_tipo = "🟢" if pos['tipo'] == 'BUY' else "🔴"
+                        st.markdown(f"**Dirección:** {color_tipo} `{pos['tipo']}` | **Lotaje:** `{pos['lotes']} L`")
+                    with col_h3:
+                        color_resultado = "🟢" if pnl >= 0 else "🔴"
+                        st.markdown(f"### {color_resultado} **${pnl:.2f} USD**")
+                        st.caption(f"Flotante: {pips:.1f} pips")
 
-                # Botón de cierre manual
-                col_btn_cerrar, _ = st.columns([1, 4])
-                with col_btn_cerrar:
-                    if st.button(f"❌ Cerrar Posición #{pos['id']}", key=f"cerrar_pos_{idx}", use_container_width=True):
-                        st.session_state.balance_pedagogico += pnl
-                        posiciones_a_eliminar.append(idx)
-                        st.info(f"Posición #{pos['id']} cerrada manualmente.")
-                        st.rerun()
+                    # Fila 2: Precios y Salida
+                    col_p1, col_p2, col_p3, col_p4, col_p5 = st.columns([1.5, 1.5, 1.5, 1.5, 1.2])
+                    with col_p1:
+                        st.caption("Precio Entrada")
+                        st.code(entrada_fmt, language=None)
+                    with col_p2:
+                        st.caption("Precio Actual")
+                        st.code(actual_fmt, language=None)
+                    with col_p3:
+                        st.caption("Stop Loss (SL)")
+                        st.code(sl_fmt, language=None)
+                    with col_p4:
+                        st.caption("Take Profit (TP)")
+                        st.code(tp_fmt, language=None)
+                    with col_p5:
+                        st.caption("Acción")
+                        if st.button("❌ Cerrar", key=f"btn_close_order_{pos['id']}_{idx}", use_container_width=True):
+                            st.session_state.balance_pedagogico += pnl
+                            posiciones_a_eliminar.append(idx)
+                            st.info(f"Posición #{pos['id']} cerrada manualmente.")
+                            st.rerun()
 
-        # Limpieza de posiciones cerradas
+        # Limpiar lista de posiciones tras cierres
         if posiciones_a_eliminar:
             for index in sorted(posiciones_a_eliminar, reverse=True):
                 st.session_state.posiciones_abiertas.pop(index)
             st.rerun()
 
     else:
-        st.info("💡 No hay posiciones abiertas en este momento.")
+        st.info("💡 No hay posiciones abiertas actualmente. Ejecuta una orden desde el panel superior.")
 
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
