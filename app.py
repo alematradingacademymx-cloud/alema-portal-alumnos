@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 import os
+import pandas as pd
 
 # Configuración de página
 st.set_page_config(page_title="ALEMA Trading Academy - Portal de Alumnos", page_icon="📈", layout="centered")
@@ -62,17 +63,25 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
 # ==========================================
-# 🔑 BASE DE DATOS DE USUARIOS AUTORIZADOS
+# 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
-USUARIOS_AUTORIZADOS = {
-    # --- DIRECCIÓN GENERAL ---
-    "DIRALEX": "Alema123",
-    
-    # --- ALUMNOS CERTIFICADOS ---
-    "ALEMA2026DUMARAO2": "Dulcetrader$357",
-    "ALEMA2026FERMAFLO1": "Fernandotrader$951"
-}
+SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
+
+@st.cache_data(ttl=60) # Actualiza la lista automáticamente cada 60 segundos
+def cargar_usuarios_desde_sheets():
+    try:
+        df = pd.read_csv(SHEET_URL)
+        df['Matricula'] = df['Matricula'].astype(str).str.strip().str.upper()
+        df['Password'] = df['Password'].astype(str).str.strip()
+        return dict(zip(df['Matricula'], df['Password']))
+    except Exception as e:
+        st.error("⚠️ Error al conectar con la base de datos de usuarios. Verifica que el archivo de Google Sheets sea público.")
+        return {}
+
+USUARIOS_AUTORIZADOS = cargar_usuarios_desde_sheets()
 
 # --- CONTROL Y PERSISTENCIA DE SESIÓN ---
 if "autenticado" not in st.session_state:
@@ -132,12 +141,12 @@ if not st.session_state.autenticado:
     url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
     st.link_button("📲 Solicitar Membresía por WhatsApp", url_wa, use_container_width=True)
 
-    st.caption("© ALEMA Trading Academy. Área protegida.")
+    st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
     st.stop()
+
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN
 # ==========================================
-
 st.sidebar.markdown("### 🎓 ALEMA PORTAL")
 st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 
@@ -184,7 +193,6 @@ ticker_html = """
 </style>
 """
 components.html(ticker_html, height=78)
-
 
 # ==========================================
 # SECCIÓN 1: CALCULADORAS DE LOTES (PESTAÑAS)
@@ -367,7 +375,6 @@ if opcion_menu == "🧮 Calculadoras de Lotes":
         💡 <b>LOTAGE SUGERIDO:</b> <span style="color:#FF6B00; font-size: 22px;"><b>{lotaje_rapido:.2f}</b></span>
         </div>
         """, unsafe_allow_html=True)
-
 
 # ==========================================
 # SECCIÓN 2: BIBLIOTECA DE GUÍAS
