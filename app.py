@@ -66,6 +66,25 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
+# 🔑 FUNCIÓN PARA CONVERTIR CUALQUIER FECHA
+# ==========================================
+def parsear_fecha(fecha_str):
+    if not fecha_str or str(fecha_str).strip() == '':
+        return datetime(2030, 12, 31).date()
+    
+    fecha_clean = str(fecha_str).strip()
+    formatos = [
+        "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y",
+        "%d-%m-%Y", "%Y/%m/%d", "%d/%m/%y", "%Y-%m-%d %H:%M:%S"
+    ]
+    for fmt in formatos:
+        try:
+            return datetime.strptime(fecha_clean, fmt).date()
+        except ValueError:
+            pass
+    return datetime(2030, 12, 31).date()
+
+# ==========================================
 # 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
 SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
@@ -74,7 +93,7 @@ SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
 URL_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Usuarios"
 URL_AVANCES = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Avances"
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=10) # Se redujo a 10s para ver cambios en Google Sheets casi al instante
 def cargar_usuarios_desde_sheets():
     try:
         df = pd.read_csv(URL_USUARIOS, dtype=str)
@@ -93,7 +112,6 @@ def cargar_usuarios_desde_sheets():
             }
         return dict_usuarios
     except Exception:
-        # Respaldo por si gviz no responde
         try:
             url_fallback = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
             df = pd.read_csv(url_fallback, dtype=str)
@@ -114,7 +132,7 @@ def cargar_usuarios_desde_sheets():
         except Exception:
             return {}
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=10)
 def obtener_avance_alumno(matricula_usuario):
     try:
         df_avances = pd.read_csv(URL_AVANCES, dtype=str)
@@ -169,21 +187,13 @@ if not st.session_state.autenticado:
             if matricula_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[matricula_input]['password'] == password_input:
                 user_info = USUARIOS_AUTORIZADOS[matricula_input]
                 
-                # Validar fecha de vencimiento
-                try:
-                    fecha_venc = datetime.strptime(user_info['vencimiento'], "%Y-%m-%d").date()
-                    hoy = datetime.now().date()
-                    
-                    if hoy > fecha_venc:
-                        st.error(f"⚠️ Tu suscripción/acceso venció el {user_info['vencimiento']}. Contacta a coordinación para renovar.")
-                    else:
-                        st.session_state.autenticado = True
-                        st.session_state.usuario_actual = matricula_input
-                        st.session_state.tipo_usuario = user_info['tipo']
-                        st.success("¡Acceso concedido!")
-                        st.rerun()
-                except Exception:
-                    # En caso de fecha mal formateada, permitir paso si contraseña es correcta
+                # Validar fecha de vencimiento contra el día de hoy
+                fecha_venc = parsear_fecha(user_info['vencimiento'])
+                hoy = datetime.now().date()
+                
+                if hoy > fecha_venc:
+                    st.error(f"⛔ **Suscripción Vencida:** Tu acceso venció el {fecha_venc.strftime('%d/%m/%Y')}. Por favor, renueva tu suscripción para volver a ingresar.")
+                else:
                     st.session_state.autenticado = True
                     st.session_state.usuario_actual = matricula_input
                     st.session_state.tipo_usuario = user_info['tipo']
