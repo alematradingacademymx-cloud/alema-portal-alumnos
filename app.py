@@ -226,7 +226,7 @@ if not st.session_state.autenticado:
 # ==========================================
 
 # 1. LOGO EN LA PARTE SUPERIOR DEL SIDEBAR
-st.sidebar.image("logo.png", width=180)
+st.sidebar.image("alema trading academy.png", width=180)
 
 # 2. DATOS DEL USUARIO
 st.sidebar.markdown("### 🎓 ALEMA PORTAL")
