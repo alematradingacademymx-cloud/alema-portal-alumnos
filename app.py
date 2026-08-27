@@ -626,7 +626,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Entorno Pedagógico de Práctica y Ejecución en Vivo</div>', unsafe_allow_html=True)
 
-    st.info("💡 **Módulo Táctico:** Analiza el mercado en vivo. La orden valida automáticamente la coherencia matemática de los niveles de SL y TP antes de permitir la ejecución.")
+    st.info("💡 **Módulo Táctico:** El precio de entrada se sincroniza directamente con el mercado en tiempo real al momento de presionar el botón de ejecución.")
 
     # Inicialización de variables de estado
     if 'balance_pedagogico' not in st.session_state:
@@ -717,13 +717,15 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         es_crypto_oro = "XAU" in activo_sim or "BTC" in activo_sim
         n_decimals = 3 if es_jpy_sim else (2 if es_crypto_oro else 5)
         
+        # Obtenemos precio de mercado fresco para mostrar en pantalla informativa
         precio_mercado_actual = obtener_precio_actual(activo_sim)
         
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
         
         if "Vivo" in modo_ejecucion:
-            sim_precio_entrada = st.number_input("Precio Entrada (Mercado Actual)", value=precio_mercado_actual, format=formato, step=step_val, disabled=True, key=f"pe_{activo_sim}")
+            st.markdown(f"**Precio de Mercado (En Vivo):** `{precio_mercado_actual:{formato[1:]}}`")
+            sim_precio_entrada = precio_mercado_actual # Se sincroniza al vuelo
         else:
             sim_precio_entrada = st.number_input("Precio Entrada (Pendiente)", value=precio_mercado_actual, format=formato, step=step_val, key=f"pe_pend_{activo_sim}")
         
@@ -769,18 +771,22 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 es_orden_valida = False
 
         if st.button("🚀 EJECUTAR ORDEN EN VIVO", key="btn_ejecutar_sim", use_container_width=True, disabled=not es_orden_valida):
+            # CAPTURA FRESCA DEL PRECIO EXACTO AL MOMENTO DEL CLIC
+            precio_real_momento = obtener_precio_actual(activo_sim)
+            pe_final = round(precio_real_momento if "Vivo" in modo_ejecucion else sim_precio_entrada, n_decimals)
+
             nueva_orden = {
                 "id": len(st.session_state.posiciones_abiertas) + len(st.session_state.historial_operaciones) + 1,
                 "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "activo": activo_sim,
                 "tipo": "BUY" if "BUY" in sim_tipo else "SELL",
                 "lotes": sim_lotes,
-                "entrada": pe_r,
+                "entrada": pe_final,
                 "sl": sl_r,
                 "tp": tp_r
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
-            st.success(f"🔥 ¡Orden #{nueva_orden['id']} enviada correctamente!")
+            st.success(f"🔥 ¡Orden #{nueva_orden['id']} ejecutada al precio exacto de mercado: {pe_final}!")
             st.rerun()
 
     # --- MONITOREO DE POSICIONES EN TIEMPO REAL ---
