@@ -633,6 +633,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         st.session_state.balance_pedagogico = 10000.00
     if 'posiciones_abiertas' not in st.session_state:
         st.session_state.posiciones_abiertas = []
+    if 'historial_operaciones' not in st.session_state:
+        st.session_state.historial_operaciones = []
 
     # FUNCIÓN PARA OBTENER PRECIO ACTUAL DESDE YFINANCE
     def obtener_precio_actual(symbol_str):
@@ -716,7 +718,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         
         precio_mercado_actual = obtener_precio_actual(activo_sim)
         
-        # Formatos exactos según tipo de activo
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
         
@@ -727,17 +728,16 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         else:
             sim_precio_entrada = st.number_input("Precio Entrada (Pendiente)", value=precio_mercado_actual, format=formato, step=step_val)
         
-        # Distancias sugeridas seguras en pips/puntos para evitar saltos automáticos
+        # Distancias seguras según activo
         if es_jpy_sim:
-            dist_sl = 0.300  # 30 pips en JPY
-            dist_tp = 0.600  # 60 pips en JPY
+            dist_sl, dist_tp = 0.300, 0.600
         elif es_crypto_oro:
             dist_sl = 10.0 if "XAU" in activo_sim else 500.0
             dist_tp = 20.0 if "XAU" in activo_sim else 1000.0
         else:
-            dist_sl = 0.00300  # 30 pips Forex Estándar
-            dist_tp = 0.00600  # 60 pips Forex Estándar
+            dist_sl, dist_tp = 0.00300, 0.00600
 
+        # DIRECCIÓN CORRECTA DE SL Y TP
         if "BUY" in sim_tipo:
             default_sl = precio_mercado_actual - dist_sl
             default_tp = precio_mercado_actual + dist_tp
@@ -751,21 +751,20 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         # BOTÓN DE EJECUCIÓN
         if st.button("🚀 EJECUTAR ORDEN EN VIVO", key="btn_ejecutar_sim", use_container_width=True):
             nueva_orden = {
-                "id": len(st.session_state.posiciones_abiertas) + 1,
+                "id": len(st.session_state.posiciones_abiertas) + len(st.session_state.historial_operaciones) + 1,
                 "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "activo": activo_sim,
                 "tipo": "BUY" if "BUY" in sim_tipo else "SELL",
                 "lotes": sim_lotes,
                 "entrada": sim_precio_entrada,
                 "sl": sim_precio_sl,
-                "tp": sim_precio_tp,
-                "ganancia": 0.00
+                "tp": sim_precio_tp
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             st.success(f"🔥 ¡Orden #{nueva_orden['id']} enviada correctamente!")
             st.rerun()
 
-  # --- MONITOREO DE POSICIONES EN TIEMPO REAL ---
+    # --- MONITOREO DE POSICIONES EN TIEMPO REAL ---
     st.divider()
     st.subheader("📊 Posiciones Abiertas en Tiempo Real")
 
@@ -778,7 +777,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             is_jpy = "JPY" in pos["activo"]
             is_metal_crypto = "XAU" in pos["activo"] or "BTC" in pos["activo"]
             
-            # Formateadores directos
             fmt = "%.3f" if is_jpy else ("%.2f" if is_metal_crypto else "%.5f")
             
             entrada_fmt = fmt % pos["entrada"]
@@ -800,23 +798,35 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
             pnl = pips * val_pip_lote * pos["lotes"]
 
-            # 1. Cierre Automático por TP o SL
-            if toco_tp:
+            # EVALUACIÓN DE SALIDAS
+            if toco_tp or toco_sl:
                 st.session_state.balance_pedagogico += pnl
+                resultado_str = "Take Profit 🎯" if toco_tp else "Stop Loss 🛑"
+                
+                # Guardar en Histórico
+                st.session_state.historial_operaciones.append({
+                    "ID": pos["id"],
+                    "Fecha": pos["fecha"],
+                    "Activo": pos["activo"],
+                    "Tipo": pos["tipo"],
+                    "Lotes": pos["lotes"],
+                    "Entrada": entrada_fmt,
+                    "Cierre": actual_fmt,
+                    "Resultado ($)": f"${pnl:.2f}",
+                    "Estado": resultado_str
+                })
                 posiciones_a_eliminar.append(idx)
-                st.balloons()
-                st.success(f"🎯 **Take Profit Alcanzado!** Posición #{pos['id']} ({pos['activo']}) cerrada con +${pnl:.2f} USD")
+                
+                if toco_tp:
+                    st.balloons()
+                    st.success(f"🎯 **Take Profit Alcanzado!** Posición #{pos['id']} cerrada (+${pnl:.2f} USD)")
+                else:
+                    st.error(f"🛑 **Stop Loss Alcanzado.** Posición #{pos['id']} cerrada (${pnl:.2f} USD)")
                 st.rerun()
-            elif toco_sl:
-                st.session_state.balance_pedagogico += pnl
-                posiciones_a_eliminar.append(idx)
-                st.error(f"🛑 **Stop Loss Alcanzado.** Posición #{pos['id']} ({pos['activo']}) cerrada con ${pnl:.2f} USD")
-                st.rerun()
-            
-            # 2. Renderizado Nativo de Tarjeta Activa (100% Visible)
+
             else:
+                # Renderizado de Tarjeta Activa
                 with st.container(border=True):
-                    # Fila 1: Encabezado de la orden
                     col_h1, col_h2, col_h3 = st.columns([2, 2, 2])
                     with col_h1:
                         st.markdown(f"### #{pos['id']} **{pos['activo']}**")
@@ -828,7 +838,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                         st.markdown(f"### {color_resultado} **${pnl:.2f} USD**")
                         st.caption(f"Flotante: {pips:.1f} pips")
 
-                    # Fila 2: Precios y Salida
                     col_p1, col_p2, col_p3, col_p4, col_p5 = st.columns([1.5, 1.5, 1.5, 1.5, 1.2])
                     with col_p1:
                         st.caption("Precio Entrada")
@@ -846,11 +855,21 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                         st.caption("Acción")
                         if st.button("❌ Cerrar", key=f"btn_close_order_{pos['id']}_{idx}", use_container_width=True):
                             st.session_state.balance_pedagogico += pnl
+                            st.session_state.historial_operaciones.append({
+                                "ID": pos["id"],
+                                "Fecha": pos["fecha"],
+                                "Activo": pos["activo"],
+                                "Tipo": pos["tipo"],
+                                "Lotes": pos["lotes"],
+                                "Entrada": entrada_fmt,
+                                "Cierre": actual_fmt,
+                                "Resultado ($)": f"${pnl:.2f}",
+                                "Estado": "Cierre Manual ✋"
+                            })
                             posiciones_a_eliminar.append(idx)
                             st.info(f"Posición #{pos['id']} cerrada manualmente.")
                             st.rerun()
 
-        # Limpiar lista de posiciones tras cierres
         if posiciones_a_eliminar:
             for index in sorted(posiciones_a_eliminar, reverse=True):
                 st.session_state.posiciones_abiertas.pop(index)
@@ -858,6 +877,16 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     else:
         st.info("💡 No hay posiciones abiertas actualmente. Ejecuta una orden desde el panel superior.")
+
+    # --- TABLA DE HISTORIAL DE OPERACIONES CERRADAS ---
+    st.divider()
+    st.subheader("📜 Historial de Operaciones Cerradas")
+    
+    if st.session_state.historial_operaciones:
+        df_historial = pd.DataFrame(st.session_state.historial_operaciones)
+        st.dataframe(df_historial, use_container_width=True, hide_index=True)
+    else:
+        st.caption("Aún no hay operaciones cerradas en la sesión actual.")
 
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
