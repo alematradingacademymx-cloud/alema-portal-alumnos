@@ -10,7 +10,7 @@ import yfinance as yf
 # Configuración de página
 st.set_page_config(page_title="ALEMA Trading Academy - Portal de Alumnos", page_icon="📈", layout="centered")
 
-# Estilos CSS personalizados con Fondo Azul Oscuro Elegante
+# Estilos CSS personalizados con Fondo Azul Oscuro Elegante y Botón Verde
 st.markdown("""
     <style>
     /* Fondo General Azul Oscuro */
@@ -63,6 +63,29 @@ st.markdown("""
     [data-testid="stSidebar"] {
         background-color: #141E2E;
         border-right: 1px solid #334155;
+    }
+
+    /* ESTILO BOTÓN VERDE DE EJECUCIÓN */
+    div.stButton > button[key="btn_ejecutar_sim"] {
+        background-color: #10B981 !important;
+        color: #FFFFFF !important;
+        font-weight: bold !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 10px 20px !important;
+        transition: 0.3s !important;
+    }
+    div.stButton > button[key="btn_ejecutar_sim"]:hover {
+        background-color: #059669 !important;
+        box-shadow: 0px 4px 12px rgba(16, 185, 129, 0.4) !important;
+    }
+
+    /* ESTILO PRECIO ENTRADA AMARILLO (EJECUCIÓN EN VIVO) */
+    .precio-amarillo input {
+        background-color: #FEF08A !important;
+        color: #0F172A !important;
+        font-weight: bold !important;
+        border: 2px solid #EAB308 !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -603,13 +626,34 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Entorno Pedagógico de Práctica y Ejecución en Vivo</div>', unsafe_allow_html=True)
 
-    st.info("💡 **Módulo Táctico:** Analiza con las herramientas completas de dibujo, coloca tus niveles por PRECIO y ejecuta. Al cerrar tu posición, el resultado se enviará automáticamente a tu Trading Journal.")
+    st.info("💡 **Módulo Táctico:** Analiza el mercado en vivo. Al ejecutar en 'Operación en Vivo (Market)', la orden rastrea el precio actual del activo, monitorea los niveles de Take Profit (TP) y Stop Loss (SL) de forma dinámica, cerrando automáticamente la posición al tocarlos.")
 
     # Inicializar variables de estado
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 10000.00
     if 'posiciones_abiertas' not in st.session_state:
         st.session_state.posiciones_abiertas = []
+
+    # FUNCIÓN PARA OBTENER PRECIO ACTUAL DESDE YFINANCE
+    def obtener_precio_actual(symbol_str):
+        mapping = {
+            "EURUSD": "EURUSD=X",
+            "GBPUSD": "GBPUSD=X",
+            "USDJPY": "JPY=X",
+            "XAUUSD": "GC=F",
+            "BTCUSD": "BTC-USD"
+        }
+        yf_sym = mapping.get(symbol_str, f"{symbol_str}=X")
+        try:
+            ticker = yf.Ticker(yf_sym)
+            data = ticker.history(period="1d", interval="1m")
+            if not data.empty:
+                return float(data['Close'].iloc[-1])
+        except Exception:
+            pass
+        # Retorno de respaldo por seguridad si falla la API
+        precios_base = {"EURUSD": 1.08500, "GBPUSD": 1.30000, "USDJPY": 155.200, "XAUUSD": 2600.00, "BTCUSD": 65000.00}
+        return precios_base.get(symbol_str, 1.0000)
 
     # BANNER SUPERIOR DE MÉTRICAS
     col_s1, col_s2, col_s3 = st.columns(3)
@@ -629,7 +673,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         
         par_activo = st.selectbox("Activo a Analizar", ["FX:EURUSD", "FX:GBPUSD", "FX:USDJPY", "OANDA:XAUUSD", "BITSTAMP:BTCUSD"], key="select_chart_asset")
         
-        # 📌 TRADINGVIEW CON HERRAMIENTAS DE DIBUJO HABILITADAS
+        # TRADINGVIEW CON HERRAMIENTAS DE DIBUJO HABILITADAS
         tradingview_html = f"""
         <div class="tradingview-widget-container" style="height:580px;width:100%">
           <div id="tradingview_chart" style="height:580px;width:100%"></div>
@@ -667,24 +711,41 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         activo_sim = par_activo.split(":")[-1]
         st.markdown(f"**Activo:** `{activo_sim}`")
         
+        modo_ejecucion = st.radio("Modo de Ejecución", ["Operación en Vivo (Market)", "Orden Pendiente (Limit/Stop)"], horizontal=True)
         sim_tipo = st.radio("Dirección", ["BUY (Compra)", "SELL (Venta)"], horizontal=True)
         sim_lotes = st.number_input("Lotaje", value=0.10, min_value=0.01, step=0.01)
         
         es_jpy_sim = "JPY" in activo_sim
-        precio_base = 155.200 if es_jpy_sim else (2600.00 if "XAU" in activo_sim else 1.08500)
-        formato = "%.3f" if es_jpy_sim else "%.5f"
-        step_val = 0.001 if es_jpy_sim else 0.00001
+        precio_mercado_actual = obtener_precio_actual(activo_sim)
         
-        # 📌 ENTRADA DE PRECIOS EXACTOS
-        sim_precio_entrada = st.number_input("Precio Entrada", value=precio_base, format=formato, step=step_val)
+        formato = "%.3f" if es_jpy_sim else ("%.2f" if "XAU" in activo_sim or "BTC" in activo_sim else "%.5f")
+        step_val = 0.001 if es_jpy_sim else (0.10 if "XAU" in activo_sim or "BTC" in activo_sim else 0.00001)
         
-        default_sl = precio_base - (0.0020 if "BUY" in sim_tipo else -0.0020)
-        default_tp = precio_base + (0.0040 if "BUY" in sim_tipo else -0.0040)
+        # SI ES OPERACIÓN EN VIVO: CAMPO EN AMARILLO AUTOMÁTICO
+        if "Vivo" in modo_ejecucion:
+            st.markdown('<div class="precio-amarillo">', unsafe_allow_html=True)
+            sim_precio_entrada = st.number_input("Precio Entrada (Precio Mercado Actual)", value=precio_mercado_actual, format=formato, step=step_val, disabled=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            sim_precio_entrada = st.number_input("Precio Entrada (Pendiente)", value=precio_mercado_actual, format=formato, step=step_val)
+        
+        delta_sl = 0.0020 if "BUY" in sim_tipo else -0.0020
+        delta_tp = 0.0040 if "BUY" in sim_tipo else -0.0040
+        if es_jpy_sim:
+            delta_sl *= 100
+            delta_tp *= 100
+        elif "XAU" in activo_sim or "BTC" in activo_sim:
+            delta_sl *= 1000
+            delta_tp *= 1000
+
+        default_sl = precio_mercado_actual - delta_sl
+        default_tp = precio_mercado_actual + delta_tp
         
         sim_precio_sl = st.number_input("Precio Stop Loss (SL)", value=default_sl, format=formato, step=step_val)
         sim_precio_tp = st.number_input("Precio Take Profit (TP)", value=default_tp, format=formato, step=step_val)
 
-        if st.button("🚀 EJECUTAR ORDEN EN VIVO", use_container_width=True):
+        # BOTÓN VERDE DE EJECUCIÓN CON KEY EXPLICITA
+        if st.button("🚀 EJECUTAR ORDEN EN VIVO", key="btn_ejecutar_sim", use_container_width=True):
             nueva_orden = {
                 "id": len(st.session_state.posiciones_abiertas) + 1,
                 "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -694,7 +755,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 "entrada": sim_precio_entrada,
                 "sl": sim_precio_sl,
                 "tp": sim_precio_tp,
-                "pnl_flotante": 0.00 # Se calcula en tiempo real
+                "ganancia": 0.00
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             st.success(f"🔥 ¡Orden #{nueva_orden['id']} de {sim_lotes} lotes colocada en el mercado!")
@@ -702,20 +763,83 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     st.divider()
 
-    # --- TABLA DE POSICIONES ACTIVAS CON P&L EN TIEMPO REAL ---
-    st.subheader("⚡ Operaciones Activas en Tiempo Real")
-    
+    # --- MOTOR DE MONITORIZACIÓN Y GESTIÓN AUTOMÁTICA DE TP/SL EN TIEMPO REAL ---
+    col_hdr1, col_hdr2 = st.columns([2.5, 1])
+    with col_hdr1:
+        st.subheader("⚡ Operaciones Activas en Tiempo Real")
+    with col_hdr2:
+        if st.button("🔄 Actualizar Precios / Simular Tick", use_container_width=True):
+            st.rerun()
+
+    posiciones_para_eliminar = []
+
     if len(st.session_state.posiciones_abiertas) > 0:
         posiciones_pantalla = []
+        
         for pos in st.session_state.posiciones_abiertas:
             pos_copy = pos.copy()
-            pos_copy["PnL Flotante ($ USD)"] = f"${pos['pnl_flotante']:+.2f}"
+            precio_actual_tick = obtener_precio_actual(pos["activo"])
+            
+            # Cálculo del valor del pip
+            val_pip_std = 7.0 if "JPY" in pos["activo"] else 10.0
+            divisor = 0.01 if "JPY" in pos["activo"] else (1.0 if "XAU" in pos["activo"] or "BTC" in pos["activo"] else 0.0001)
+            
+            if pos["tipo"] == "BUY":
+                pips_flotantes = (precio_actual_tick - pos["entrada"]) / divisor
+                ganancia_calculada = pips_flotantes * val_pip_std * pos["lotes"]
+                
+                # Cierre Automático por TP o SL
+                if precio_actual_tick >= pos["tp"]:
+                    st.success(f"🎯 **Take Profit Alcanzado!** La Orden #{pos['id']} se cerró con ganancia de +${ganancia_calculada:.2f} USD")
+                    posiciones_para_eliminar.append((pos, ganancia_calculada, "🎯 Take Profit Alcanzado"))
+                elif precio_actual_tick <= pos["sl"]:
+                    st.error(f"🛑 **Stop Loss Alcanzado!** La Orden #{pos['id']} se cerró con pérdida de ${ganancia_calculada:.2f} USD")
+                    posiciones_para_eliminar.append((pos, ganancia_calculada, "🛑 Stop Loss Alcanzado"))
+
+            else: # SELL
+                pips_flotantes = (pos["entrada"] - precio_actual_tick) / divisor
+                ganancia_calculada = pips_flotantes * val_pip_std * pos["lotes"]
+                
+                # Cierre Automático por TP o SL
+                if precio_actual_tick <= pos["tp"]:
+                    st.success(f"🎯 **Take Profit Alcanzado!** La Orden #{pos['id']} se cerró con ganancia de +${ganancia_calculada:.2f} USD")
+                    posiciones_para_eliminar.append((pos, ganancia_calculada, "🎯 Take Profit Alcanzado"))
+                elif precio_actual_tick >= pos["sl"]:
+                    st.error(f"🛑 **Stop Loss Alcanzado!** La Orden #{pos['id']} se cerró con pérdida de ${ganancia_calculada:.2f} USD")
+                    posiciones_para_eliminar.append((pos, ganancia_calculada, "🛑 Stop Loss Alcanzado"))
+
+            pos_copy["Ganancia"] = f"${ganancia_calculada:+.2f} USD"
             posiciones_pantalla.append(pos_copy)
 
+        # Procesar cierres automáticos si los hubo
+        if posiciones_para_eliminar:
+            for item, pnl_res, motivo in posiciones_para_eliminar:
+                st.session_state.balance_pedagogico += pnl_res
+                st.session_state.posiciones_abiertas = [p for p in st.session_state.posiciones_abiertas if p["id"] != item["id"]]
+                
+                # Enviar reporte al Journal
+                form_data = {
+                    "entry.990498500": st.session_state.usuario_actual,
+                    "entry.155506709": datetime.now().strftime("%Y-%m-%d"),
+                    "entry.906926856": item["activo"],
+                    "entry.1849778551": item["tipo"],
+                    "entry.974887529": str(item["lotes"]),
+                    "entry.46118986": "0",
+                    "entry.1003289205": str(round(pnl_res, 2)),
+                    "entry.372443422": "🟢 Disciplinado",
+                    "entry.332810614": f"[Auto-Cierre: {motivo}] Entrada: {item['entrada']} | SL: {item['sl']} | TP: {item['tp']}",
+                    "entry.635428194": ""
+                }
+                try:
+                    requests.post(URL_FORM_RESPONSE, data=form_data)
+                except Exception:
+                    pass
+            st.rerun()
+
         df_pos = pd.DataFrame(posiciones_pantalla)
-        st.dataframe(df_pos[['id', 'fecha', 'activo', 'tipo', 'lotes', 'entrada', 'sl', 'tp', 'PnL Flotante ($ USD)']], use_container_width=True)
+        st.dataframe(df_pos[['id', 'fecha', 'activo', 'tipo', 'lotes', 'entrada', 'sl', 'tp', 'Ganancia']], use_container_width=True)
         
-        st.subheader("🏁 Cerrar Operación y Enviar al Journal")
+        st.subheader("🏁 Cerrar Operación Manualmente")
         c_close1, c_close2 = st.columns([2, 1])
         
         with c_close1:
@@ -731,17 +855,16 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 trade_obj = next((p for p in st.session_state.posiciones_abiertas if p["id"] == id_cerrar), None)
                 
                 if trade_obj:
-                    # Envío a Google Sheets / Formulario
                     form_data = {
                         "entry.990498500": st.session_state.usuario_actual,
                         "entry.155506709": datetime.now().strftime("%Y-%m-%d"),
                         "entry.906926856": trade_obj["activo"],
                         "entry.1849778551": trade_obj["tipo"],
                         "entry.974887529": str(trade_obj["lotes"]),
-                        "entry.46118986": "0", # Pips
+                        "entry.46118986": "0",
                         "entry.1003289205": str(pnl_final_cierre),
                         "entry.372443422": emocion_sim,
-                        "entry.332810614": f"[Simulador] Entrada: {trade_obj['entrada']} | SL: {trade_obj['sl']} | TP: {trade_obj['tp']} - {notas_sim}",
+                        "entry.332810614": f"[Simulador Manual] Entrada: {trade_obj['entrada']} | SL: {trade_obj['sl']} | TP: {trade_obj['tp']} - {notas_sim}",
                         "entry.635428194": ""
                     }
                     
@@ -750,7 +873,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     except Exception:
                         pass
                     
-                    # Actualización de saldo local y remoción de orden
                     st.session_state.balance_pedagogico += pnl_final_cierre
                     st.session_state.posiciones_abiertas = [p for p in st.session_state.posiciones_abiertas if p["id"] != id_cerrar]
                     st.success("✅ Posición cerrada con éxito y enviada a tu Journal de Operaciones.")
