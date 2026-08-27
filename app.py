@@ -46,14 +46,14 @@ st.markdown("""
         margin-bottom: 15px;
     }
     
-    /* Estilo Caja de Login */
-    .login-box {
+    /* Estilo Caja de Login y Tarjetas */
+    .card-box {
         background-color: #1E293B;
-        padding: 25px;
+        padding: 20px;
         border-radius: 12px;
         border: 1px solid #334155;
-        margin-top: 15px;
-        margin-bottom: 20px;
+        margin-top: 10px;
+        margin-bottom: 15px;
     }
     
     /* Personalización Sidebar */
@@ -68,18 +68,45 @@ st.markdown("""
 # 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
 SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
 
-@st.cache_data(ttl=60) # Actualiza la lista automáticamente cada 60 segundos
+# URLs para exportar pestañas específicas en formato CSV
+URL_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Usuarios"
+URL_AVANCES = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Avances"
+
+@st.cache_data(ttl=60)
 def cargar_usuarios_desde_sheets():
     try:
-        df = pd.read_csv(SHEET_URL)
-        df['Matricula'] = df['Matricula'].astype(str).str.strip().str.upper()
-        df['Password'] = df['Password'].astype(str).str.strip()
+        df = pd.read_csv(URL_USUARIOS, dtype=str)
+        df.columns = df.columns.str.strip()
+        df['Matricula'] = df['Matricula'].fillna('').str.strip().str.upper()
+        df['Password'] = df['Password'].fillna('').str.strip()
         return dict(zip(df['Matricula'], df['Password']))
-    except Exception as e:
-        st.error("⚠️ Error al conectar con la base de datos de usuarios. Verifica que el archivo de Google Sheets sea público.")
-        return {}
+    except Exception:
+        # Respaldo por si la pestaña principal no tiene nombre o falla gviz
+        try:
+            url_fallback = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
+            df = pd.read_csv(url_fallback, dtype=str)
+            df.columns = df.columns.str.strip()
+            df['Matricula'] = df['Matricula'].fillna('').str.strip().str.upper()
+            df['Password'] = df['Password'].fillna('').str.strip()
+            return dict(zip(df['Matricula'], df['Password']))
+        except Exception:
+            return {}
+
+@st.cache_data(ttl=60)
+def obtener_avance_alumno(matricula_usuario):
+    try:
+        df_avances = pd.read_csv(URL_AVANCES, dtype=str)
+        df_avances.columns = df_avances.columns.str.strip()
+        df_avances['Matricula'] = df_avances['Matricula'].fillna('').str.strip().str.upper()
+        
+        # Filtrar datos del alumno actual
+        alumno_data = df_avances[df_avances['Matricula'] == matricula_usuario]
+        if not alumno_data.empty:
+            return alumno_data.iloc[0].to_dict()
+        return None
+    except Exception:
+        return None
 
 USUARIOS_AUTORIZADOS = cargar_usuarios_desde_sheets()
 
@@ -152,7 +179,7 @@ st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 
 opcion_menu = st.sidebar.radio(
     "Selecciona una sección:",
-    ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"],
+    ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"],
     key="navegacion_principal"
 )
 
@@ -195,9 +222,37 @@ ticker_html = """
 components.html(ticker_html, height=78)
 
 # ==========================================
-# SECCIÓN 1: CALCULADORAS DE LOTES (PESTAÑAS)
+# SECCIÓN SELECCIONADA: MI AVANCE ACADÉMICO
 # ==========================================
-if opcion_menu == "🧮 Calculadoras de Lotes":
+if opcion_menu == "📊 Mi Avance Académico":
+    st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title" style="text-align: left;">Expediente Institucional del Alumno</div>', unsafe_allow_html=True)
+
+    datos_alumno = obtener_avance_alumno(st.session_state.usuario_actual)
+
+    if datos_alumno:
+        st.subheader(f"👋 Bienvenid@, {datos_alumno.get('Nombre', 'Alumno')}")
+        
+        col_av1, col_av2, col_av3 = st.columns(3)
+        with col_av1:
+            st.metric(label="Módulo Actual", value=str(datos_alumno.get('Modulo_Actual', 'N/A')))
+        with col_av2:
+            st.metric(label="Progreso General", value=str(datos_alumno.get('Porcentaje', '0%')))
+        with col_av3:
+            st.metric(label="Estatus de Beca", value=str(datos_alumno.get('Estatus_Beca', 'N/A')))
+            
+        st.divider()
+        
+        st.subheader("📌 Indicaciones & Calendario de Evaluación")
+        st.info(f"💡 **Nota del Coordinador:** {datos_alumno.get('Notas', 'Sin observaciones registradas.')}")
+        
+    else:
+        st.warning("⚠️ No se encontraron registros de avance para tu matrícula. Consulta con coordinación.")
+
+# ==========================================
+# SECCIÓN: CALCULADORAS DE LOTES (PESTAÑAS)
+# ==========================================
+elif opcion_menu == "🧮 Calculadoras de Lotes":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Módulo Institucional de Gestión de Riesgo y Lotajes</div>', unsafe_allow_html=True)
 
@@ -377,7 +432,7 @@ if opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SECCIÓN 2: BIBLIOTECA DE GUÍAS
+# SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
 elif opcion_menu == "📚 Biblioteca de Guías":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
