@@ -89,11 +89,10 @@ def parsear_fecha(fecha_str):
 # ==========================================
 SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
 
-# URLs para exportar pestañas específicas en formato CSV
 URL_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Usuarios"
 URL_AVANCES = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Avances"
 
-@st.cache_data(ttl=10) # Se redujo a 10s para ver cambios en Google Sheets casi al instante
+@st.cache_data(ttl=10)
 def cargar_usuarios_desde_sheets():
     try:
         df = pd.read_csv(URL_USUARIOS, dtype=str)
@@ -158,6 +157,9 @@ if "usuario_actual" not in st.session_state:
 if "tipo_usuario" not in st.session_state:
     st.session_state.tipo_usuario = "ALUMNO"
 
+if "journal_trades" not in st.session_state:
+    st.session_state.journal_trades = []
+
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
     st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
@@ -165,16 +167,14 @@ if not st.session_state.autenticado:
     
     st.markdown("---")
     
-    # --- MENSAJE DE BIENVENIDA ---
     st.markdown("### 👋 ¡Bienvenido al Portal Institucional!")
     st.write(
-        "Este es tu ecosistema de herramientas operativas, calculadoras de gestión de riesgo "
-        "y biblioteca digital de aprendizaje. Ingresa tus credenciales para comenzar a operar con disciplina."
+        "Este es tu ecosistema de herramientas operativas, calculadoras de gestión de riesgo, "
+        "journal de operaciones y biblioteca digital. Ingresa tus credenciales para comenzar."
     )
     
     st.markdown("---")
     
-    # --- FORMULARIO DE INGRESO ---
     st.subheader("🔒 Acceso al Portal Privado")
     st.write("Ingresa tus credenciales institucionales:")
     
@@ -187,7 +187,6 @@ if not st.session_state.autenticado:
             if matricula_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[matricula_input]['password'] == password_input:
                 user_info = USUARIOS_AUTORIZADOS[matricula_input]
                 
-                # Validar fecha de vencimiento contra el día de hoy
                 fecha_venc = parsear_fecha(user_info['vencimiento'])
                 hoy = datetime.now().date()
                 
@@ -202,11 +201,10 @@ if not st.session_state.autenticado:
             else:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
     
-    # --- SECCIÓN DE VENTA / SUSCRIPCIÓN ---
     st.markdown("---")
     st.markdown("### 🚀 ¿Aún no tienes tu acceso al Portal?")
     st.write(
-        "Obtén acceso a las **Calculadoras Operativas**, **Biblioteca de Guías en PDF** "
+        "Obtén acceso a las **Calculadoras Operativas**, **Trading Journal**, **Biblioteca de Guías en PDF** "
         "y **Cápsulas de Psicotrading** por solo **$150 MXN / mes**."
     )
 
@@ -229,12 +227,10 @@ st.sidebar.markdown("### 🎓 ALEMA PORTAL")
 st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 
-# Definición de opciones por tipo de usuario
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
-    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
+    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📚 Biblioteca de Guías"]
 else:
-    # Para SUSCRIPTOR comercial
-    opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
+    opciones_disponibles = ["🧮 Calculadoras de Lotes", "📓 Trading Journal", "📚 Biblioteca de Guías"]
 
 opcion_menu = st.sidebar.radio(
     "Selecciona una sección:",
@@ -282,7 +278,7 @@ ticker_html = """
 components.html(ticker_html, height=78)
 
 # ==========================================
-# SECCIÓN: MI AVANCE ACADÉMICO (SOLO ALUMNOS/ADMIN)
+# SECCIÓN: MI AVANCE ACADÉMICO
 # ==========================================
 if opcion_menu == "📊 Mi Avance Académico":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
@@ -310,18 +306,14 @@ if opcion_menu == "📊 Mi Avance Académico":
         st.warning("⚠️ No se encontraron registros de avance para tu matrícula. Consulta con coordinación.")
 
 # ==========================================
-# SECCIÓN: CALCULADORAS DE LOTES (PESTAÑAS)
+# SECCIÓN: CALCULADORAS DE LOTES
 # ==========================================
 elif opcion_menu == "🧮 Calculadoras de Lotes":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Módulo Institucional de Gestión de Riesgo y Lotajes</div>', unsafe_allow_html=True)
 
-    # --- PESTAÑAS DE SELECCIÓN DE CALCULADORA ---
     tab_operativa, tab_rapida = st.tabs(["⚡ Calculadora Operativa Completa", "🛡️ Calculadora de Lotes Rápidos (Riesgo)"])
 
-    # ------------------------------------------
-    # SUB-PESTAÑA 1: CALCULADORA OPERATIVA
-    # ------------------------------------------
     with tab_operativa:
         st.subheader("⚡ Calculadora Operativa & Multi-Activo")
         
@@ -356,7 +348,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
                 st.warning(
                     "⚠️ **Par JPY Detectado:**\n"
                     "• El valor del pip se ajustó a **$7.0 USD/lote**.\n"
-                    "• 📌 **Importante:** No olvides verificar y actualizar tu **Precio de Entrada** al valor actual del par en TradingView."
+                    "• 📌 **Importante:** Verifica el **Precio de Entrada** actual en TradingView."
                 )
             
             balance = st.number_input("Balance de la Cuenta ($)", value=200.0, step=10.0, key="op_balance")
@@ -381,7 +373,6 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
             valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_sugerido, step=0.5, key=f"op_val_pip_{es_jpy}")
             ratio = st.number_input("Ratio (Riesgo:Beneficio)", value=3.0, step=0.5, key="op_ratio")
 
-        # Cálculos Operativa
         dinero_arriesgar = balance * (riesgo_pct / 100.0)
         lotaje = dinero_arriesgar / (sl_pips * valor_pip) if sl_pips > 0 and valor_pip > 0 else 0.0
         tp_pips = sl_pips * ratio
@@ -403,11 +394,11 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         st.divider()
 
         if riesgo_pct <= 2.0:
-            st.success(f"🟢 **Gestión Institucional Excelente ({riesgo_pct}%):** Riesgo controlado bajo los estándares ALEMA.")
+            st.success(f"🟢 **Gestión Institucional Excelente ({riesgo_pct}%):** Riesgo controlado.")
         elif riesgo_pct <= 5.0:
             st.warning(f"🟠 **Riesgo Moderado ({riesgo_pct}%):** Requiere confirmación de alta probabilidad.")
         else:
-            st.error(f"🔴 **Alerta de Sobrerriesgo ({riesgo_pct}%):** Reduce la exposición para proteger la cuenta.")
+            st.error(f"🔴 **Alerta de Sobrerriesgo ({riesgo_pct}%):** Reduce la exposición.")
 
         st.subheader("📊 Resultados de Ejecución")
         res_col1, res_col2 = st.columns(2)
@@ -453,12 +444,9 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
         st.plotly_chart(fig, use_container_width=True)
 
-    # ------------------------------------------
-    # SUB-PESTAÑA 2: CALCULADORA DE LOTES RÁPIDOS
-    # ------------------------------------------
     with tab_rapida:
         st.subheader("🛡️ Calculadora Rápida de Lotaje y Riesgo")
-        st.write("Calcula de forma inmediata el lotaje exacto según tu capital y tolerancia de riesgo sin necesidad de ingresar precio de entrada.")
+        st.write("Calcula de forma inmediata el lotaje exacto según tu capital y tolerancia de riesgo.")
 
         col_r1, col_r2 = st.columns(2)
 
@@ -470,7 +458,6 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
             sl_r = st.number_input("Stop Loss en Pips / Puntos", value=20.0, step=1.0, key="rap_sl")
             val_pip_r = st.number_input("Valor por Pip (1 Lote Estándar $)", value=10.0, step=0.5, key="rap_pip_val")
 
-        # Cálculos de Lote Rápido
         monto_arriesgar = bal_r * (riesgo_r / 100.0)
         lotaje_rapido = monto_arriesgar / (sl_r * val_pip_r) if sl_r > 0 and val_pip_r > 0 else 0.0
 
@@ -489,6 +476,92 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         💡 <b>LOTAGE SUGERIDO:</b> <span style="color:#FF6B00; font-size: 22px;"><b>{lotaje_rapido:.2f}</b></span>
         </div>
         """, unsafe_allow_html=True)
+
+# ==========================================
+# SECCIÓN: TRADING JOURNAL (DIARIO)
+# ==========================================
+elif opcion_menu == "📓 Trading Journal":
+    st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title" style="text-align: left;">Journal Institucional de Operaciones y Bitácora Psicológica</div>', unsafe_allow_html=True)
+
+    # --- DASHBOARD DE MÉTRICAS ---
+    trades = st.session_state.journal_trades
+    total_trades = len(trades)
+    
+    if total_trades > 0:
+        df_j = pd.DataFrame(trades)
+        pnl_total = df_j['Resultado_USD'].sum()
+        wins = len(df_j[df_j['Resultado_USD'] > 0])
+        win_rate = (wins / total_trades) * 100
+    else:
+        pnl_total = 0.0
+        win_rate = 0.0
+
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric("Total de Trades", f"{total_trades}")
+    with m2:
+        st.metric("Win Rate (%)", f"{win_rate:.1f}%")
+    with m3:
+        st.metric("P&L Total ($ USD)", f"${pnl_total:.2f}")
+
+    st.divider()
+
+    # --- FORMULARIO DE REGISTRO ---
+    st.subheader("✍️ Registrar Nueva Operación")
+    
+    with st.form("form_journal", clear_on_submit=True):
+        col_j1, col_j2 = st.columns(2)
+        
+        with col_j1:
+            j_fecha = st.date_input("Fecha", value=datetime.now())
+            j_activo = st.text_input("Activo / Par", value="EUR/USD").strip().upper()
+            j_tipo = st.selectbox("Tipo", ["BUY", "SELL"])
+            j_lotes = st.number_input("Lotes Operados", value=0.10, step=0.01)
+            
+        with col_j2:
+            j_pips = st.number_input("Pips (+/-)", value=20.0, step=1.0)
+            j_pnl = st.number_input("Resultado ($ USD)", value=20.0, step=1.0)
+            j_emocion = st.selectbox("Estado Emocional / Psicotrading", [
+                "🟢 Disciplinado (Plan Cumplido)",
+                "🟡 Ansiedad / Dudas",
+                "🔴 Impulsivo / FOMO",
+                "🔴 Revancha (Overtrading)"
+            ])
+            j_link = st.text_input("Enlace / Captura de TradingView", value="")
+
+        j_notas = st.text_area("Observaciones / Conclusión Técnica", placeholder="¿Por qué entraste? ¿Qué confirmó tu setup?")
+        
+        submitted = st.form_submit_button("💾 Guardar en Journal", use_container_width=True)
+        if submitted:
+            nuevo_trade = {
+                "Fecha": str(j_fecha),
+                "Activo": j_activo,
+                "Tipo": j_tipo,
+                "Lotes": j_lotes,
+                "Pips": j_pips,
+                "Resultado_USD": j_pnl,
+                "Emoción": j_emocion,
+                "Notas": j_notas,
+                "Link": j_link
+            }
+            st.session_state.journal_trades.insert(0, nuevo_trade)
+            st.success("✅ Trade registrado con éxito en tu bitácora.")
+            st.rerun()
+
+    st.divider()
+
+    # --- HISTORIAL DE TRADES ---
+    st.subheader("📋 Bitácora de Trades Registrados")
+    if len(st.session_state.journal_trades) > 0:
+        df_display = pd.DataFrame(st.session_state.journal_trades)
+        st.dataframe(df_display, use_container_width=True)
+        
+        if st.button("🗑️ Borrar Historial del Journal"):
+            st.session_state.journal_trades = []
+            st.rerun()
+    else:
+        st.info("💡 Aún no has registrado ninguna operación hoy. Utiliza el formulario superior para comenzar tu seguimiento.")
 
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
@@ -531,7 +604,7 @@ elif opcion_menu == "📚 Biblioteca de Guías":
             key="btn_descarga_pdf"
         )
         
-        st.info("💡 **Recomendación para Celulares:** Presiona el botón naranja superior para abrir el manual directamente en el visor HD de tu teléfono con desplazamiento fluido.")
+        st.info("💡 **Recomendación para Celulares:** Presiona el botón naranja superior para abrir el manual directamente en tu teléfono.")
     else:
         st.warning(f"⚠️ El archivo `{archivo_pdf}` no se encuentra en el repositorio.")
 
