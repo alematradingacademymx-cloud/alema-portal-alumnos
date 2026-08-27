@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import plotly.graph_objects as go
 import os
 import pandas as pd
+from datetime import datetime
 
 # Configuración de página
 st.set_page_config(page_title="ALEMA Trading Academy - Portal de Alumnos", page_icon="📈", layout="centered")
@@ -80,16 +81,36 @@ def cargar_usuarios_desde_sheets():
         df.columns = df.columns.str.strip()
         df['Matricula'] = df['Matricula'].fillna('').str.strip().str.upper()
         df['Password'] = df['Password'].fillna('').str.strip()
-        return dict(zip(df['Matricula'], df['Password']))
+        df['Tipo_Usuario'] = df['Tipo_Usuario'].fillna('ALUMNO').str.strip().str.upper()
+        df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
+        
+        dict_usuarios = {}
+        for _, row in df.iterrows():
+            dict_usuarios[row['Matricula']] = {
+                'password': row['Password'],
+                'tipo': row['Tipo_Usuario'],
+                'vencimiento': row['Fecha_Vencimiento']
+            }
+        return dict_usuarios
     except Exception:
-        # Respaldo por si la pestaña principal no tiene nombre o falla gviz
+        # Respaldo por si gviz no responde
         try:
             url_fallback = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
             df = pd.read_csv(url_fallback, dtype=str)
             df.columns = df.columns.str.strip()
             df['Matricula'] = df['Matricula'].fillna('').str.strip().str.upper()
             df['Password'] = df['Password'].fillna('').str.strip()
-            return dict(zip(df['Matricula'], df['Password']))
+            df['Tipo_Usuario'] = df['Tipo_Usuario'].fillna('ALUMNO').str.strip().str.upper()
+            df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
+            
+            dict_usuarios = {}
+            for _, row in df.iterrows():
+                dict_usuarios[row['Matricula']] = {
+                    'password': row['Password'],
+                    'tipo': row['Tipo_Usuario'],
+                    'vencimiento': row['Fecha_Vencimiento']
+                }
+            return dict_usuarios
         except Exception:
             return {}
 
@@ -100,7 +121,6 @@ def obtener_avance_alumno(matricula_usuario):
         df_avances.columns = df_avances.columns.str.strip()
         df_avances['Matricula'] = df_avances['Matricula'].fillna('').str.strip().str.upper()
         
-        # Filtrar datos del alumno actual
         alumno_data = df_avances[df_avances['Matricula'] == matricula_usuario]
         if not alumno_data.empty:
             return alumno_data.iloc[0].to_dict()
@@ -117,10 +137,13 @@ if "autenticado" not in st.session_state:
 if "usuario_actual" not in st.session_state:
     st.session_state.usuario_actual = ""
 
+if "tipo_usuario" not in st.session_state:
+    st.session_state.tipo_usuario = "ALUMNO"
+
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
     st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados y Suscriptores</div>', unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -143,11 +166,29 @@ if not st.session_state.autenticado:
     col_btn, _ = st.columns([1, 1])
     with col_btn:
         if st.button("🔑 Iniciar Sesión", use_container_width=True):
-            if matricula_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[matricula_input] == password_input:
-                st.session_state.autenticado = True
-                st.session_state.usuario_actual = matricula_input
-                st.success("¡Acceso concedido!")
-                st.rerun()
+            if matricula_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[matricula_input]['password'] == password_input:
+                user_info = USUARIOS_AUTORIZADOS[matricula_input]
+                
+                # Validar fecha de vencimiento
+                try:
+                    fecha_venc = datetime.strptime(user_info['vencimiento'], "%Y-%m-%d").date()
+                    hoy = datetime.now().date()
+                    
+                    if hoy > fecha_venc:
+                        st.error(f"⚠️ Tu suscripción/acceso venció el {user_info['vencimiento']}. Contacta a coordinación para renovar.")
+                    else:
+                        st.session_state.autenticado = True
+                        st.session_state.usuario_actual = matricula_input
+                        st.session_state.tipo_usuario = user_info['tipo']
+                        st.success("¡Acceso concedido!")
+                        st.rerun()
+                except Exception:
+                    # En caso de fecha mal formateada, permitir paso si contraseña es correcta
+                    st.session_state.autenticado = True
+                    st.session_state.usuario_actual = matricula_input
+                    st.session_state.tipo_usuario = user_info['tipo']
+                    st.success("¡Acceso concedido!")
+                    st.rerun()
             else:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
     
@@ -172,20 +213,29 @@ if not st.session_state.autenticado:
     st.stop()
 
 # ==========================================
-# 🚀 MENÚ LATERAL Y NAVEGACIÓN
+# 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
 st.sidebar.markdown("### 🎓 ALEMA PORTAL")
 st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
+st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
+
+# Definición de opciones por tipo de usuario
+if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
+    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
+else:
+    # Para SUSCRIPTOR comercial
+    opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
 
 opcion_menu = st.sidebar.radio(
     "Selecciona una sección:",
-    ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"],
+    opciones_disponibles,
     key="navegacion_principal"
 )
 
 if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state.autenticado = False
     st.session_state.usuario_actual = ""
+    st.session_state.tipo_usuario = "ALUMNO"
     st.rerun()
 
 # --- TICKER DE TRADINGVIEW SUPERIOR ---
@@ -222,7 +272,7 @@ ticker_html = """
 components.html(ticker_html, height=78)
 
 # ==========================================
-# SECCIÓN SELECCIONADA: MI AVANCE ACADÉMICO
+# SECCIÓN: MI AVANCE ACADÉMICO (SOLO ALUMNOS/ADMIN)
 # ==========================================
 if opcion_menu == "📊 Mi Avance Académico":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
@@ -292,7 +342,6 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
             divisor_pip = 100.0 if es_jpy else 10000.0
             valor_pip_sugerido = 7.0 if es_jpy else 10.0
 
-            # --- ALERTA VISUAL Y RECORDATORIO PARA EL ALUMNO ---
             if es_jpy:
                 st.warning(
                     "⚠️ **Par JPY Detectado:**\n"
@@ -436,7 +485,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 # ==========================================
 elif opcion_menu == "📚 Biblioteca de Guías":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title" style="text-align: left;">Biblioteca Digital Exclusiva para Alumnos</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title" style="text-align: left;">Biblioteca Digital Exclusiva para Alumnos y Suscriptores</div>', unsafe_allow_html=True)
 
     st.subheader("📖 Lectura y Consulta de Materiales")
     
