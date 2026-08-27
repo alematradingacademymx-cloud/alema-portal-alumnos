@@ -1,3 +1,4 @@
+import requests
 import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
@@ -479,8 +480,6 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         </div>
         """, unsafe_allow_html=True)
 
-import requests  # Asegúrate de incluir 'requests' en tu requirements.txt
-
 # ==========================================
 # SECCIÓN: TRADING JOURNAL (INTEGRADO DIRECTAMENTE EN LA APP)
 # ==========================================
@@ -566,18 +565,17 @@ elif opcion_menu == "📓 Trading Journal":
         submitted = st.form_submit_button("💾 Guardar en Journal", use_container_width=True)
         
         if submitted:
-            # MAPEO DE CAMPOS GOOGLE FORM CON SUS IDs REALES
             form_data = {
-                "entry.990498500": st.session_state.usuario_actual, # Matricula
-                "entry.155506709": str(j_fecha),                    # Fecha
-                "entry.906926856": j_activo,                        # Activo
-                "entry.1849778551": j_tipo,                         # Tipo
-                "entry.974887529": str(j_lotes),                    # Lotes
-                "entry.46118986": str(j_pips),                      # Pips
-                "entry.1003289205": str(j_pnl),                     # Resultado USD
-                "entry.372443422": j_emocion,                       # Emoción
-                "entry.332810614": j_notas,                         # Notas
-                "entry.635428194": j_link                           # Link
+                "entry.990498500": st.session_state.usuario_actual,
+                "entry.155506709": str(j_fecha),
+                "entry.906926856": j_activo,
+                "entry.1849778551": j_tipo,
+                "entry.974887529": str(j_lotes),
+                "entry.46118986": str(j_pips),
+                "entry.1003289205": str(j_pnl),
+                "entry.372443422": j_emocion,
+                "entry.332810614": j_notas,
+                "entry.635428194": j_link
             }
             
             try:
