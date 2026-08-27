@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import os
 import pandas as pd
 from datetime import datetime
+import yfinance as yf
 
 # Configuración de página
 st.set_page_config(page_title="ALEMA Trading Academy - Portal de Alumnos", page_icon="📈", layout="centered")
@@ -596,13 +597,13 @@ elif opcion_menu == "📓 Trading Journal":
         st.info("💡 Aún no tienes trades guardados en tu historial permanente.")
 
 # ==========================================
-# SECCIÓN: SIMULADOR DE EJECUCIÓN INSTITUCIONAL (ACTUALIZADO)
+# SECCIÓN: SIMULADOR DE EJECUCIÓN INSTITUCIONAL
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Entorno Pedagógico de Práctica y Ejecución en Vivo</div>', unsafe_allow_html=True)
 
-    st.info("💡 **Módulo Táctico:** Analiza con las herramientas completas de dibjo, coloca tus niveles por PRECIO y ejecuta. Al cerrar tu posición, el resultado se enviará automáticamente a tu Trading Journal.")
+    st.info("💡 **Módulo Táctico:** Analiza con las herramientas completas de dibujo, coloca tus niveles por PRECIO y ejecuta. Al cerrar tu posición, el resultado se enviará automáticamente a tu Trading Journal.")
 
     # Inicializar variables de estado
     if 'balance_pedagogico' not in st.session_state:
@@ -674,7 +675,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         formato = "%.3f" if es_jpy_sim else "%.5f"
         step_val = 0.001 if es_jpy_sim else 0.00001
         
-        # 📌 CAMBIO A ENTRADA DE PRECIOS EXACTOS
+        # 📌 ENTRADA DE PRECIOS EXACTOS
         sim_precio_entrada = st.number_input("Precio Entrada", value=precio_base, format=formato, step=step_val)
         
         default_sl = precio_base - (0.0020 if "BUY" in sim_tipo else -0.0020)
@@ -705,11 +706,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     st.subheader("⚡ Operaciones Activas en Tiempo Real")
     
     if len(st.session_state.posiciones_abiertas) > 0:
-        # PnL Dinámico Simulado para demostración visual
         posiciones_pantalla = []
         for pos in st.session_state.posiciones_abiertas:
             pos_copy = pos.copy()
-            # PnL visual inicial
             pos_copy["PnL Flotante ($ USD)"] = f"${pos['pnl_flotante']:+.2f}"
             posiciones_pantalla.append(pos_copy)
 
@@ -729,11 +728,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.write(" ")
             st.write(" ")
             if st.button("💾 CERRAR Y GUARDAR EN JOURNAL", use_container_width=True):
-                # Buscar la posición a cerrar
                 trade_obj = next((p for p in st.session_state.posiciones_abiertas if p["id"] == id_cerrar), None)
                 
                 if trade_obj:
-                    # 📌 ENVÍO AUTOMÁTICO A GOOGLE SHEETS / FORMULARIO
+                    # Envío a Google Sheets / Formulario
                     form_data = {
                         "entry.990498500": st.session_state.usuario_actual,
                         "entry.155506709": datetime.now().strftime("%Y-%m-%d"),
@@ -752,15 +750,13 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     except Exception:
                         pass
                     
-                    # Actualizar estado de balance y remover posición
+                    # Actualización de saldo local y remoción de orden
                     st.session_state.balance_pedagogico += pnl_final_cierre
                     st.session_state.posiciones_abiertas = [p for p in st.session_state.posiciones_abiertas if p["id"] != id_cerrar]
-                    
-                    st.cache_data.clear()
-                    st.success(f"✅ Trade #{id_cerrar} cerrado exitosamente. ¡Resultado guardado en tu Trading Journal permanente!")
+                    st.success("✅ Posición cerrada con éxito y enviada a tu Journal de Operaciones.")
                     st.rerun()
     else:
-        st.info("💡 No hay operaciones abiertas actualmente. Ingresa una orden en el panel de la derecha para comenzar.")
+        st.info("💡 No tienes posiciones abiertas en este momento. Usa el panel superior para ejecutar una orden simulada.")
 
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
