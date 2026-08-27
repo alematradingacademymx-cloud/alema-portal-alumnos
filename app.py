@@ -765,7 +765,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.success(f"🔥 ¡Orden #{nueva_orden['id']} enviada correctamente!")
             st.rerun()
 
-    # --- MONITOREO DE POSICIONES EN TIEMPO REAL ---
+   # --- MONITOREO DE POSICIONES EN TIEMPO REAL ---
     st.divider()
     st.subheader("📊 Posiciones Abiertas en Tiempo Real")
 
@@ -773,24 +773,33 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         posiciones_a_eliminar = []
         
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
-            precio_actual = obtener_precio_actual(pos["activo"])
+            precio_actual_raw = obtener_precio_actual(pos["activo"])
             
             is_jpy = "JPY" in pos["activo"]
             is_metal_crypto = "XAU" in pos["activo"] or "BTC" in pos["activo"]
             
+            # Definir formato visual exacto
+            fmt = "%.3f" if is_jpy else ("%.2f" if is_metal_crypto else "%.5f")
+            
+            # Formatear números para evitar decimales infinitos
+            entrada_fmt = fmt % pos["entrada"]
+            actual_fmt = fmt % precio_actual_raw
+            sl_fmt = fmt % pos["sl"]
+            tp_fmt = fmt % pos["tp"]
+
             # Factor multiplicador para pips y valor en USD
             mult_pip = 100.0 if is_jpy else (1.0 if is_metal_crypto else 10000.0)
             val_pip_lote = 7.0 if is_jpy else 10.0
 
             # Cálculo exacto según dirección
             if pos["tipo"] == "BUY":
-                pips = (precio_actual - pos["entrada"]) * mult_pip
-                toco_tp = precio_actual >= pos["tp"]
-                toco_sl = precio_actual <= pos["sl"]
+                pips = (precio_actual_raw - pos["entrada"]) * mult_pip
+                toco_tp = precio_actual_raw >= pos["tp"]
+                toco_sl = precio_actual_raw <= pos["sl"]
             else:
-                pips = (pos["entrada"] - precio_actual) * mult_pip
-                toco_tp = precio_actual <= pos["tp"]
-                toco_sl = precio_actual >= pos["sl"]
+                pips = (pos["entrada"] - precio_actual_raw) * mult_pip
+                toco_tp = precio_actual_raw <= pos["tp"]
+                toco_sl = precio_actual_raw >= pos["sl"]
 
             pnl = pips * val_pip_lote * pos["lotes"]
 
@@ -805,17 +814,34 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 posiciones_a_eliminar.append(idx)
                 st.error(f"🛑 **Stop Loss Alcanzado.** Posición #{pos['id']} ({pos['activo']}) cerrada en SL con resultado de ${pnl:.2f} USD")
             else:
-                # Renderizado de la orden activa si sigue abierta
+                # Renderizado limpio con columnas organizadas
                 color_pnl = "🟢" if pnl >= 0 else "🔴"
-                c1, c2, c3, c4, c5, c6 = st.columns([1, 1, 1, 1.2, 1.2, 1])
-                c1.write(f"**#{pos['id']} {pos['activo']}**")
-                c2.write(f"{pos['tipo']} ({pos['lotes']} L)")
-                c3.write(f"Entrada: {pos['entrada']}")
-                c4.write(f"Actual: {precio_actual}")
-                c5.write(f"{color_pnl} **${pnl:.2f} USD** ({pips:.1f} pips)")
                 
-                with c6:
-                    if st.button("❌ Cerrar", key=f"cerrar_pos_{idx}"):
+                # Creado de tarjeta visual estilizada
+                st.markdown(f"""
+                <div class="card-box" style="padding: 12px 20px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <span style="font-size: 16px; font-weight: bold; color: #38BDF8;">#{pos['id']} {pos['activo']}</span> 
+                            <span style="font-size: 14px; font-weight: bold; color: {'#10B981' if pos['tipo']=='BUY' else '#FF6B00'}; margin-left: 8px;">{pos['tipo']} ({pos['lotes']} L)</span>
+                        </div>
+                        <div style="font-size: 14px;">
+                            🔹 <b>Entrada:</b> <code>{entrada_fmt}</code> | 📈 <b>Actual:</b> <code>{actual_fmt}</code>
+                        </div>
+                        <div style="font-size: 14px;">
+                            🛑 <b>SL:</b> <code style="color:#EF4444;">{sl_fmt}</code> | 🎯 <b>TP:</b> <code style="color:#10B981;">{tp_fmt}</code>
+                        </div>
+                        <div style="font-size: 16px; font-weight: bold;">
+                            {color_pnl} ${pnl:.2f} USD <span style="font-size: 13px; color: #94A3B8;">({pips:.1f} pips)</span>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Botón de cierre manual
+                col_btn_cerrar, _ = st.columns([1, 4])
+                with col_btn_cerrar:
+                    if st.button(f"❌ Cerrar Posición #{pos['id']}", key=f"cerrar_pos_{idx}", use_container_width=True):
                         st.session_state.balance_pedagogico += pnl
                         posiciones_a_eliminar.append(idx)
                         st.info(f"Posición #{pos['id']} cerrada manualmente.")
