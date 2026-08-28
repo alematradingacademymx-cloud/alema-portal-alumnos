@@ -626,7 +626,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Entorno Pedagógico de Práctica y Ejecución en Vivo</div>', unsafe_allow_html=True)
 
-    st.info("💡 **Módulo Táctico:** El precio de entrada cuenta con ajuste interactivo para sincronizarlo al milímetro con el gráfico de TradingView.")
+    st.info("💡 **Módulo Táctico:** Sincronización de ejecución con validación estricta de niveles de salida institucionales.")
 
     # Inicialización de variables de estado
     if 'balance_pedagogico' not in st.session_state:
@@ -720,17 +720,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
 
-        # OBTENCIÓN DEL PRECIO BASE
         precio_mercado_actual = obtener_precio_actual(activo_sim)
 
         if "Vivo" in modo_ejecucion:
-            st.markdown(f"""
-                <div style="background-color: #1E293B; padding: 6px 10px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 5px;">
-                    <span style="color: #94A3B8; font-size: 11px;">💡 Ajusta los decimales si requieres calzarlo exactamente con el gráfico de TradingView:</span>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            # Campo editable para emparejar el precio de entrada al milímetro con el gráfico de TradingView
             sim_precio_entrada = st.number_input(
                 "Precio de Mercado (En Vivo)", 
                 value=float(precio_mercado_actual), 
@@ -741,7 +733,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         else:
             sim_precio_entrada = st.number_input("Precio Entrada (Pendiente)", value=precio_mercado_actual, format=formato, step=step_val, key=f"pe_pend_{activo_sim}")
         
-        # Distancias calculadas
         if es_jpy_sim:
             dist_sl, dist_tp = 0.300, 0.600
         elif es_crypto_oro:
@@ -750,18 +741,16 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         else:
             dist_sl, dist_tp = 0.00300, 0.00600
 
-        # Lógica de sugeridos según dirección
         if "BUY" in sim_tipo:
             default_sl = round(sim_precio_entrada - dist_sl, n_decimals)
             default_tp = round(sim_precio_entrada + dist_tp, n_decimals)
-        else: # SELL
+        else: 
             default_sl = round(sim_precio_entrada + dist_sl, n_decimals)
             default_tp = round(sim_precio_entrada - dist_tp, n_decimals)
         
         sim_precio_sl = st.number_input("Precio Stop Loss (SL)", value=default_sl, format=formato, step=step_val, key=f"sl_in_{sim_tipo}_{activo_sim}")
         sim_precio_tp = st.number_input("Precio Take Profit (TP)", value=default_tp, format=formato, step=step_val, key=f"tp_in_{sim_tipo}_{activo_sim}")
 
-        # VALIDACIÓN REDONDEADA Y PRECISA
         pe_r = round(sim_precio_entrada, n_decimals)
         sl_r = round(sim_precio_sl, n_decimals)
         tp_r = round(sim_precio_tp, n_decimals)
@@ -774,7 +763,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             elif tp_r <= pe_r:
                 st.warning(f"⚠️ En BUY: El Take Profit ({tp_r}) debe ser MAYOR que la entrada ({pe_r}).")
                 es_orden_valida = False
-        else: # SELL
+        else: 
             if sl_r <= pe_r:
                 st.warning(f"⚠️ En SELL: El Stop Loss ({sl_r}) debe ser MAYOR que la entrada ({pe_r}).")
                 es_orden_valida = False
@@ -796,7 +785,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 "tp": tp_r
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
-            st.success(f"🔥 ¡Orden #{nueva_orden['id']} ejecutada al precio de entrada: {pe_final}!")
+            st.success(f"🔥 ¡Orden #{nueva_orden['id']} ejecutada correctamente!")
             st.rerun()
 
     # --- MONITOREO DE POSICIONES EN TIEMPO REAL ---
@@ -824,12 +813,13 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
             if pos["tipo"] == "BUY":
                 pips = (precio_actual_raw - pos["entrada"]) * mult_pip
-                toco_tp = precio_actual_raw >= pos["tp"]
-                toco_sl = precio_actual_raw <= pos["sl"]
-            else: # SELL
+                # Validación estricta para evitar falsos positivos al abrir
+                toco_tp = precio_actual_raw >= pos["tp"] and precio_actual_raw > pos["entrada"]
+                toco_sl = precio_actual_raw <= pos["sl"] and precio_actual_raw < pos["entrada"]
+            else: 
                 pips = (pos["entrada"] - precio_actual_raw) * mult_pip
-                toco_tp = precio_actual_raw <= pos["tp"]
-                toco_sl = precio_actual_raw >= pos["sl"]
+                toco_tp = precio_actual_raw <= pos["tp"] and precio_actual_raw < pos["entrada"]
+                toco_sl = precio_actual_raw >= pos["sl"] and precio_actual_raw > pos["entrada"]
 
             pnl = pips * val_pip_lote * pos["lotes"]
 
@@ -837,6 +827,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 st.session_state.balance_pedagogico += pnl
                 resultado_str = "Take Profit 🎯" if toco_tp else "Stop Loss 🛑"
                 
+                # Guardado seguro directo en historial antes de eliminar de activas
                 st.session_state.historial_operaciones.append({
                     "ID": pos["id"],
                     "Fecha": pos["fecha"],
