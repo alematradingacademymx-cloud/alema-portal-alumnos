@@ -626,7 +626,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Entorno Pedagógico de Práctica y Ejecución en Vivo</div>', unsafe_allow_html=True)
 
-    st.info("💡 **Módulo Táctico:** Sincronización de ejecución con validación estricta de niveles de salida institucionales.")
+    st.info("💡 **Módulo Táctico:** Control operativo con validación estricta de márgenes institucionales.")
 
     # Inicialización de variables de estado
     if 'balance_pedagogico' not in st.session_state:
@@ -758,17 +758,17 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         es_orden_valida = True
         if "BUY" in sim_tipo:
             if sl_r >= pe_r:
-                st.warning(f"⚠️ En BUY: El Stop Loss ({sl_r}) debe ser MENOR que la entrada ({pe_r}).")
+                st.warning(f"⚠️ En BUY: El Stop Loss ({sl_r}) debe ser menor que la entrada ({pe_r}).")
                 es_orden_valida = False
             elif tp_r <= pe_r:
-                st.warning(f"⚠️ En BUY: El Take Profit ({tp_r}) debe ser MAYOR que la entrada ({pe_r}).")
+                st.warning(f"⚠️ En BUY: El Take Profit ({tp_r}) debe ser mayor que la entrada ({pe_r}).")
                 es_orden_valida = False
-        else: 
+        else: # SELL
             if sl_r <= pe_r:
-                st.warning(f"⚠️ En SELL: El Stop Loss ({sl_r}) debe ser MAYOR que la entrada ({pe_r}).")
+                st.warning(f"⚠️ En SELL: El Stop Loss ({sl_r}) debe ser mayor que la entrada ({pe_r}).")
                 es_orden_valida = False
             elif tp_r >= pe_r:
-                st.warning(f"⚠️ En SELL: El Take Profit ({tp_r}) debe ser MENOR que la entrada ({pe_r}).")
+                st.warning(f"⚠️ En SELL: El Take Profit ({tp_r}) debe ser menor que la entrada ({pe_r}).")
                 es_orden_valida = False
 
         if st.button("🚀 EJECUTAR ORDEN EN VIVO", key="btn_ejecutar_sim", use_container_width=True, disabled=not es_orden_valida):
@@ -785,7 +785,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 "tp": tp_r
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
-            st.success(f"🔥 ¡Orden #{nueva_orden['id']} ejecutada correctamente!")
+            st.success(f"🔥 ¡Orden #{nueva_orden['id']} abierta con éxito en {activo_sim}!")
             st.rerun()
 
     # --- MONITOREO DE POSICIONES EN TIEMPO REAL ---
@@ -813,13 +813,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
             if pos["tipo"] == "BUY":
                 pips = (precio_actual_raw - pos["entrada"]) * mult_pip
-                # Validación estricta para evitar falsos positivos al abrir
-                toco_tp = precio_actual_raw >= pos["tp"] and precio_actual_raw > pos["entrada"]
-                toco_sl = precio_actual_raw <= pos["sl"] and precio_actual_raw < pos["entrada"]
-            else: 
+                toco_tp = precio_actual_raw >= pos["tp"]
+                toco_sl = precio_actual_raw <= pos["sl"]
+            else: # SELL
                 pips = (pos["entrada"] - precio_actual_raw) * mult_pip
-                toco_tp = precio_actual_raw <= pos["tp"] and precio_actual_raw < pos["entrada"]
-                toco_sl = precio_actual_raw >= pos["sl"] and precio_actual_raw > pos["entrada"]
+                toco_tp = precio_actual_raw <= pos["tp"]
+                toco_sl = precio_actual_raw >= pos["sl"]
 
             pnl = pips * val_pip_lote * pos["lotes"]
 
@@ -827,8 +826,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 st.session_state.balance_pedagogico += pnl
                 resultado_str = "Take Profit 🎯" if toco_tp else "Stop Loss 🛑"
                 
-                # Guardado seguro directo en historial antes de eliminar de activas
-                st.session_state.historial_operaciones.append({
+                # Inserción asegurada al historial antes de eliminar
+                st.session_state.historial_operaciones.insert(0, {
                     "ID": pos["id"],
                     "Fecha": pos["fecha"],
                     "Activo": pos["activo"],
@@ -878,7 +877,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                         st.caption("Acción")
                         if st.button("❌ Cerrar", key=f"btn_close_order_{pos['id']}_{idx}", use_container_width=True):
                             st.session_state.balance_pedagogico += pnl
-                            st.session_state.historial_operaciones.append({
+                            st.session_state.historial_operaciones.insert(0, {
                                 "ID": pos["id"],
                                 "Fecha": pos["fecha"],
                                 "Activo": pos["activo"],
