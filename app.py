@@ -110,17 +110,14 @@ def parsear_fecha(fecha_str):
     return datetime(2030, 12, 31).date()
 
 # ==========================================
-# 🔑 BASE DE DATOS DE USUARIOS Y MÓDULOS (GOOGLE SHEETS)
+# 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
 SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
 
 URL_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Usuarios"
 URL_AVANCES = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Avances"
-URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Journal"
-URL_SIMULADOR_JOURNAL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Simulador_Journal"
-
 URL_FORM_RESPONSE = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
-URL_FORM_SIMULADOR_RESPONSE = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
+URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Journal"
 
 @st.cache_data(ttl=10)
 def cargar_usuarios_desde_sheets():
@@ -249,6 +246,8 @@ if not st.session_state.autenticado:
 
     st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
     st.stop()
+
+
 
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
