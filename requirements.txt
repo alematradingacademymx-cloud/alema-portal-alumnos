@@ -1,5 +1,6 @@
 streamlit
 plotly
+datetime
 pandas
 requests
 yfinance
