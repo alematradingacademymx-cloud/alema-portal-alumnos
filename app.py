@@ -110,14 +110,17 @@ def parsear_fecha(fecha_str):
     return datetime(2030, 12, 31).date()
 
 # ==========================================
-# 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
+# 🔑 BASE DE DATOS DE USUARIOS Y MÓDULOS (GOOGLE SHEETS)
 # ==========================================
 SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
 
 URL_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Usuarios"
 URL_AVANCES = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Avances"
-URL_FORM_RESPONSE = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
 URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Journal"
+URL_SIMULADOR_JOURNAL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Simulador_Journal"
+
+URL_FORM_RESPONSE = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
+URL_FORM_SIMULADOR_RESPONSE = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
 
 @st.cache_data(ttl=10)
 def cargar_usuarios_desde_sheets():
@@ -630,9 +633,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     import requests
     import pandas as pd
 
-    # Archivos locales para persistencia en disco
+    # Archivos locales para persistencia en disco de posiciones activas
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
-    ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
 
     def cargar_datos_json(archivo):
         if os.path.exists(archivo):
@@ -670,12 +672,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
     
-    # Sincronización con archivos persistentes en disco
+    # Sincronización con archivo persistente de activas
     if 'posiciones_abiertas' not in st.session_state:
         st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS)
-    
-    if 'historial_cerradas' not in st.session_state:
-        st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
     # Panel de Métricas Superior estilo MT5
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
@@ -771,7 +770,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
         if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_sim", use_container_width=True):
             nueva_orden = {
-                "id": len(st.session_state.posiciones_abiertas) + len(st.session_state.historial_cerradas) + 1,
+                "id": len(st.session_state.posiciones_abiertas) + 1,
                 "fecha": str(datetime.now().date()),
                 "activo": activo_sim,
                 "tipo": sim_tipo,
@@ -859,7 +858,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     tipo_cierre_txt = f"Cierre automático por {motivo_cierre}" if cierre_automatico else "Cierre manual por el usuario"
                     st.session_state.balance_pedagogico += pnl
                     
-                    # 1. Envío de datos al Google Form / Journal con depuración visible
+                    # 1. Envío exclusivo al formulario del Simulador (Pestaña Simulador_Journal)
                     form_data_simulador = {
                         "entry.990498500": st.session_state.get("usuario_actual", "DIRALEX"),
                         "entry.155506709": str(datetime.now().date()),
@@ -874,27 +873,13 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     }
                     
                     try:
-                        response = requests.post(URL_FORM_RESPONSE, data=form_data_simulador)
+                        response = requests.post(URL_FORM_SIMULADOR_RESPONSE, data=form_data_simulador)
                         if response.status_code == 200:
-                            st.success("📡 Datos enviados correctamente a la base de datos (Google Sheets).")
+                            st.success("📡 Datos enviados correctamente a la pestaña 'Simulador_Journal'.")
                         else:
                             st.warning(f"⚠️ El servidor de Google respondió con código: {response.status_code}")
                     except Exception as e:
                         st.error(f"❌ Error de conexión al enviar al formulario: {e}")
-
-                    # 2. Guardar en el Historial Permanente local
-                    registro_historial = {
-                        "Marca temporal": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                        "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
-                        "Fecha": pos['fecha'],
-                        "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"),
-                        "Tipo": pos['tipo'],
-                        "Lotes": pos['lotes'],
-                        "Pips": round(pips, 1),
-                        "Resultado USD": round(pnl, 2)
-                    }
-                    st.session_state.historial_cerradas.append(registro_historial)
-                    guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
 
                     posiciones_a_cerrar.append(idx)
 
@@ -906,15 +891,19 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     else:
         st.info("No hay posiciones activas actualmente.")
 
-    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE ---
+    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE (Leyendo de Google Sheets) ---
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("### 📋 Bitácora Histórica Permanente")
+    st.markdown("### 📋 Bitácora Histórica Permanente (Simulador)")
     
-    if st.session_state.historial_cerradas:
-        df_historial = pd.DataFrame(st.session_state.historial_cerradas)
-        st.dataframe(df_historial, use_container_width=True, hide_index=False)
-    else:
-        st.info("Aún no hay operaciones cerradas en el historial permanente. Las operaciones aparecerán aquí en cuanto se cierren por TP, SL o de forma manual.")
+    try:
+        df_simulador_journal = pd.read_csv(URL_SIMULADOR_JOURNAL, dtype=str)
+        df_simulador_journal.columns = df_simulador_journal.columns.str.strip()
+        if not df_simulador_journal.empty:
+            st.dataframe(df_simulador_journal, use_container_width=True, hide_index=False)
+        else:
+            st.info("La pestaña 'Simulador_Journal' está conectada, pero aún no registra operaciones.")
+    except Exception as e:
+        st.info("Aún no hay operaciones registradas en la bitácora del simulador.")
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
