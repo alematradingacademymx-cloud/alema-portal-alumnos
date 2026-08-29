@@ -619,7 +619,6 @@ elif opcion_menu == "📓 Trading Journal":
     else:
         st.info("💡 Aún no tienes trades guardados en tu historial permanente.")
 
-Python
 # ==========================================
 # SECCIÓN: SIMULADOR DE EJECUCIÓN INSTITUCIONAL (ESTILO MT5)
 # ==========================================
