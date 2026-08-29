@@ -772,7 +772,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.success("¡Orden abierta correctamente en la terminal!")
             st.rerun()
 
-    # --- PANEL INFERIOR: POSICIONES ABIERTAS ---
+    # --- PANEL INFERIOR: POSICIONES ABIERTAS (DINÁMICA INSTITUCIONAL) ---
     st.markdown("### 📊 Posiciones Abiertas (Tiempo Real)")
 
     if st.session_state.posiciones_abiertas:
@@ -781,7 +781,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
             precio_actual_vivo = obtener_precio_en_vivo(pos["activo"])
             
-            # Definición local de variables para formato de activos
             es_jpy = "JPY" in pos["activo"]
             is_mc = "XAU" in pos["activo"] or "BTC" in pos["activo"]
             fmt = "%.3f" if es_jpy else ("%.2f" if is_mc else "%.5f")
@@ -791,22 +790,22 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             pips = (precio_actual_vivo - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_actual_vivo)
             pnl = pips * mp * vp * pos["lotes"]
 
-            # Comprobación de límites lógicos reales de mercado para TP/SL automático
+            # Lógica estricta de mercado: Solo se cierra si el precio cruza genuinamente los límites establecidos
             cierre_automatico = False
-            motivo_cierre = "Manual"
+            motivo_cierre = "Activa"
             
             if pos["tipo"] == "BUY":
-                if precio_actual_vivo >= pos["tp"] and pos["tp"] > pos["entrada"]:
+                if precio_actual_vivo >= pos["tp"]:
                     cierre_automatico = True
                     motivo_cierre = "Take Profit (TP)"
-                elif precio_actual_vivo <= pos["sl"] and pos["sl"] < pos["entrada"]:
+                elif precio_actual_vivo <= pos["sl"]:
                     cierre_automatico = True
                     motivo_cierre = "Stop Loss (SL)"
             else: 
-                if precio_actual_vivo <= pos["tp"] and pos["tp"] < pos["entrada"]:
+                if precio_actual_vivo <= pos["tp"]:
                     cierre_automatico = True
                     motivo_cierre = "Take Profit (TP)"
-                elif precio_actual_vivo >= pos["sl"] and pos["sl"] > pos["entrada"]:
+                elif precio_actual_vivo >= pos["sl"]:
                     cierre_automatico = True
                     motivo_cierre = "Stop Loss (SL)"
 
@@ -832,14 +831,19 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                                 <td><code>{fmt % pos['sl']}</code></td>
                                 <td style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}; font-weight:bold;">{pos['tipo']}</td>
                                 <td style="color: {'#26a69a' if pnl>=0 else '#ef5350'}; font-weight:bold;">${pnl:,.2f}</td>
-                                <td style="color: {'#26a69a' if cierre_automatico else '#2962FF'};">{'● Cierre ' + motivo_cierre if cierre_automatico else '● Activa'}</td>
+                                <td style="color: {'#26a69a' if cierre_automatico else '#2962FF'};">{'● Cierre ' + motivo_cierre if cierre_automatico else '● Activa en Mercado'}</td>
                             </tr>
                         </table>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # Botón individual de cierre manual para cada orden abierta
-                if cierre_automatico or st.button(f"Cerrar Posición #{pos['id']}", key=f"cerrar_pos_{pos['id']}_{idx}"):
+                # Botón de cierre manual colocado al final de cada tarjeta de posición
+                col_info_btn, col_btn_cerrar = st.columns([4, 1])
+                with col_btn_cerrar:
+                    btn_manual = st.button(f"Cerrar #{pos['id']}", key=f"btn_cierre_manual_{pos['id']}_{idx}", use_container_width=True)
+
+                if cierre_automatico or btn_manual:
+                    tipo_cierre_txt = f"Cierre automático por {motivo_cierre}" if cierre_automatico else "Cierre manual por el usuario"
                     st.session_state.balance_pedagogico += pnl
                     
                     # Estructura conectada directamente al Google Form (Journal de Alumnos)
@@ -852,7 +856,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                         "entry.46118986": str(round(pips, 1)),
                         "entry.1003289205": str(round(pnl, 2)),
                         "entry.372443422": "🟢 Disciplinado (Simulador Live)",
-                        "entry.332810614": f"Cierre automático por {motivo_cierre}" if cierre_automatico else "Cierre manual en terminal live",
+                        "entry.332810614": tipo_cierre_txt,
                         "entry.635428194": "Simulador MT5 ALEMA"
                     }
                     
@@ -861,7 +865,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     except Exception:
                         pass
 
-                    st.success(f"🔥 Orden #{pos['id']} cerrada correctamente. Balance actualizado y datos enviados al Journal.")
+                    st.success(f"🔥 Orden #{pos['id']} cerrada. Resultado de ${pnl:,.2f} guardado en el Journal de Excel.")
                     posiciones_a_cerrar.append(idx)
                     st.rerun()
 
@@ -870,7 +874,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 st.session_state.posiciones_abiertas.pop(index)
             st.rerun()
     else:
-        st.info("No hay posiciones abiertas actualmente en la terminal.")
+        st.info("No hay posiciones activas en este momento. Las órdenes abiertas aparecerán aquí y esperarán a tocar su TP o SL en tiempo real.")
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
