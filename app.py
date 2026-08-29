@@ -624,6 +624,30 @@ elif opcion_menu == "📓 Trading Journal":
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
+    import json
+    import os
+    from datetime import datetime
+
+    # Archivos locales para persistencia en disco
+    ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
+    ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
+
+    def cargar_datos_json(archivo):
+        if os.path.exists(archivo):
+            try:
+                with open(archivo, "r") as f:
+                    return json.load(f)
+            except Exception:
+                return []
+        return []
+
+    def guardar_datos_json(archivo, datos):
+        try:
+            with open(archivo, "w") as f:
+                json.dump(datos, f)
+        except Exception:
+            pass
+
     # Inyección de Estilos CSS estilo Terminal MT5
     st.markdown("""
         <style>
@@ -643,18 +667,22 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     # 1. Balance inicial estricto de 300 USD
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
+    
+    # Sincronización con archivos persistentes en disco
     if 'posiciones_abiertas' not in st.session_state:
-        st.session_state.posiciones_abiertas = []
+        st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS)
+    
+    if 'historial_cerradas' not in st.session_state:
+        st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
     # Panel de Métricas Superior estilo MT5
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.metric("Balance", f"${st.session_state.balance_pedagogico:,.2f}")
     with col_m2:
-        # Se calcula el flotante con base en el precio de entrada digitado actual de la sesión
         pnl_flotante_total = 0.0
         for pos in st.session_state.posiciones_abiertas:
-            act_p = pos["precio_vela_actual"] # Toma el pulso de la vela activa
+            act_p = pos.get("precio_vela_actual", pos["entrada"]) 
             is_jpy_m = "JPY" in pos["activo"]
             is_mc_m = "XAU" in pos["activo"] or "BTC" in pos["activo"]
             mp = 100.0 if is_jpy_m else (1.0 if is_mc_m else 10000.0)
@@ -715,7 +743,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
 
-        # Precio base predeterminado visual de referencia en el panel lateral
         precios_base_ref = {"EURUSD": 1.15781, "GBPUSD": 1.30000, "USDJPY": 155.200, "XAUUSD": 2600.00, "BTCUSD": 65000.00}
         precio_referencia_vela = precios_base_ref.get(activo_sim, 1.15781)
 
@@ -742,7 +769,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
         if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_sim", use_container_width=True):
             nueva_orden = {
-                "id": len(st.session_state.posiciones_abiertas) + len(st.session_state.get('historial_cerradas', [])) + 1,
+                "id": len(st.session_state.posiciones_abiertas) + len(st.session_state.historial_cerradas) + 1,
                 "fecha": str(datetime.now().date()),
                 "activo": activo_sim,
                 "tipo": sim_tipo,
@@ -750,22 +777,21 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 "entrada": float(sim_precio_entrada),
                 "sl": float(sim_precio_sl),
                 "tp": float(sim_precio_tp),
-                "precio_vela_actual": float(sim_precio_entrada) # Arranca exactamente en el precio de la vela actual indicada
+                "precio_vela_actual": float(sim_precio_entrada)
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
-            st.success("¡Orden abierta correctamente con los parámetros de la vela actual!")
+            guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
+            st.success("¡Orden abierta correctamente con persistencia en disco!")
             st.rerun()
 
-    # --- PANEL INFERIOR: POSICIONES ABIERTAS (DINÁMICA DE VELA ACTUAL) ---
+    # --- PANEL INFERIOR: POSICIONES ABIERTAS ---
     st.markdown("### 📊 Posiciones Abiertas (Tiempo Real)")
 
     if st.session_state.posiciones_abiertas:
         posiciones_a_cerrar = []
         
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
-            # Para simular la interacción dinámica de la vela actual de forma limpia sin fuentes externas, 
-            # tomamos el valor actual registrado en la posición o permitimos que fluctúe de manera controlada.
-            precio_actual_vela = pos["precio_vela_actual"]
+            precio_actual_vela = pos.get("precio_vela_actual", pos["entrada"])
             
             es_jpy = "JPY" in pos["activo"]
             is_mc = "XAU" in pos["activo"] or "BTC" in pos["activo"]
@@ -776,7 +802,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             pips = (precio_actual_vela - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_actual_vela)
             pnl = pips * mp * vp * pos["lotes"]
 
-            # Comprobación de límites estrictos de seguridad (TP y SL basados netamente en la vela)
             cierre_automatico = False
             motivo_cierre = "Activa"
             
@@ -823,18 +848,18 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # Botón de cierre manual individual al final de cada tarjeta de posición
                 col_info_btn, col_btn_cerrar = st.columns([4, 1])
                 with col_btn_cerrar:
                     btn_manual = st.button(f"Cerrar #{pos['id']}", key=f"btn_cierre_manual_{pos['id']}_{idx}", use_container_width=True)
 
+                # Si ocurre el cierre automático o manual
                 if cierre_automatico or btn_manual:
                     tipo_cierre_txt = f"Cierre automático por {motivo_cierre}" if cierre_automatico else "Cierre manual por el usuario"
                     st.session_state.balance_pedagogico += pnl
                     
-                    # Estructura conectada directamente al Google Form (Journal de Alumnos)
+                    # 1. Enviar datos al Google Form (Journal)
                     form_data_simulador = {
-                        "entry.990498500": st.session_state.usuario_actual,
+                        "entry.990498500": st.session_state.get("usuario_actual", "DIRALEX"),
                         "entry.155506709": str(datetime.now().date()),
                         "entry.906926856": pos['activo'],
                         "entry.1849778551": pos['tipo'],
@@ -851,16 +876,42 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     except Exception:
                         pass
 
-                    st.success(f"🔥 Orden #{pos['id']} cerrada correctamente. Resultado de ${pnl:,.2f} enviado al Journal de Excel.")
+                    # 2. Guardar en el Historial Permanente local (con los datos exactos que pides)
+                    registro_historial = {
+                        "Marca temporal": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                        "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
+                        "Fecha": pos['fecha'],
+                        "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"), # Estilo estético similar a la imagen
+                        "Tipo": pos['tipo'],
+                        "Lotes": pos['lotes'],
+                        "Pips": round(pips, 1),
+                        "Resultado USD": round(pnl, 2)
+                    }
+                    st.session_state.historial_cerradas.append(registro_historial)
+                    guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
+
+                    st.success(f"🔥 Orden #{pos['id']} cerrada y registrada en la bitácora permanente.")
                     posiciones_a_cerrar.append(idx)
-                    st.rerun()
 
         if posiciones_a_cerrar:
             for index in sorted(posiciones_a_cerrar, reverse=True):
                 st.session_state.posiciones_abiertas.pop(index)
+            guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
             st.rerun()
     else:
-        st.info("No hay posiciones activas. Las operaciones permanecerán abiertas con sus límites de seguridad a la espera de que el precio de la vela actual toque el TP/SL o decidas cerrarlas manualmente.")
+        st.info("No hay posiciones activas actualmente.")
+
+    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE (ESTILO IMAGEN 2) ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("### 📋 Bitácora Histórica Permanente")
+    
+    if st.session_state.historial_cerradas:
+        import pandas as pd
+        df_historial = pd.DataFrame(st.session_state.historial_cerradas)
+        # Mostramos la tabla limpia idéntica al formato de tu captura
+        st.dataframe(df_historial, use_container_width=True, hide_index=False)
+    else:
+        st.info("Aún no hay operaciones cerradas en el historial permanente. Las operaciones aparecerán aquí en cuanto se cierren por TP, SL o de forma manual.")
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
