@@ -296,8 +296,7 @@ collapse_script = """
     });
 </script>
 """
-st.sidebar.components.v1.html(collapse_script, height=0, width=0)ate.tipo_usuario = "ALUMNO"
-    st.rerun()
+components.v1.html(collapse_script, height=0, width=0)
 
 # --- TICKER DE TRADINGVIEW SUPERIOR ---
 ticker_html = """
