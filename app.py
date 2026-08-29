@@ -630,7 +630,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     # Inicialización segura de estados
     if 'balance_pedagogico' not in st.session_state:
-        st.session_state.balance_pedagogico = 10000.00
+        st.session_state.balance_pedagogico = 250.00
     if 'posiciones_abiertas' not in st.session_state:
         st.session_state.posiciones_abiertas = []
     if 'historial_operaciones' not in st.session_state:
