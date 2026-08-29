@@ -763,10 +763,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 "fecha": str(datetime.now().date()),
                 "activo": activo_sim,
                 "tipo": sim_tipo,
-                "lotes": sim_lotes,
-                "entrada": sim_precio_entrada,
-                "sl": sim_precio_sl,
-                "tp": sim_precio_tp
+                "lotes": float(sim_lotes),
+                "entrada": float(sim_precio_entrada),
+                "sl": float(sim_precio_sl),
+                "tp": float(sim_precio_tp)
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             st.rerun()
@@ -854,11 +854,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     
                     try:
                         res = requests.post(URL_FORM_RESPONSE, data=form_data_simulador)
-                        if res.status_code == 200 or res.status_code == 0:
+                        # Aceptamos códigos de redirección estándar de Google Forms (200, 302, 303) como exitosos
+                        if res.status_code in [200, 302, 303, 0]:
                             st.success(f"🔥 Orden #{pos['id']} cerrada y guardada automáticamente en tu Journal de Google Sheets.")
                             st.cache_data.clear()
                         else:
-                            st.warning("⚠️ Operación cerrada localmente.")
+                            st.warning(f"⚠️ Operación cerrada localmente (Código de red: {res.status_code}).")
                     except Exception as e:
                         st.error(f"Error de sincronización con la base de datos: {e}")
 
