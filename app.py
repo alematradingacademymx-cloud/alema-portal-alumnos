@@ -666,7 +666,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal MT5 Simulator</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal ALEMA </div>', unsafe_allow_html=True)
 
     # 1. Balance inicial estricto de 300 USD
     if 'balance_pedagogico' not in st.session_state:
@@ -697,7 +697,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
     with col_m4:
-        st.metric("Servidor", "ALEMA-Demo Live")
+        st.metric("Servidor", "ALEMA-Live")
 
     st.divider()
 
