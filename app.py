@@ -674,10 +674,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         pnl_flotante_total = 0.0
         for pos in st.session_state.posiciones_abiertas:
             act_p = obtener_precio_en_vivo(pos["activo"])
-            is_jpy = "JPY" in pos["activo"]
-            is_mc = "XAU" in pos["activo"] or "BTC" in pos["activo"]
-            mp = 100.0 if is_jpy else (1.0 if is_mc else 10000.0)
-            vp = 7.0 if is_jpy else 10.0
+            is_jpy_m = "JPY" in pos["activo"]
+            is_mc_m = "XAU" in pos["activo"] or "BTC" in pos["activo"]
+            mp = 100.0 if is_jpy_m else (1.0 if is_mc_m else 10000.0)
+            vp = 7.0 if is_jpy_m else 10.0
             pips_calc = (act_p - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - act_p)
             pnl_flotante_total += (pips_calc * mp * vp * pos["lotes"])
         st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
@@ -780,12 +780,14 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
             precio_actual_vivo = obtener_precio_en_vivo(pos["activo"])
-            is_jpy = "JPY" in pos["activo"]
+            
+            # Definición local de variables para formato de activos
+            es_jpy = "JPY" in pos["activo"]
             is_mc = "XAU" in pos["activo"] or "BTC" in pos["activo"]
             fmt = "%.3f" if es_jpy else ("%.2f" if is_mc else "%.5f")
             
-            mp = 100.0 if is_jpy else (1.0 if is_mc else 10000.0)
-            vp = 7.0 if is_jpy else 10.0
+            mp = 100.0 if es_jpy else (1.0 if is_mc else 10000.0)
+            vp = 7.0 if es_jpy else 10.0
             pips = (precio_actual_vivo - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_actual_vivo)
             pnl = pips * mp * vp * pos["lotes"]
 
@@ -861,7 +863,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
                     st.success(f"🔥 Orden #{pos['id']} cerrada correctamente. Balance actualizado y datos enviados al Journal.")
                     posiciones_a_cerrar.append(idx)
-                    st.stale = True
+                    st.rerun()
 
         if posiciones_a_cerrar:
             for index in sorted(posiciones_a_cerrar, reverse=True):
