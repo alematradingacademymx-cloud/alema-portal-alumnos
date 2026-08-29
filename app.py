@@ -252,6 +252,7 @@ if not st.session_state.autenticado:
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
+import streamlit.components.v1 as components
 
 st.sidebar.image("alema trading academy.png", width=180)
 
@@ -276,6 +277,27 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state.usuario_actual = ""
     st.session_state.tipo_usuario = "ALUMNO"
     st.rerun()
+
+# --- SCRIPT DE COLAPSO AUTOMÁTICO PARA MÓVILES ---
+collapse_script = """
+<script>
+    const streamlitDoc = window.parent.document;
+    const radioOptions = streamlitDoc.querySelectorAll('div[data-testid="stSidebar"] input[type="radio"]');
+    
+    radioOptions.forEach(option => {
+        option.addEventListener('change', function() {
+            if (window.parent.innerWidth < 768) {
+                const collapseBtn = streamlitDoc.querySelector('button[data-testid="collapsedControl"]');
+                const sidebarExpanded = streamlitDoc.querySelector('section[data-testid="stSidebar"][aria-expanded="true"]');
+                if (collapseBtn && sidebarExpanded) {
+                    collapseBtn.click();
+                }
+            }
+        });
+    });
+</script>
+"""
+components.html(collapse_script, height=0, width=0)
 
 # --- TICKER DE TRADINGVIEW SUPERIOR ---
 ticker_html = """
@@ -309,7 +331,6 @@ ticker_html = """
 </style>
 """
 components.html(ticker_html, height=78)
-
 
 # ==========================================
 # SECCIÓN: MI AVANCE ACADÉMICO (ALUMNOS/ADMIN)
