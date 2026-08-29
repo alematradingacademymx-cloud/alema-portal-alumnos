@@ -627,6 +627,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     import json
     import os
     from datetime import datetime
+    import requests
+    import pandas as pd
 
     # Archivos locales para persistencia en disco
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
@@ -857,7 +859,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     tipo_cierre_txt = f"Cierre automático por {motivo_cierre}" if cierre_automatico else "Cierre manual por el usuario"
                     st.session_state.balance_pedagogico += pnl
                     
-                    # 1. Enviar datos al Google Form (Journal)
+                    # 1. Envío de datos al Google Form / Journal con depuración visible
                     form_data_simulador = {
                         "entry.990498500": st.session_state.get("usuario_actual", "DIRALEX"),
                         "entry.155506709": str(datetime.now().date()),
@@ -872,16 +874,20 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     }
                     
                     try:
-                        requests.post(URL_FORM_RESPONSE, data=form_data_simulador)
-                    except Exception:
-                        pass
+                        response = requests.post(URL_FORM_RESPONSE, data=form_data_simulador)
+                        if response.status_code == 200:
+                            st.success("📡 Datos enviados correctamente a la base de datos (Google Sheets).")
+                        else:
+                            st.warning(f"⚠️ El servidor de Google respondió con código: {response.status_code}")
+                    except Exception as e:
+                        st.error(f"❌ Error de conexión al enviar al formulario: {e}")
 
-                    # 2. Guardar en el Historial Permanente local (con los datos exactos que pides)
+                    # 2. Guardar en el Historial Permanente local
                     registro_historial = {
                         "Marca temporal": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                         "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
                         "Fecha": pos['fecha'],
-                        "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"), # Estilo estético similar a la imagen
+                        "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"),
                         "Tipo": pos['tipo'],
                         "Lotes": pos['lotes'],
                         "Pips": round(pips, 1),
@@ -890,7 +896,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     st.session_state.historial_cerradas.append(registro_historial)
                     guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
 
-                    st.success(f"🔥 Orden #{pos['id']} cerrada y registrada en la bitácora permanente.")
                     posiciones_a_cerrar.append(idx)
 
         if posiciones_a_cerrar:
@@ -901,14 +906,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     else:
         st.info("No hay posiciones activas actualmente.")
 
-    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE (ESTILO IMAGEN 2) ---
+    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE ---
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("### 📋 Bitácora Histórica Permanente")
     
     if st.session_state.historial_cerradas:
-        import pandas as pd
         df_historial = pd.DataFrame(st.session_state.historial_cerradas)
-        # Mostramos la tabla limpia idéntica al formato de tu captura
         st.dataframe(df_historial, use_container_width=True, hide_index=False)
     else:
         st.info("Aún no hay operaciones cerradas en el historial permanente. Las operaciones aparecerán aquí en cuanto se cierren por TP, SL o de forma manual.")
