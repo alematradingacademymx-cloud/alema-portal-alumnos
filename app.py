@@ -624,7 +624,7 @@ elif opcion_menu == "📓 Trading Journal":
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
-    # Inyección de Estilos CSS estilo Terminal MT5 para máxima estética
+    # Inyección de Estilos CSS estilo Terminal MT5
     st.markdown("""
         <style>
             .mt5-terminal-card {
@@ -634,13 +634,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 border-radius: 4px;
                 margin-bottom: 8px;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            }
-            .metric-box {
-                background-color: #1E222D;
-                border: 1px solid #363C4E;
-                padding: 10px;
-                border-radius: 6px;
-                text-align: center;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -652,8 +645,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         st.session_state.balance_pedagogico = 300.00
     if 'posiciones_abiertas' not in st.session_state:
         st.session_state.posiciones_abiertas = []
-    if 'historial_operaciones' not in st.session_state:
-        st.session_state.historial_operaciones = []
 
     # Función de precio en tiempo real optimizada
     def obtener_precio_en_vivo(symbol_str):
@@ -680,7 +671,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_m1:
         st.metric("Balance", f"${st.session_state.balance_pedagogico:,.2f}")
     with col_m2:
-        # Cálculo de PnL flotante total en tiempo real
         pnl_flotante_total = 0.0
         for pos in st.session_state.posiciones_abiertas:
             act_p = obtener_precio_en_vivo(pos["activo"])
@@ -769,8 +759,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
         if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_sim", use_container_width=True):
             nueva_orden = {
-                "id": len(st.session_state.posiciones_abiertas) + len(st.session_state.historial_operaciones) + 1,
-                "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "id": len(st.session_state.posiciones_abiertas) + 1,
+                "fecha": str(datetime.now().date()),
                 "activo": activo_sim,
                 "tipo": sim_tipo,
                 "lotes": sim_lotes,
@@ -781,7 +771,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.session_state.posiciones_abiertas.append(nueva_orden)
             st.rerun()
 
-    # --- PANEL INFERIOR ESTILO TERMINAL MT5 (Posiciones Abiertas) ---
+    # --- PANEL INFERIOR: POSICIONES ABIERTAS & CIERRE AUTOMÁTICO (TP/SL) ---
     st.markdown("### 📊 Posiciones Abiertas (Tiempo Real)")
 
     if st.session_state.posiciones_abiertas:
@@ -798,7 +788,25 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             pips = (precio_actual_vivo - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_actual_vivo)
             pnl = pips * mp * vp * pos["lotes"]
 
-            # Contenedor con estructura idéntica a la solicitada: Activo, lotaje, entrada, TP, SL, tipo, ganancia, estatus, botón
+            # Evaluación de TP o SL automático
+            cierre_automatico = False
+            motivo_cierre = "Manual"
+            
+            if pos["tipo"] == "BUY":
+                if precio_actual_vivo >= pos["tp"]:
+                    cierre_automatico = True
+                    motivo_cierre = "Take Profit (TP)"
+                elif precio_actual_vivo <= pos["sl"]:
+                    cierre_automatico = True
+                    motivo_cierre = "Stop Loss (SL)"
+            else: 
+                if precio_actual_vivo <= pos["tp"]:
+                    cierre_automatico = True
+                    motivo_cierre = "Take Profit (TP)"
+                elif precio_actual_vivo >= pos["sl"]:
+                    cierre_automatico = True
+                    motivo_cierre = "Stop Loss (SL)"
+
             with st.container():
                 st.markdown(f"""
                     <div class="mt5-terminal-card">
@@ -821,25 +829,39 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                                 <td><code>{fmt % pos['sl']}</code></td>
                                 <td style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}; font-weight:bold;">{pos['tipo']}</td>
                                 <td style="color: {'#26a69a' if pnl>=0 else '#ef5350'}; font-weight:bold;">${pnl:,.2f}</td>
-                                <td style="color: #2962FF;">● Activa</td>
+                                <td style="color: {'#26a69a' if cierre_automatico else '#2962FF'};">{'● Cierre ' + motivo_cierre if cierre_automatico else '● Activa'}</td>
                             </tr>
                         </table>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                if st.button(f"Cerrar #{pos['id']}", key=f"cerrar_pos_{pos['id']}_{idx}"):
+                if cierre_automatico or st.button(f"Cerrar #{pos['id']}", key=f"cerrar_pos_{pos['id']}_{idx}"):
                     st.session_state.balance_pedagogico += pnl
-                    st.session_state.historial_operaciones.insert(0, {
-                        "ID": pos["id"],
-                        "Fecha": pos["fecha"],
-                        "Activo": pos["activo"],
-                        "Tipo": pos["tipo"],
-                        "Lotes": pos["lotes"],
-                        "Entrada": fmt % pos["entrada"],
-                        "Cierre": fmt % precio_actual_vivo,
-                        "Resultado ($)": f"${pnl:,.2f}",
-                        "Estado": "Cerrada"
-                    })
+                    
+                    # Estructura conectada directamente al Google Form (Journal de Alumnos)
+                    form_data_simulador = {
+                        "entry.990498500": st.session_state.usuario_actual,
+                        "entry.155506709": str(datetime.now().date()),
+                        "entry.906926856": pos['activo'],
+                        "entry.1849778551": pos['tipo'],
+                        "entry.974887529": str(pos['lotes']),
+                        "entry.46118986": str(round(pips, 1)),
+                        "entry.1003289205": str(round(pnl, 2)),
+                        "entry.372443422": "🟢 Disciplinado (Simulador Live)",
+                        "entry.332810614": f"Cierre automático por {motivo_cierre}" if cierre_automatico else "Cierre manual en terminal live",
+                        "entry.635428194": "Simulador MT5 ALEMA"
+                    }
+                    
+                    try:
+                        res = requests.post(URL_FORM_RESPONSE, data=form_data_simulador)
+                        if res.status_code == 200 or res.status_code == 0:
+                            st.success(f"🔥 Orden #{pos['id']} cerrada y guardada automáticamente en tu Journal de Google Sheets.")
+                            st.cache_data.clear()
+                        else:
+                            st.warning("⚠️ Operación cerrada localmente.")
+                    except Exception as e:
+                        st.error(f"Error de sincronización con la base de datos: {e}")
+
                     posiciones_a_cerrar.append(idx)
                     st.rerun()
 
@@ -849,13 +871,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.rerun()
     else:
         st.info("No hay posiciones abiertas actualmente en la terminal.")
-
-    # --- HISTORIAL DE OPERACIONES CERRADAS ---
-    st.markdown("### 📜 Historial de Operaciones (Journal)")
-    if st.session_state.historial_operaciones:
-        st.dataframe(pd.DataFrame(st.session_state.historial_operaciones), use_container_width=True, hide_index=True)
-    else:
-        st.caption("El historial de operaciones cerradas aparecerá aquí automáticamente.")
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
