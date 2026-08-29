@@ -277,6 +277,28 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state.tipo_usuario = "ALUMNO"
     st.rerun()
 
+# --- SCRIPT DE COLAPSO AUTOMÁTICO PARA MÓVILES ---
+collapse_script = """
+<script>
+    const streamlitDoc = window.parent.document;
+    const radioOptions = streamlitDoc.querySelectorAll('div[data-testid="stSidebar"] input[type="radio"]');
+    
+    radioOptions.forEach(option => {
+        option.addEventListener('change', function() {
+            if (window.parent.innerWidth < 768) {
+                const collapseBtn = streamlitDoc.querySelector('button[data-testid="collapsedControl"]');
+                const sidebarExpanded = streamlitDoc.querySelector('section[data-testid="stSidebar"][aria-expanded="true"]');
+                if (collapseBtn && sidebarExpanded) {
+                    collapseBtn.click();
+                }
+            }
+        });
+    });
+</script>
+"""
+st.sidebar.components.v1.html(collapse_script, height=0, width=0)ate.tipo_usuario = "ALUMNO"
+    st.rerun()
+
 # --- TICKER DE TRADINGVIEW SUPERIOR ---
 ticker_html = """
 <div class="tradingview-widget-container">
