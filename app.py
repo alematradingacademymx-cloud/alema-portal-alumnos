@@ -630,7 +630,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     import requests
     import pandas as pd
 
-    # Archivos locales para persistencia en disco
+    # Definición de enlace CSV para tu nueva pestaña en Google Sheets
+    URL_SIMULADOR_JOURNAL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Simulador_Journal"
+
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
     ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
 
@@ -650,7 +652,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         except Exception:
             pass
 
-    # Inyección de Estilos CSS estilo Terminal MT5
+    # Estilos CSS Terminal MT5
     st.markdown("""
         <style>
             .mt5-terminal-card {
@@ -666,18 +668,16 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal MT5 Simulator</div>', unsafe_allow_html=True)
 
-    # 1. Balance inicial estricto de 300 USD
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
     
-    # Sincronización con archivos persistentes en disco
     if 'posiciones_abiertas' not in st.session_state:
         st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS)
     
     if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
-    # Panel de Métricas Superior estilo MT5
+    # Panel Métricas Superior
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.metric("Balance", f"${st.session_state.balance_pedagogico:,.2f}")
@@ -748,13 +748,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         precios_base_ref = {"EURUSD": 1.15781, "GBPUSD": 1.30000, "USDJPY": 155.200, "XAUUSD": 2600.00, "BTCUSD": 65000.00}
         precio_referencia_vela = precios_base_ref.get(activo_sim, 1.15781)
 
-        sim_precio_entrada = st.number_input(
-            "Precio de Entrada (Vela Actual)", 
-            value=float(precio_referencia_vela), 
-            format=formato, 
-            step=step_val, 
-            key=f"precio_vela_sync_{activo_sim}"
-        )
+        sim_precio_entrada = st.number_input("Precio de Entrada (Vela Actual)", value=float(precio_referencia_vela), format=formato, step=step_val, key=f"precio_vela_sync_{activo_sim}")
         
         dist_sl = 0.00500 if not es_jpy_sim and not es_crypto_oro else (0.500 if es_jpy_sim else 20.0)
         dist_tp = 0.01000 if not es_jpy_sim and not es_crypto_oro else (1.000 if es_jpy_sim else 40.0)
@@ -783,10 +777,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success("¡Orden abierta correctamente con persistencia en disco!")
+            st.success("¡Orden abierta correctamente!")
             st.rerun()
 
-    # --- PANEL INFERIOR: POSICIONES ABIERTAS ---
+    # --- POSICIONES ABIERTAS ---
     st.markdown("### 📊 Posiciones Abiertas (Tiempo Real)")
 
     if st.session_state.posiciones_abiertas:
@@ -854,12 +848,11 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 with col_btn_cerrar:
                     btn_manual = st.button(f"Cerrar #{pos['id']}", key=f"btn_cierre_manual_{pos['id']}_{idx}", use_container_width=True)
 
-                # Si ocurre el cierre automático o manual
                 if cierre_automatico or btn_manual:
                     tipo_cierre_txt = f"Cierre automático por {motivo_cierre}" if cierre_automatico else "Cierre manual por el usuario"
                     st.session_state.balance_pedagogico += pnl
                     
-                    # 1. Envío de datos al Google Form / Journal con depuración visible
+                    # Envío a Google Form
                     form_data_simulador = {
                         "entry.990498500": st.session_state.get("usuario_actual", "DIRALEX"),
                         "entry.155506709": str(datetime.now().date()),
@@ -874,15 +867,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     }
                     
                     try:
-                        response = requests.post(URL_FORM_RESPONSE, data=form_data_simulador)
-                        if response.status_code == 200:
-                            st.success("📡 Datos enviados correctamente a la base de datos (Google Sheets).")
-                        else:
-                            st.warning(f"⚠️ El servidor de Google respondió con código: {response.status_code}")
-                    except Exception as e:
-                        st.error(f"❌ Error de conexión al enviar al formulario: {e}")
+                        requests.post(URL_FORM_RESPONSE, data=form_data_simulador)
+                    except Exception:
+                        pass
 
-                    # 2. Guardar en el Historial Permanente local
                     registro_historial = {
                         "Marca temporal": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                         "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
@@ -906,15 +894,22 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     else:
         st.info("No hay posiciones activas actualmente.")
 
-    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE ---
+    # --- BITÁCORA HISTÓRICA PERMANENTE (Sincronizada con Google Sheets y Local) ---
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("### 📋 Bitácora Histórica Permanente")
     
-    if st.session_state.historial_cerradas:
+    try:
+        df_sheets_simulador = pd.read_csv(URL_SIMULADOR_JOURNAL, dtype=str)
+    except Exception:
+        df_sheets_simulador = pd.DataFrame()
+
+    if not df_sheets_simulador.empty:
+        st.dataframe(df_sheets_simulador, use_container_width=True, hide_index=False)
+    elif st.session_state.historial_cerradas:
         df_historial = pd.DataFrame(st.session_state.historial_cerradas)
         st.dataframe(df_historial, use_container_width=True, hide_index=False)
     else:
-        st.info("Aún no hay operaciones cerradas en el historial permanente. Las operaciones aparecerán aquí en cuanto se cierren por TP, SL o de forma manual.")
+        st.info("Aún no hay operaciones registradas en la base de datos de 'Simulador_Journal'.")
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
