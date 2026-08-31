@@ -577,6 +577,23 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         except Exception:
             pass
 
+    # --- FÓRMULA MATEMÁTICA INSTITUCIONAL PARA CÁLCULO DE PNL EN USD ---
+    def calcular_pnl_institucional(activo, tipo, entrada, salida, lotes):
+        diferencia = (salida - entrada) if tipo == "BUY" else (entrada - salida)
+        
+        if "XAU" in activo:
+            # Contrato estándar de Oro: 100 oz troy (1.00 USD de movimiento = $100 USD por lote)
+            return diferencia * 100.0 * lotes
+        elif "JPY" in activo:
+            # Contrato Forex estándar de Yenes (100,000 JPY por lote).
+            # Valor exacto del Pip en USD convertido en tiempo real según el precio actual
+            valor_pip_usd_por_lote = 1000.0 / salida if salida != 0 else 6.80
+            pips = diferencia * 100.0
+            return pips * valor_pip_usd_por_lote * lotes
+        else:
+            # Pares estándar Forex Directos e Indirectos (EURUSD, GBPUSD, etc.): 100,000 unidades base
+            return diferencia * 100000.0 * lotes
+
     # Estilos CSS
     st.markdown("""
         <style>
@@ -714,7 +731,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, precio_actual_ref)
 
-    # --- MONITOREO AUTOMÁTICO DE TP / SL ---
+    # --- MONITOREO AUTOMÁTICO DE TP / SL (USANDO CÁLCULO INSTITUCIONAL) ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -726,9 +743,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
             es_jpy = "JPY" in sim_pos
             is_oro = "XAU" in sim_pos
-            
-            mult_pips = 100.0 if es_jpy else (10.0 if is_oro else 10000.0)
-            val_pip_base = 7.0 if es_jpy else 10.0
             
             cierre_por_tp_sl = False
             precio_ejecucion_salida = p_vivo_pos
@@ -745,8 +759,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     cierre_por_tp_sl, precio_ejecucion_salida = True, pos["sl"]
 
             if cierre_por_tp_sl:
-                pips_reales = (precio_ejecucion_salida - pos["entrada"]) * mult_pips if pos["tipo"] == "BUY" else (pos["entrada"] - precio_ejecucion_salida) * mult_pips
-                pnl_real = pips_reales * val_pip_base * pos["lotes"]
+                pnl_real = calcular_pnl_institucional(
+                    sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"]
+                )
                 
                 st.session_state.balance_pedagogico += pnl_real
                 
@@ -779,12 +794,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         pnl_flotante_total = 0.0
         for pos in st.session_state.posiciones_abiertas:
             act_p = pos.get("precio_vela_actual", pos["entrada"])
-            is_jpy_m = "JPY" in pos["activo"]
-            is_oro_m = "XAU" in pos["activo"]
-            mp_m = 100.0 if is_jpy_m else (10.0 if is_oro_m else 10000.0)
-            vp_m = 7.0 if is_jpy_m else 10.0
-            pips_calc = (act_p - pos["entrada"]) * mp_m if pos["tipo"] == "BUY" else (pos["entrada"] - act_p) * mp_m
-            pnl_flotante_total += (pips_calc * vp_m * pos["lotes"])
+            pnl_flotante_total += calcular_pnl_institucional(
+                pos["activo"], pos["tipo"], pos["entrada"], act_p, pos["lotes"]
+            )
         st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
@@ -882,11 +894,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             is_oro_pos = "XAU" in pos["activo"]
             fmt_pos = "%.3f" if es_jpy_pos else ("%.2f" if is_oro_pos else "%.5f")
             
-            mp_card = 100.0 if es_jpy_pos else (10.0 if is_oro_pos else 10000.0)
-            vp_card = 7.0 if es_jpy_pos else 10.0
-            
-            pips_calc_card = (precio_vivo - pos["entrada"]) * mp_card if pos["tipo"] == "BUY" else (pos["entrada"] - precio_vivo) * mp_card
-            pnl_card = pips_calc_card * vp_card * pos["lotes"]
+            pnl_card = calcular_pnl_institucional(
+                pos["activo"], pos["tipo"], pos["entrada"], precio_vivo, pos["lotes"]
+            )
 
             st.markdown(f"""
                 <div class="mt5-terminal-card">
