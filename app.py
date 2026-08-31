@@ -543,7 +543,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (BID/ASK + SPREAD + PRECIO DE MERCADO DINÁMICO EN TIEMPO REAL)
+# (PERSISTENCIA TOTAL EN DISCO: BALANCE + ORDENES ABIERTAS + BITÁCORA)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -560,24 +560,40 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     # Recarga automática de la pantalla cada 4 segundos para movimiento fluido
     st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_live")
 
+    # --- ARCHIVOS DE PERSISTENCIA EN DISCO ---
+    ARCH_PERSISTENCIA_BALANCE = "balance_alema.json"
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
     ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
 
-    def cargar_datos_json(archivo):
+    # --- FUNCIONES DE LECTURA Y ESCRITURA EN DISCO ---
+    def cargar_datos_json(archivo, valor_defecto):
         if os.path.exists(archivo):
             try:
                 with open(archivo, "r") as f:
                     return json.load(f)
             except Exception:
-                return []
-        return []
+                return valor_defecto
+        return valor_defecto
 
     def guardar_datos_json(archivo, datos):
         try:
             with open(archivo, "w") as f:
-                json.dump(datos, f)
+                json.dump(datos, f, indent=4)
         except Exception:
             pass
+
+    # Cargar datos persistentes al iniciar/reiniciar el servidor
+    if 'balance_pedagogico' not in st.session_state:
+        st.session_state.balance_pedagogico = float(cargar_datos_json(ARCH_PERSISTENCIA_BALANCE, 300.00))
+    if 'posiciones_abiertas' not in st.session_state:
+        st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, [])
+    if 'historial_cerradas' not in st.session_state:
+        st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
+
+    if 'cache_precios_forex' not in st.session_state:
+        st.session_state.cache_precios_forex = {}
+    if 'ultimo_tiempo_api' not in st.session_state:
+        st.session_state.ultimo_tiempo_api = {}
 
     def calcular_pnl_institucional(activo, tipo, entrada, salida, lotes):
         diferencia = (salida - entrada) if tipo == "BUY" else (entrada - salida)
@@ -599,7 +615,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     def obtener_config_activo(simbolo):
         if "JPY" in simbolo:
-            # dec, fmt, step, default_sl_dist, default_tp_dist, spread_valor
             return 3, "%.3f", 0.001, 0.500, 1.000, 0.015
         elif "XAU" in simbolo:
             return 2, "%.2f", 0.10, 10.0, 20.0, 0.35
@@ -663,19 +678,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional (Spread + Cotización Vivo)</div>', unsafe_allow_html=True)
-
-    if 'balance_pedagogico' not in st.session_state:
-        st.session_state.balance_pedagogico = 300.00
-    if 'posiciones_abiertas' not in st.session_state:
-        st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS)
-    if 'historial_cerradas' not in st.session_state:
-        st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
-
-    if 'cache_precios_forex' not in st.session_state:
-        st.session_state.cache_precios_forex = {}
-    if 'ultimo_tiempo_api' not in st.session_state:
-        st.session_state.ultimo_tiempo_api = {}
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional (Persistencia Permanente)</div>', unsafe_allow_html=True)
 
     lista_activos = [
         "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", 
@@ -770,7 +773,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, bid_actual)
 
-    # --- MONITOREO DE ORDENES ACTIVAS ---
+    # --- MONITOREO DE ORDENES ACTIVAS (EVALUACIÓN AUTOMÁTICA SL/TP) ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -804,7 +807,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
             if cierre_por_tp_sl:
                 pnl_real = calcular_pnl_institucional(sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"])
+                
+                # Actualizar Balance y Guardar
                 st.session_state.balance_pedagogico += pnl_real
+                guardar_datos_json(ARCH_PERSISTENCIA_BALANCE, st.session_state.balance_pedagogico)
                 
                 registro_historial = {
                     "Tipo": pos['tipo'].lower(),
@@ -827,7 +833,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
             st.rerun()
 
-    # Métrica Dashboard
+    # Métrica Dashboard (Con botón para resetear la cuenta completa si se desea)
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.metric("Balance", f"${st.session_state.balance_pedagogico:,.2f}")
@@ -840,7 +846,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
     with col_m4:
-        st.metric("Servidor", "ALEMA-ECN-Feed")
+        st.metric("Estado Datos", "💾 Persistente en Disco")
 
     st.divider()
 
@@ -849,7 +855,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     n_decimals, formato_str, step_val, dist_sl, dist_tp, spread_val = obtener_config_activo(par_activo)
 
     with col_grafico:
-        # AQUÍ SE MUESTRA EL PRECIO DE MERCADO EN TIEMPO REAL JUNTO AL SPREAD, BID Y ASK
         st.markdown(
             f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>"
             f"Gráfico {par_activo} | "
@@ -921,6 +926,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 "ask_vela_actual": float(ask_actual)
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
+            
+            # Guardar en disco inmediatamente
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
             st.success(f"¡Orden {sim_tipo} abierta en {par_activo}: {formato_str % precio_ejecucion}!")
             st.rerun()
@@ -946,6 +953,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             
             if st.button(f"Cerrar Manual #{pos['id']}", key=f"manual_btn_forex_{pos['id']}_{idx}"):
                 st.session_state.balance_pedagogico += pnl_card
+                guardar_datos_json(ARCH_PERSISTENCIA_BALANCE, st.session_state.balance_pedagogico)
+
                 st.session_state.historial_cerradas.append({
                     "Tipo": pos['tipo'].lower(),
                     "Volumen": pos['lotes'],
@@ -957,6 +966,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     "Beneficio": round(pnl_card, 2)
                 })
                 guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
+                
                 st.session_state.posiciones_abiertas.pop(idx)
                 guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
                 st.rerun()
@@ -966,11 +976,16 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     # --- BITÁCORA HISTÓRICA ---
     st.markdown("<br>", unsafe_allow_html=True)
     
-    col_tit_bita, col_btn_bita = st.columns([3, 1])
+    col_tit_bita, col_btn_bita1, col_btn_bita2 = st.columns([2.5, 1, 1])
     with col_tit_bita:
         st.markdown("### 📋 Bitácora Histórica (MetaTrader 5)")
-    with col_btn_bita:
-        if st.button("🗑️ Reiniciar Bitácora", key="btn_reset_bitacora_mt5"):
+    with col_btn_bita1:
+        if st.button("🔄 Restablecer Balance ($300)", key="btn_reset_balance_mt5"):
+            st.session_state.balance_pedagogico = 300.00
+            guardar_datos_json(ARCH_PERSISTENCIA_BALANCE, 300.00)
+            st.rerun()
+    with col_btn_bita2:
+        if st.button("🗑️ Limpiar Historial", key="btn_reset_bitacora_mt5"):
             st.session_state.historial_cerradas = []
             guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
             st.rerun()
