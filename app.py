@@ -543,7 +543,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (CIERRE EXACTO TP/SL SIN DESINCRONIZACIÓN)
+# (VERSIÓN DEFINITIVA CON ESTADOS DE RIESGO Y TICKS SINCRONIZADOS)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -645,7 +645,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     par_activo = st.selectbox("Símbolo de Mercado", lista_activos, key="select_chart_asset_forex")
 
-    # --- NÚCLEO DE PRECIOS ---
+    # --- NÚCLEO DE PRECIOS CON PROTECCIÓN DE API ---
     def obtener_cotizacion_completa(simbolo):
         dec, _, step_val, _, _, spread_val = obtener_config_activo(simbolo)
         simbolos_map = { "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY", "EURJPY": "EUR/JPY", "AUDUSD": "AUD/USD", "USDCAD": "USD/CAD", "USDCHF": "USD/CHF", "GBPJPY": "GBP/JPY", "XAUUSD": "XAU/USD", "WTIUSD": "WTI/USD", "BRENTUSD": "BRENT/USD", "US30": "US30", "SPX500": "SPX", "NAS100": "NDX", "GER40": "DAX", "BTCUSD": "BTC/USD" }
@@ -681,8 +681,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
         return precio_bid, precio_ask, precio_vivo
 
-    # FIX: DICCIONARIO DE TICKS SINCRONIZADOS
-    # Esto asegura que el gráfico y el validador de posiciones vean exactamente el mismo precio
+    # DICCIONARIO DE TICKS SINCRONIZADOS
     precios_tick_actual = {}
     
     def get_precio_sincronizado(simbolo):
@@ -716,7 +715,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, bid_actual)
 
-    # --- MONITOREO DE ORDENES ACTIVAS (CIERRE EXACTO) ---
+    # --- MONITOREO DE ORDENES ACTIVAS (CIERRE EXACTO ECN) ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -725,7 +724,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             sim_pos = pos["activo"]
             dec_pos, _, _, _, _, _ = obtener_config_activo(sim_pos)
             
-            # Usamos el precio del tick sincronizado
             p_bid, p_ask, _ = get_precio_sincronizado(sim_pos)
             
             pos["bid_vela_actual"] = p_bid
@@ -735,23 +733,22 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             sl_exacto = round(pos["sl"], dec_pos)
 
             cierre_por_tp_sl = False
-            # Por defecto cierra en el precio actual del mercado, pero si toca TP/SL se sobreescribe
             precio_ejecucion_salida = p_bid if pos["tipo"] == "BUY" else p_ask
 
             if pos["tipo"] == "BUY":
                 if p_bid >= tp_exacto:
                     cierre_por_tp_sl = True
-                    precio_ejecucion_salida = tp_exacto # Ejecución límite exacta
+                    precio_ejecucion_salida = tp_exacto
                 elif p_bid <= sl_exacto:
                     cierre_por_tp_sl = True
-                    precio_ejecucion_salida = sl_exacto # Ejecución límite exacta
+                    precio_ejecucion_salida = sl_exacto
             else: # SELL
                 if p_ask <= tp_exacto:
                     cierre_por_tp_sl = True
-                    precio_ejecucion_salida = tp_exacto # Ejecución límite exacta
+                    precio_ejecucion_salida = tp_exacto
                 elif p_ask >= sl_exacto:
                     cierre_por_tp_sl = True
-                    precio_ejecucion_salida = sl_exacto # Ejecución límite exacta
+                    precio_ejecucion_salida = sl_exacto
 
             if cierre_por_tp_sl:
                 pnl_real = calcular_pnl_institucional(sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"])
@@ -824,8 +821,18 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01)
         
         precio_ref_orden = ask_actual if sim_tipo == "BUY" else bid_actual
-        sim_precio_sl = st.number_input("Stop Loss", value=float(round(precio_ref_orden - dist_sl if sim_tipo == "BUY" else precio_ref_orden + dist_sl, n_decimals)), format=formato_str, step=step_val)
-        sim_precio_tp = st.number_input("Take Profit", value=float(round(precio_ref_orden + dist_tp if sim_tipo == "BUY" else precio_ref_orden - dist_tp, n_decimals)), format=formato_str, step=step_val)
+
+        # --- GESTIÓN DE ESTADOS INDEPENDIENTES PARA SL Y TP (EVITA RESEOS AL REFRESCAR) ---
+        key_sl = f"sim_precio_sl_{par_activo}_{sim_tipo}"
+        key_tp = f"sim_precio_tp_{par_activo}_{sim_tipo}"
+
+        if key_sl not in st.session_state:
+            st.session_state[key_sl] = float(round(precio_ref_orden - dist_sl if sim_tipo == "BUY" else precio_ref_orden + dist_sl, n_decimals))
+        if key_tp not in st.session_state:
+            st.session_state[key_tp] = float(round(precio_ref_orden + dist_tp if sim_tipo == "BUY" else precio_ref_orden - dist_tp, n_decimals))
+
+        sim_precio_sl = st.number_input("Stop Loss", format=formato_str, step=step_val, key=key_sl)
+        sim_precio_tp = st.number_input("Take Profit", format=formato_str, step=step_val, key=key_tp)
 
         if st.button(f"🟢 COMPRAR @ {formato_str % ask_actual}" if sim_tipo == "BUY" else f"🔴 VENDER @ {formato_str % bid_actual}", use_container_width=True):
             nueva_orden = {
