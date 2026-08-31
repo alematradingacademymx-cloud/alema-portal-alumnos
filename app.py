@@ -543,7 +543,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (VERSIÓN DEFINITIVA CON ESTADOS DE RIESGO Y TICKS SINCRONIZADOS)
+# (VERSIÓN 100% ESTABLE - BOTÓN FIJO Y TICKS SINCRONIZADOS)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -822,7 +822,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         
         precio_ref_orden = ask_actual if sim_tipo == "BUY" else bid_actual
 
-        # --- GESTIÓN DE ESTADOS INDEPENDIENTES PARA SL Y TP (EVITA RESEOS AL REFRESCAR) ---
+        # GESTIÓN DE ESTADOS INDEPENDIENTES PARA SL Y TP
         key_sl = f"sim_precio_sl_{par_activo}_{sim_tipo}"
         key_tp = f"sim_precio_tp_{par_activo}_{sim_tipo}"
 
@@ -834,7 +834,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         sim_precio_sl = st.number_input("Stop Loss", format=formato_str, step=step_val, key=key_sl)
         sim_precio_tp = st.number_input("Take Profit", format=formato_str, step=step_val, key=key_tp)
 
-        if st.button(f"🟢 COMPRAR @ {formato_str % ask_actual}" if sim_tipo == "BUY" else f"🔴 VENDER @ {formato_str % bid_actual}", use_container_width=True):
+        # BOTÓN FIJO (ETIQUETA ESTÁTICA PARA EVITAR FALLOS DE CLIC POR EL AUTOREFRESH)
+        texto_boton = "🟢 EJECUTAR ORDEN DE COMPRA" if sim_tipo == "BUY" else "🔴 EJECUTAR ORDEN DE VENTA"
+        
+        if st.button(texto_boton, use_container_width=True):
             nueva_orden = {
                 "id": int(datetime.now().timestamp()),
                 "tiempo_apertura": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
