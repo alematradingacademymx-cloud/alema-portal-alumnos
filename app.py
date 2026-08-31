@@ -542,21 +542,20 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (MOTOR AUTÓNOMO BASADO EN TIEMPO REAL)
+# TERMINAL INSTITUCIONAL ALEMA TRADING ACADEMY (CONEXIÓN OFICIAL METATRADER 5)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
     import json
     import os
-    from datetime import datetime, timedelta
-    import time
+    from datetime import datetime
     import pandas as pd
-    import numpy as np
+    import MetaTrader5 as mt5
     import plotly.graph_objects as go
     from streamlit_autorefresh import st_autorefresh
 
-    # Auto-refresco de la terminal cada 3 segundos para fluidez total en tiempo real
-    st_autorefresh(interval=3000, key="auto_refresh_terminal_alema_tiempo_real")
+    # Auto-refresco de la terminal cada 3 segundos para sincronización en vivo con MT5
+    st_autorefresh(interval=3000, key="auto_refresh_terminal_mt5")
 
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
     ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
@@ -588,15 +587,14 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             }
             .live-ticker {
-                color: #E2B714;
+                color: #26a69a;
                 font-weight: 700;
                 font-size: 16px;
-                animation: pulse 1.5s infinite;
             }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional en Vivo</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Conectada a MetaTrader 5</div>', unsafe_allow_html=True)
 
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
@@ -605,64 +603,59 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
-    precios_base_iniciales = {
-        "EURUSD": 1.15903, "GBPUSD": 1.30250, 
-        "USDJPY": 155.200, "XAUUSD": 2385.50, "BTCUSD": 64200.0
-    }
-
-    # Inicializar histórico de precios y control de tiempo por activo
-    if 'mercado_historicos_tr' not in st.session_state:
-        st.session_state.mercado_historicos_tr = {}
-        np.random.seed(101)
-        for simb, p_base in precios_base_iniciales.items():
-            fechas = [datetime.now() - timedelta(minutes=5 * i) for i in range(50)][::-1]
-            vol = p_base * 0.0005
-            tendencia = np.cumsum(np.random.normal(0, vol, 50))
-            closes = p_base + tendencia
-            opens = closes + np.random.normal(0, vol * 0.2, 50)
-            highs = np.maximum(opens, closes) + abs(np.random.normal(0, vol * 0.3, 50))
-            lows = np.minimum(opens, closes) - abs(np.random.normal(0, vol * 0.3, 50))
-            
-            df_init = pd.DataFrame({
-                'Open': opens, 'High': highs, 'Low': lows, 'Close': closes
-            }, index=fechas)
-            st.session_state.mercado_historicos_tr[simb] = df_init
+    # Inicializar conexión con MetaTrader 5
+    mt5_conectado = True
+    if not mt5.initialize():
+        mt5_conectado = False
+        st.error(f"⚠️ No se pudo conectar a MetaTrader 5. Error: {mt5.last_error()}. Asegúrate de tener la terminal de MT5 abierta en tu equipo.")
 
     # Selector principal de activo
-    par_activo = st.selectbox("Símbolo de Mercado", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD"], key="select_chart_asset_tr")
+    par_activo = st.selectbox("Símbolo de Mercado (MetaTrader)", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD"], key="select_chart_asset_mt5")
 
-    # --- MOTOR DE TICK EN TIEMPO REAL BASADO EN DELTA DE TIEMPO ---
-    def avanzar_precio_tiempo_real(simbolo):
-        df = st.session_state.mercado_historicos_tr[simbolo]
-        ultimo_cierre = float(df['Close'].iloc[-1])
+    def obtener_datos_mt5(simbolo):
+        if not mt5_conectado:
+            return pd.DataFrame(), 0.0
         
-        # Generar variación estocástica realista adaptada al activo
-        factor = 0.00012 if "JPY" in simbolo else (0.00008 if ("XAU" in simbolo or "BTC" in simbolo) else 0.00004)
-        delta = np.random.normal(0, ultimo_cierre * factor)
-        
-        nuevo_precio = round(ultimo_cierre + delta, 3 if "JPY" in simbolo else (2 if ("XAU" in simbolo or "BTC" in simbolo) else 5))
-        
-        # Actualizar la vela actual en tiempo real
-        df.iloc[-1, df.columns.get_loc('Close')] = nuevo_precio
-        df.iloc[-1, df.columns.get_loc('High')] = max(df.iloc[-1]['Open'], max(df.iloc[-1]['High'], nuevo_precio))
-        df.iloc[-1, df.columns.get_loc('Low')] = min(df.iloc[-1]['Open'], min(df.iloc[-1]['Low'], nuevo_precio))
-        
-        return df, nuevo_precio
+        # Seleccionar símbolo en el Market Watch de MT5 si es necesario
+        if not mt5.symbol_select(simbolo, True):
+            return pd.DataFrame(), 0.0
 
-    df_history, precio_actual_ref = avanzar_precio_tiempo_real(par_activo)
+        # Obtener el precio actual (tick en vivo)
+        tick = mt5.symbol_info_tick(simbolo)
+        precio_actual = float(tick.ask) if tick is not None else 0.0
 
-    # --- MONITOREO Y EVALUACIÓN AUTOMÁTICA DE TP / SL ---
-    if st.session_state.posiciones_abiertas:
+        # Obtener histórico de velas M15 directamente de MT5
+        rates = mt5.copy_rates_from_pos(simbolo, mt5.TIMEFRAME_M15, 0, 60)
+        if rates is None or len(rates) == 0:
+            return pd.DataFrame(), precio_actual
+
+        df = pd.DataFrame(rates)
+        df['time'] = pd.to_datetime(df['time'], unit='s')
+        df.set_index('time', inplace=True)
+        df.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close'}, inplace=True)
+        
+        return df, precio_actual
+
+    df_history, precio_actual_ref = obtener_datos_mt5(par_activo)
+
+    # --- MOTOR DE MONITOREO Y EVALUACIÓN DE TP / SL CON DATOS REALES DE MT5 ---
+    if st.session_state.posiciones_abiertas and mt5_conectado:
         posiciones_conservadas = []
         hubo_cambios_auto = False
 
         for pos in st.session_state.posiciones_abiertas:
             sim_pos = pos["activo"]
-            df_pos_hist, p_vivo_pos = avanzar_precio_tiempo_real(sim_pos)
-            vela_actual = df_pos_hist.iloc[-1]
-            precio_cierre_vivo = float(vela_actual['Close'])
-            max_vela = float(vela_actual['High'])
-            min_vela = float(vela_actual['Low'])
+            df_pos_hist, p_vivo_pos = obtener_datos_mt5(sim_pos)
+            
+            if not df_pos_hist.empty:
+                vela_actual = df_pos_hist.iloc[-1]
+                precio_cierre_vivo = float(vela_actual['Close'])
+                max_vela = float(vela_actual['High'])
+                min_vela = float(vela_actual['Low'])
+            else:
+                precio_cierre_vivo = p_vivo_pos
+                max_vela = p_vivo_pos
+                min_vela = p_vivo_pos
 
             pos["precio_vela_actual"] = precio_cierre_vivo
 
@@ -731,7 +724,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
     with col_m4:
-        st.metric("Servidor", "ALEMA-Live-TR")
+        st.metric("Servidor MT5", "Conectado" if mt5_conectado else "Desconectado")
 
     st.divider()
 
@@ -743,7 +736,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     precio_formateado = formato_str % precio_actual_ref
 
     with col_grafico:
-        st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional (TradingView Style) - {par_activo} | Cotización en Vivo: <span class='live-ticker'>{precio_formateado}</span></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico MetaTrader 5 - {par_activo} | Cotización Real en Vivo: <span class='live-ticker'>{precio_formateado}</span></div>", unsafe_allow_html=True)
 
         fig = go.Figure()
 
@@ -759,7 +752,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 decreasing_line_color='#ef5350'
             ))
 
-        # Pintar niveles de las posiciones abiertas en el gráfico
         for pos in st.session_state.posiciones_abiertas:
             if pos["activo"] == par_activo:
                 fig.add_hline(y=pos["entrada"], line_dash="dash", line_color="#2962FF", annotation_text=f"Entrada ({pos['entrada']})", annotation_font_color="#2962FF")
@@ -779,9 +771,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         st.plotly_chart(fig, use_container_width=True)
 
     with col_panel:
-        st.markdown("### 🎛️ Nueva Orden de Mercado")
-        sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_terminal_tr")
-        sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01, key="sim_lote_terminal_tr")
+        st.markdown("### 🎛️ Nueva Orden (MT5 Real)")
+        sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_mt5")
+        sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01, key="sim_lote_mt5")
         
         n_decimals = 3 if es_jpy else (2 if es_crypto_oro else 5)
         formato = "%.3f" if es_jpy else ("%.2f" if es_crypto_oro else "%.5f")
@@ -793,29 +785,32 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         default_sl = round(precio_actual_ref - dist_sl if sim_tipo == "BUY" else precio_actual_ref + dist_sl, n_decimals)
         default_tp = round(precio_actual_ref + dist_tp if sim_tipo == "BUY" else precio_actual_ref - dist_tp, n_decimals)
         
-        sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key="sim_sl_terminal_tr")
-        sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key="sim_tp_terminal_tr")
+        sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key="sim_sl_mt5")
+        sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key="sim_tp_mt5")
 
-        if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_terminal_tr", use_container_width=True):
-            precio_ejecucion = precio_actual_ref
-            nueva_orden = {
-                "id": int(datetime.now().timestamp()),
-                "fecha": str(datetime.now().date()),
-                "activo": par_activo,
-                "tipo": sim_tipo,
-                "lotes": float(sim_lotes),
-                "entrada": float(precio_ejecucion),
-                "sl": float(sim_precio_sl),
-                "tp": float(sim_precio_tp),
-                "precio_vela_actual": float(precio_ejecucion)
-            }
-            st.session_state.posiciones_abiertas.append(nueva_orden)
-            guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success(f"¡Orden ejecutada con éxito al precio de mercado: {precio_ejecucion}!")
-            st.rerun()
+        if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_mt5", use_container_width=True):
+            if precio_actual_ref > 0:
+                precio_ejecucion = precio_actual_ref
+                nueva_orden = {
+                    "id": int(datetime.now().timestamp()),
+                    "fecha": str(datetime.now().date()),
+                    "activo": par_activo,
+                    "tipo": sim_tipo,
+                    "lotes": float(sim_lotes),
+                    "entrada": float(precio_ejecucion),
+                    "sl": float(sim_precio_sl),
+                    "tp": float(sim_precio_tp),
+                    "precio_vela_actual": float(precio_ejecucion)
+                }
+                st.session_state.posiciones_abiertas.append(nueva_orden)
+                guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
+                st.success(f"¡Orden pedagógica ejecutada al precio real de MT5: {precio_ejecucion}!")
+                st.rerun()
+            else:
+                st.error("No hay cotización disponible desde MetaTrader 5.")
 
     # --- PANEL INFERIOR: POSICIONES ACTIVAS ---
-    st.markdown("### 📊 Posiciones Abiertas (Monitoreo en Vivo)")
+    st.markdown("### 📊 Posiciones Abiertas (Monitoreo en Vivo MT5)")
     if st.session_state.posiciones_abiertas:
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
             precio_vivo = pos.get("precio_vela_actual", pos["entrada"])
@@ -830,14 +825,14 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.markdown(f"""
                 <div class="mt5-terminal-card">
                     <b>{pos['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}">{pos['tipo']}</span> | 
-                    Entrada: <code>{fmt_pos % pos['entrada']}</code> | Vivo: <code style="color: #E2B714;">{fmt_pos % precio_vivo}</code> | 
+                    Entrada: <code>{fmt_pos % pos['entrada']}</code> | Vivo MT5: <code style="color: #26a69a;">{fmt_pos % precio_vivo}</code> | 
                     TP: <span style="color:#26a69a;">{fmt_pos % pos['tp']}</span> | 
                     SL: <span style="color:#ef5350;">{fmt_pos % pos['sl']}</span> | 
                     PnL: <b style="color: {'#26a69a' if pnl>=0 else '#ef5350'}">${pnl:,.2f} USD</b>
                 </div>
             """, unsafe_allow_html=True)
             
-            if st.button(f"Cerrar Manual #{pos['id']}", key=f"manual_btn_tr_{pos['id']}_{idx}"):
+            if st.button(f"Cerrar Manual #{pos['id']}", key=f"manual_btn_mt5_{pos['id']}_{idx}"):
                 st.session_state.balance_pedagogico += pnl
                 st.session_state.historial_cerradas.append({
                     "Marca temporal": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
@@ -855,7 +850,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
                 st.rerun()
     else:
-        st.info("No hay posiciones activas. Al abrir una operación, verás sus líneas de Entrada, TP y SL proyectadas directamente en el gráfico.")
+        st.info("No hay posiciones activas.")
 
     # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE ---
     st.markdown("<br>", unsafe_allow_html=True)
