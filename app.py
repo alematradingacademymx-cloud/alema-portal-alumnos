@@ -10,6 +10,10 @@ import yfinance as yf
 # Configuración de página
 st.set_page_config(page_title="ALEMA Trading Academy - Portal de Alumnos", page_icon="📈", layout="centered")
 
+# Variables globales iniciales por defecto (evitan errores antes del login)
+ARCH_PERSISTENCIA_HISTORIAL = "historial_invitado.json"
+ARCH_PERSISTENCIA_POSICIONES = "posiciones_invitado.json"
+
 # Estilos CSS personalizados con Fondo Azul Oscuro Elegante y Botón Verde
 st.markdown("""
     <style>
@@ -128,7 +132,6 @@ def cargar_usuarios_desde_sheets():
         df['Password'] = df['Password'].fillna('').str.strip()
         df['Tipo_Usuario'] = df['Tipo_Usuario'].fillna('ALUMNO').str.strip().str.upper()
         df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
-        # CAPTURA DE CAPITAL BASE (Predeterminado 300.0 si está vacío)
         df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
         
         dict_usuarios = {}
@@ -232,6 +235,22 @@ if not st.session_state.autenticado:
                     # ASIGNAR CAPITAL INICIAL DESDE SHEETS AL ENTRAR
                     st.session_state.balance_pedagogico = float(user_info['capital_base'])
                     
+                    # --- CONFIGURAR ARCHIVOS INDIVIDUALES POR ALUMNO ---
+                    global ARCH_PERSISTENCIA_HISTORIAL, ARCH_PERSISTENCIA_POSICIONES
+                    ARCH_PERSISTENCIA_HISTORIAL = f"historial_{matricula_input}.json"
+                    ARCH_PERSISTENCIA_POSICIONES = f"posiciones_{matricula_input}.json"
+                    
+                    if os.path.exists(ARCH_PERSISTENCIA_POSICIONES):
+                        st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_POSICIONES, [])
+                    else:
+                        st.session_state.posiciones_abiertas = []
+
+                    if os.path.exists(ARCH_PERSISTENCIA_HISTORIAL):
+                        st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
+                    else:
+                        st.session_state.historial_cerradas = []
+                    # --------------------------------------------------
+                    
                     st.success("¡Acceso concedido!")
                     st.rerun()
             else:
@@ -271,7 +290,6 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         datos_frescos = cargar_usuarios_desde_sheets()
         capital_nuevo = datos_frescos.get(alumno_seleccionado, {}).get('capital_base', 300.0)
         
-        # Si el admin resetea al usuario que está logueado actualmente en pantalla:
         if alumno_seleccionado == st.session_state.usuario_actual:
             st.session_state.balance_pedagogico = capital_nuevo
             st.session_state.posiciones_abiertas = []
