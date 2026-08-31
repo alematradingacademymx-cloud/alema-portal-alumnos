@@ -660,12 +660,11 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     import json
     import os
     from datetime import datetime
-    import pytz # Importado para manejo exacto de zonas horarias
+    import pytz
     import requests
     import pandas as pd
     import yfinance as yf
 
-    # Definición de la zona horaria oficial de México
     TZ_MEXICO = pytz.timezone("America/Mexico_City")
 
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
@@ -814,12 +813,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
         if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_sim", use_container_width=True):
             precio_ejecucion_final = obtener_precio_instante(activo_sim) if modo_ejecucion == "Ejecución por Mercado" else sim_precio_entrada
-            
-            # Fecha de apertura basada estrictamente en el horario de México
             fecha_mx_str = str(datetime.now(TZ_MEXICO).date())
 
             nueva_orden = {
-                "id": len(st.session_state.posiciones_abiertas) + len(st.session_state.historial_cerradas) + 1,
+                "id": int(datetime.now().timestamp() * 1000), # ID único basado en milisegundos para evitar colisiones
                 "fecha": fecha_mx_str,
                 "activo": activo_sim,
                 "tipo": sim_tipo,
@@ -834,13 +831,14 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.success(f"¡Orden ejecutada a {precio_ejecucion_final} con éxito!")
             st.rerun()
 
-    # --- PANEL INFERIOR: POSICIONES ABIERTAS ---
+    # --- PANEL INFERIOR: POSICIONES ABIERTAS (MONITOREO Y CIERRE AUTOMÁTICO) ---
     st.markdown("### 📊 Posiciones Abiertas (Tiempo Real)")
 
     if st.session_state.posiciones_abiertas:
-        posiciones_a_cerrar = []
+        hubo_cambios = False
+        posiciones_conservadas = []
         
-        for idx, pos in enumerate(st.session_state.posiciones_abiertas):
+        for pos in st.session_state.posiciones_abiertas:
             precio_actual_vela = obtener_precio_instante(pos["activo"])
             pos["precio_vela_actual"] = precio_actual_vela 
             
@@ -856,16 +854,25 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             cierre_automatico = False
             motivo_cierre = "Activa"
             
+            # Evaluación estricta de cruce de TP o SL
             if pos["tipo"] == "BUY":
                 if precio_actual_vela >= pos["tp"]:
                     cierre_automatico, motivo_cierre = True, "Take Profit (TP)"
+                    pips = (pos["tp"] - pos["entrada"]) # Fijar el valor exacto del TP
+                    pnl = pips * mp * vp * pos["lotes"]
                 elif precio_actual_vela <= pos["sl"]:
                     cierre_automatico, motivo_cierre = True, "Stop Loss (SL)"
-            else: 
+                    pips = (pos["sl"] - pos["entrada"]) # Fijar el valor exacto del SL
+                    pnl = pips * mp * vp * pos["lotes"]
+            else: # SELL
                 if precio_actual_vela <= pos["tp"]:
                     cierre_automatico, motivo_cierre = True, "Take Profit (TP)"
+                    pips = (pos["entrada"] - pos["tp"]) # Fijar el valor exacto del TP
+                    pnl = pips * mp * vp * pos["lotes"]
                 elif precio_actual_vela >= pos["sl"]:
                     cierre_automatico, motivo_cierre = True, "Stop Loss (SL)"
+                    pips = (pos["entrada"] - pos["sl"]) # Fijar el valor exacto del SL
+                    pnl = pips * mp * vp * pos["lotes"]
 
             with st.container():
                 st.markdown(f"""
@@ -899,12 +906,11 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 
                 col_info_btn, col_btn_cerrar = st.columns([4, 1])
                 with col_btn_cerrar:
-                    btn_manual = st.button(f"Cerrar #{pos['id']}", key=f"btn_cierre_manual_{pos['id']}_{idx}", use_container_width=True)
+                    btn_manual = st.button(f"Cerrar #{str(pos['id'])[-4:]}", key=f"btn_cierre_manual_{pos['id']}", use_container_width=True)
 
+                # Si se cumple el cierre automático o el alumno hace clic en cerrar manual:
                 if cierre_automatico or btn_manual:
                     st.session_state.balance_pedagogico += pnl
-                    
-                    # Marca temporal y fecha sincronizadas estrictamente con la hora de México
                     ahora_mexico = datetime.now(TZ_MEXICO)
                     
                     registro_historial = {
@@ -919,11 +925,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     }
                     st.session_state.historial_cerradas.append(registro_historial)
                     guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
-                    posiciones_a_cerrar.append(idx)
+                    hubo_cambios = True # Marcamos que esta posición debe retirarse de las activas
+                else:
+                    posiciones_conservadas.append(pos)
 
-        if posiciones_a_cerrar:
-            for index in sorted(posiciones_a_cerrar, reverse=True):
-                st.session_state.posiciones_abiertas.pop(index)
+        if hubo_cambios:
+            st.session_state.posiciones_abiertas = posiciones_conservadas
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
             st.rerun()
     else:
