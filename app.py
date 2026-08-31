@@ -543,7 +543,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (PERSISTENCIA TOTAL + MONITOREO SL/TP ROBUSTO + NAVEGACIÓN TIPO TRADINGVIEW)
+# (PERSISTENCIA TOTAL + MONITOREO SL/TP ROBUSTO + NAVEGACIÓN Y EURJPY INCLUIDO)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -680,8 +680,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional</div>', unsafe_allow_html=True)
 
+    # --- LISTA ACTUALIZADA CON EURJPY ---
     lista_activos = [
-        "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", 
+        "EURUSD", "GBPUSD", "USDJPY", "EURJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", 
         "XAUUSD", "WTIUSD", "BRENTUSD", 
         "US30", "SPX500", "NAS100", "GER40", "BTCUSD"
     ]
@@ -697,10 +698,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         dec, _, step_val, _, _, spread_val = obtener_config_activo(simbolo)
         simbolos_map = {
             "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY",
-            "AUDUSD": "AUD/USD", "USDCAD": "USD/CAD", "USDCHF": "USD/CHF",
-            "GBPJPY": "GBP/JPY", "XAUUSD": "XAU/USD", "WTIUSD": "WTI/USD",
-            "BRENTUSD": "BRENT/USD", "US30": "US30", "SPX500": "SPX",
-            "NAS100": "NDX", "GER40": "DAX", "BTCUSD": "BTC/USD"
+            "EURJPY": "EUR/JPY", "AUDUSD": "AUD/USD", "USDCAD": "USD/CAD", 
+            "USDCHF": "USD/CHF", "GBPJPY": "GBP/JPY", "XAUUSD": "XAU/USD", 
+            "WTIUSD": "WTI/USD", "BRENTUSD": "BRENT/USD", "US30": "US30", 
+            "SPX500": "SPX", "NAS100": "NDX", "GER40": "DAX", "BTCUSD": "BTC/USD"
         }
         
         simbolo_api = simbolos_map.get(simbolo, "EUR/USD")
@@ -726,9 +727,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         else:
             precios_fallback = {
                 "EURUSD": 1.15919, "GBPUSD": 1.31210, "USDJPY": 146.850,
-                "AUDUSD": 0.65500, "USDCAD": 1.35200, "USDCHF": 0.88400, "GBPJPY": 192.500,
-                "XAUUSD": 2512.30, "WTIUSD": 74.50, "BRENTUSD": 78.20,
-                "US30": 41200.00, "SPX500": 5600.00, "NAS100": 19500.00, "GER40": 18500.00,
+                "EURJPY": 162.450, "AUDUSD": 0.65500, "USDCAD": 1.35200, 
+                "USDCHF": 0.88400, "GBPJPY": 192.500, "XAUUSD": 2512.30, 
+                "WTIUSD": 74.50, "BRENTUSD": 78.20, "US30": 41200.00, 
+                "SPX500": 5600.00, "NAS100": 19500.00, "GER40": 18500.00,
                 "BTCUSD": 62500.00
             }
             precio_base = precios_fallback.get(simbolo, 1.0000)
@@ -880,7 +882,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 fig.add_hline(y=pos["tp"], line_dash="dot", line_color="#26a69a", annotation_text=f"TP ({pos['tp']})", annotation_font_color="#26a69a")
                 fig.add_hline(y=pos["sl"], line_dash="dot", line_color="#ef5350", annotation_text=f"SL ({pos['sl']})", annotation_font_color="#ef5350")
 
-        # --- AQUI SE AJUSTA LA NAVEGACIÓN FLUIDA ---
         fig.update_layout(
             template="plotly_dark",
             paper_bgcolor="#131722",
@@ -889,16 +890,15 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             margin=dict(l=10, r=10, t=10, b=10),
             xaxis=dict(showgrid=True, gridcolor='#2A2E39', title='', rangeslider=dict(visible=False)),
             yaxis=dict(showgrid=True, gridcolor='#2A2E39', zeroline=False, title=''),
-            dragmode='pan'  # <--- Habilita ARRASTRAR/DESPLAZAR por defecto en vez de la lupa
+            dragmode='pan'
         )
 
-        # Habilitar scrollZoom para acercar/alejar con la rueda del ratón
         st.plotly_chart(
             fig, 
             use_container_width=True,
             config={
-                'scrollZoom': True,       # Permite Zoom con la rueda del ratón o scroll
-                'displayModeBar': True,   # Permite cambiar a la lupa manualmente si el usuario quiere
+                'scrollZoom': True,
+                'displayModeBar': True,
                 'displaylogo': False
             }
         )
