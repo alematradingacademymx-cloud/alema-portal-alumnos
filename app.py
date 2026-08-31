@@ -628,7 +628,6 @@ if opcion_menu == "🧪 Simulador de Ejecución":
 
         st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional En Vivo - {par_activo}</div>", unsafe_allow_html=True)
 
-        # Generador de datos simulados robusto para Altair
         import random
         data_puntos = []
         tiempo_actual = datetime.now(TZ_MEXICO) - timedelta(minutes=60)
@@ -659,7 +658,7 @@ if opcion_menu == "🧪 Simulador de Ejecución":
         )
 
         lines = base.mark_rule(color='#2A2E39').encode(
-            y=alt.Y('Mínimo:Q', scale=alt.ZeroBased(False), axis=alt.Axis(title='', labelColor='#94A3B8', gridColor='#2A2E39')),
+            y=alt.Y('Mínimo:Q', scale=alt.Scale(zero=False), axis=alt.Axis(title='', labelColor='#94A3B8', gridColor='#2A2E39')),
             y2='Máximo:Q'
         )
 
