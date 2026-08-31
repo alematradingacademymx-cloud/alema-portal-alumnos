@@ -846,7 +846,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
     with col_m4:
-        st.metric("Estado Datos", "💾 Persistente en Disco")
+        st.metric("Estado Datos", "Alema serividor")
 
     st.divider()
 
