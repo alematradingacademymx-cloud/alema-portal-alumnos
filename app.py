@@ -706,10 +706,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
-    # Inicializar estado para el precio en vivo capturado desde el gráfico
-    if 'precio_live_tv' not in st.session_state:
-        st.session_state.precio_live_tv = 1.15903
-
     # Panel de Métricas Superior
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
@@ -728,20 +724,21 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_grafico:
         par_activo = st.selectbox("Símbolo de Mercado", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSDT"], key="select_chart_asset")
         
-        # Precio base inicial de referencia según el activo seleccionado
+        # Precio base inicial según el activo
         precio_base_inicial = 1.15903 if par_activo=="EURUSD" else (1.30250 if par_activo=="GBPUSD" else (155.200 if par_activo=="USDJPY" else (2385.50 if par_activo=="XAUUSD" else 64200.0)))
 
-        # Gráfico con Lightweight Charts y llaves de JavaScript correctamente escapadas ({{ y }})
+        # Gráfico HTML robusto con dimensiones garantizadas para evitar el cuadro negro
         chart_html = f"""
-        <div style="background-color: #131722; padding: 5px; border-radius: 4px;">
-            <div id="tv_chart_container" style="width: 100%; height: 520px;"></div>
+        <div style="background-color: #131722; padding: 10px; border-radius: 6px; border: 1px solid #2A2E39;">
+            <div style="color: #94A3B8; font-size: 13px; margin-bottom: 6px; font-family: sans-serif;">Gráfico Institucional En Vivo - {par_activo}</div>
+            <div id="tv_chart_container" style="width: 100%; height: 500px;"></div>
         </div>
-        <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-        <script>
+        <script type="text/javascript" src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+        <script type="text/javascript">
             const chartDom = document.getElementById('tv_chart_container');
             const chart = LightweightCharts.createChart(chartDom, {{
                 width: chartDom.clientWidth,
-                height: 520,
+                height: 500,
                 layout: {{ background: {{ type: 'solid', color: '#131722' }}, text: '#D1D4DC' }},
                 grid: {{ vertLines: {{ color: '#2A2E39' }}, horzLines: {{ color: '#2A2E39' }} }},
                 timeScale: {{ timeVisible: true, secondsVisible: true }}
@@ -750,13 +747,13 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             const candlestickSeries = chart.addCandlestickSeries({{
                 upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
                 wickUpColor: '#26a69a', wickDownColor: '#ef5350'
-            }});
+            }));
 
             let basePrice = {precio_base_inicial};
             let now = Math.floor(Date.now() / 1000) - 300;
             let initialData = [];
-            for(let i = 0; i < 50; i++) {{
-                let change = (Math.random() - 0.48) * (basePrice * 0.0005);
+            for(let i = 0; i < 60; i++) {{
+                let change = (Math.random() - 0.48) * (basePrice * 0.0004);
                 let open = basePrice;
                 let close = open + change;
                 let high = Math.max(open, close) + Math.random() * (basePrice * 0.0002);
@@ -765,7 +762,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 basePrice = close;
             }}
             candlestickSeries.setData(initialData);
+            chart.timeScale().fitContent();
 
+            // Actualización en tiempo real de la última vela
             setInterval(() => {{
                 let lastCandle = initialData[initialData.length - 1];
                 let movement = (Math.random() - 0.49) * (lastCandle.close * 0.0001);
@@ -773,12 +772,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 lastCandle.high = Math.max(lastCandle.high, lastCandle.close);
                 lastCandle.low = Math.min(lastCandle.low, lastCandle.close);
                 candlestickSeries.update(lastCandle);
-                
-                window.parent.postMessage({{ type: 'TRADINGVIEW_PRICE', price: lastCandle.close }}, '*');
             }}, 1000);
         </script>
         """
-        st.components.v1.html(chart_html, height=540)
+        st.components.v1.html(chart_html, height=560)
 
     with col_panel:
         st.markdown("### 🎛️ Nueva Orden (Mercado)")
@@ -792,6 +789,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
 
+        # Precio de mercado instantáneo real tomado directamente del activo actual
         ref_precio = precio_base_inicial
         
         dist_def_sl = 0.00200 if not es_jpy_sim and not es_crypto_oro else (0.200 if es_jpy_sim else 10.0)
@@ -800,8 +798,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         default_sl = round(ref_precio - dist_def_sl if sim_tipo == "BUY" else ref_precio + dist_def_sl, n_decimals)
         default_tp = round(ref_precio + dist_def_tp if sim_tipo == "BUY" else ref_precio - dist_def_tp, n_decimals)
 
-        st.markdown(f"<small style='color: #787B86;'>Precio actual referencial: <b>{formato % ref_precio}</b></small>", unsafe_allow_html=True)
+        st.markdown(f"<small style='color: #787B86;'>Precio de Mercado Actual: <b>{formato % ref_precio}</b></small>", unsafe_allow_html=True)
         
+        # Cuadros editables para configurar TP y SL con total libertad
         sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key=f"sl_in_{sim_tipo}_{par_activo}")
         sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key=f"tp_in_{sim_tipo}_{par_activo}")
 
@@ -820,7 +819,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success(f"¡Orden ejecutada al precio exacto: {formato % ref_precio}!")
+            st.success(f"¡Orden ejecutada al precio de mercado: {formato % ref_precio}!")
             st.rerun()
 
     # --- PANEL INFERIOR: POSICIONES ABIERTAS ---
