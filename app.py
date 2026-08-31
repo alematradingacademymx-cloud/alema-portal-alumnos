@@ -626,10 +626,11 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     # Recarga automática de la pantalla cada 4 segundos
     st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_live")
 
-    # --- ARCHIVOS DE PERSISTENCIA EN DISCO ---
-    ARCH_PERSISTENCIA_BALANCE = "balance_alema.json"
-    ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
-    ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
+    # --- IDENTIFICADOR DE USUARIO Y ARCHIVOS DE PERSISTENCIA AISLADOS ---
+    usuario = st.session_state.get("usuario_actual", "alema")
+    ARCH_PERSISTENCIA_BALANCE = f"balance_{usuario}.json"
+    ARCH_PERSISTENCIA_ACTIVAS = f"posiciones_activas_{usuario}.json"
+    ARCH_PERSISTENCIA_HISTORIAL = f"historial_cerradas_{usuario}.json"
 
     def cargar_datos_json(archivo, valor_defecto):
         if os.path.exists(archivo):
@@ -647,13 +648,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         except Exception:
             pass
 
-    # Cargar datos persistentes
-    if 'balance_pedagogico' not in st.session_state:
+    # Cargar datos persistentes asegurando aislamiento por alumno y evitando reseteos al recargar
+    if 'balance_pedagogico' not in st.session_state or st.session_state.get('current_loaded_user') != usuario:
         st.session_state.balance_pedagogico = float(cargar_datos_json(ARCH_PERSISTENCIA_BALANCE, 300.00))
-    if 'posiciones_abiertas' not in st.session_state:
         st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, [])
-    if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
+        st.session_state.current_loaded_user = usuario
 
     if 'cache_precios_forex' not in st.session_state:
         st.session_state.cache_precios_forex = {}
@@ -948,7 +948,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     else:
         st.info("No hay posiciones activas.")
 
-# --- BITÁCORA ---
+    # --- BITÁCORA ---
     st.markdown("<br>", unsafe_allow_html=True)
 
     if st.session_state.get("tipo_usuario") == "ADMIN":
