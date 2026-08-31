@@ -542,7 +542,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (EJECUCIÓN INSTANTÁNEA AL TACTO TP/SL)
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (MOTOR CON SPREAD BID / ASK REAL)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -597,21 +597,22 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     def obtener_config_activo(simbolo):
         if "JPY" in simbolo:
-            return 3, "%.3f", 0.001, 0.500, 1.000
+            # dec, fmt, step, default_sl_dist, default_tp_dist, spread_valor
+            return 3, "%.3f", 0.001, 0.500, 1.000, 0.015
         elif "XAU" in simbolo:
-            return 2, "%.2f", 0.10, 10.0, 20.0
+            return 2, "%.2f", 0.10, 10.0, 20.0, 0.35
         elif "WTI" in simbolo or "BRENT" in simbolo:
-            return 2, "%.2f", 0.01, 1.0, 2.0
+            return 2, "%.2f", 0.01, 1.0, 2.0, 0.04
         elif "BTC" in simbolo:
-            return 2, "%.2f", 1.0, 500.0, 1000.0
+            return 2, "%.2f", 1.0, 500.0, 1000.0, 25.00
         elif any(idx in simbolo for idx in ["US30", "NAS100", "GER40"]):
-            return 2, "%.2f", 1.0, 100.0, 200.0
+            return 2, "%.2f", 1.0, 100.0, 200.0, 2.00
         elif "SPX" in simbolo:
-            return 2, "%.2f", 0.10, 20.0, 40.0
+            return 2, "%.2f", 0.10, 20.0, 40.0, 0.40
         else:
-            return 5, "%.5f", 0.00001, 0.00500, 0.01000
+            return 5, "%.5f", 0.00001, 0.00500, 0.01000, 0.00012
 
-    # Estilos CSS
+    # Estilos CSS de Terminal MetaTrader 5
     st.markdown("""
         <style>
             .mt5-terminal-card {
@@ -622,11 +623,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 margin-bottom: 8px;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             }
-            .live-ticker {
-                color: #26a69a;
-                font-weight: 700;
-                font-size: 16px;
-            }
+            .live-ticker-bid { color: #ef5350; font-weight: 700; font-size: 15px; }
+            .live-ticker-ask { color: #26a69a; font-weight: 700; font-size: 15px; }
             .mt5-table-container {
                 overflow-x: auto;
                 border: 1px solid #2A2E39;
@@ -662,7 +660,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional (Ejecución Exacta)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional (Spread Bid/Ask Real)</div>', unsafe_allow_html=True)
 
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
@@ -688,9 +686,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         key="select_chart_asset_forex"
     )
 
-    # --- PROVEEDOR DE PRECIOS SIN SKEW EN MISMO RENDER ---
-    def obtener_precio_forex_real(simbolo):
-        dec, _, _, _, _ = obtener_config_activo(simbolo)
+    # --- OBTENCIÓN DE PRECIOS BID / ASK REALES ---
+    def obtener_cotizacion_bid_ask(simbolo):
+        dec, _, _, _, _, spread_val = obtener_config_activo(simbolo)
         simbolos_map = {
             "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY",
             "AUDUSD": "AUD/USD", "USDCAD": "USD/CAD", "USDCHF": "USD/CHF",
@@ -701,11 +699,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         
         simbolo_api = simbolos_map.get(simbolo, "EUR/USD")
         api_key = "6223c6d78f7a43b2872fc3acbb3f578e"
-        
         ahora = time.time()
         tiempo_ultimo = st.session_state.ultimo_tiempo_api.get(simbolo, 0)
         
-        # 1. Consulta API real cada 12s
         if ahora - tiempo_ultimo > 12:
             try:
                 url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
@@ -713,37 +709,29 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 if res.status_code == 200:
                     data = res.json()
                     if "price" in data:
-                        nuevo_precio = round(float(data["price"]), dec)
-                        st.session_state.cache_precios_forex[simbolo] = nuevo_precio
+                        precio_bid = round(float(data["price"]), dec)
+                        st.session_state.cache_precios_forex[simbolo] = precio_bid
                         st.session_state.ultimo_tiempo_api[simbolo] = ahora
-                        return nuevo_precio
             except Exception:
                 pass
-        
-        # 2. Fluctuación coherente en cache
-        if simbolo in st.session_state.cache_precios_forex:
-            # Solo fluctuar si pasó al menos 1 segundo desde la última actualización interna
-            if ahora - tiempo_ultimo >= 1:
-                precio_base = st.session_state.cache_precios_forex[simbolo]
-                variacion = np.random.normal(0, precio_base * 0.00001)
-                precio_actualizado = round(precio_base + variacion, dec)
-                st.session_state.cache_precios_forex[simbolo] = precio_actualizado
-                st.session_state.ultimo_tiempo_api[simbolo] = ahora
-            return st.session_state.cache_precios_forex[simbolo]
-            
-        precios_fallback = {
-            "EURUSD": 1.15919, "GBPUSD": 1.31210, "USDJPY": 146.850,
-            "AUDUSD": 0.65500, "USDCAD": 1.35200, "USDCHF": 0.88400, "GBPJPY": 192.500,
-            "XAUUSD": 2512.30, "WTIUSD": 74.50, "BRENTUSD": 78.20,
-            "US30": 41200.00, "SPX500": 5600.00, "NAS100": 19500.00, "GER40": 18500.00,
-            "BTCUSD": 62500.00
-        }
-        precio_inicial = round(precios_fallback.get(simbolo, 1.0000), dec)
-        st.session_state.cache_precios_forex[simbolo] = precio_inicial
-        st.session_state.ultimo_tiempo_api[simbolo] = ahora
-        return precio_inicial
 
-    precio_actual_ref = obtener_precio_forex_real(par_activo)
+        if simbolo in st.session_state.cache_precios_forex:
+            precio_bid = st.session_state.cache_precios_forex[simbolo]
+        else:
+            precios_fallback = {
+                "EURUSD": 1.15919, "GBPUSD": 1.31210, "USDJPY": 146.850,
+                "AUDUSD": 0.65500, "USDCAD": 1.35200, "USDCHF": 0.88400, "GBPJPY": 192.500,
+                "XAUUSD": 2512.30, "WTIUSD": 74.50, "BRENTUSD": 78.20,
+                "US30": 41200.00, "SPX500": 5600.00, "NAS100": 19500.00, "GER40": 18500.00,
+                "BTCUSD": 62500.00
+            }
+            precio_bid = round(precios_fallback.get(simbolo, 1.0000), dec)
+            st.session_state.cache_precios_forex[simbolo] = precio_bid
+
+        precio_ask = round(precio_bid + spread_val, dec)
+        return precio_bid, precio_ask
+
+    bid_actual, ask_actual = obtener_cotizacion_bid_ask(par_activo)
 
     if 'mercado_forex_df' not in st.session_state:
         st.session_state.mercado_forex_df = {}
@@ -769,44 +757,45 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         df.iloc[-1, df.columns.get_loc('Low')] = min(df.iloc[-1]['Open'], min(df.iloc[-1]['Low'], precio_actual))
         return df
 
-    df_history = obtener_dataframe_forex(par_activo, precio_actual_ref)
+    df_history = obtener_dataframe_forex(par_activo, bid_actual)
 
-    # --- MONITOREO AUTOMÁTICO INSTANTÁNEO DE TP / SL ---
+    # --- MONITOREO AUTOMÁTICO DE TP / SL SEGÚN REGLA BID/ASK ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
 
         for pos in st.session_state.posiciones_abiertas:
             sim_pos = pos["activo"]
-            dec_pos, _, _, _, _ = obtener_config_activo(sim_pos)
+            dec_pos, _, _, _, _, _ = obtener_config_activo(sim_pos)
             
-            p_vivo_pos = obtener_precio_forex_real(sim_pos)
-            pos["precio_vela_actual"] = p_vivo_pos
+            p_bid, p_ask = obtener_cotizacion_bid_ask(sim_pos)
+            
+            # Guardar cotizaciones vivas de referencia
+            pos["bid_vela_actual"] = p_bid
+            pos["ask_vela_actual"] = p_ask
 
             tp_exacto = round(pos["tp"], dec_pos)
             sl_exacto = round(pos["sl"], dec_pos)
-
-            # Margen de tolerancia de medio micro-pip según decimales del activo
             eps = (10 ** -dec_pos) / 2.0
 
             cierre_por_tp_sl = False
-            precio_ejecucion_salida = p_vivo_pos
+            precio_ejecucion_salida = p_bid if pos["tipo"] == "BUY" else p_ask
 
             if pos["tipo"] == "BUY":
-                # Al tocar o cruzar el TP/SL se activa de inmediato
-                if p_vivo_pos >= (tp_exacto - eps):
+                # Las Compras cierran en el precio BID (Venta)
+                if p_bid >= (tp_exacto - eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
-                elif p_vivo_pos <= (sl_exacto + eps):
+                elif p_bid <= (sl_exacto + eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, sl_exacto
             else: # SELL
-                if p_vivo_pos <= (tp_exacto + eps):
+                # Las Ventas cierran en el precio ASK (Compra)
+                if p_ask <= (tp_exacto + eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
-                elif p_vivo_pos >= (sl_exacto - eps):
+                elif p_ask >= (sl_exacto - eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, sl_exacto
 
             if cierre_por_tp_sl:
                 pnl_real = calcular_pnl_institucional(sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"])
-                
                 st.session_state.balance_pedagogico += pnl_real
                 
                 registro_historial = {
@@ -837,23 +826,28 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_m2:
         pnl_flotante_total = 0.0
         for pos in st.session_state.posiciones_abiertas:
-            act_p = pos.get("precio_vela_actual", pos["entrada"])
-            pnl_flotante_total += calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], act_p, pos["lotes"])
+            p_salida = pos.get("bid_vela_actual", pos["entrada"]) if pos["tipo"] == "BUY" else pos.get("ask_vela_actual", pos["entrada"])
+            pnl_flotante_total += calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], p_salida, pos["lotes"])
         st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
     with col_m4:
-        st.metric("Servidor", "ALEMA-Live-Feed")
+        st.metric("Servidor", "ALEMA-ECN-Feed")
 
     st.divider()
 
     col_grafico, col_panel = st.columns([2.4, 1.0])
 
-    n_decimals, formato_str, step_val, dist_sl, dist_tp = obtener_config_activo(par_activo)
-    precio_formateado = formato_str % precio_actual_ref
+    n_decimals, formato_str, step_val, dist_sl, dist_tp, spread_val = obtener_config_activo(par_activo)
 
     with col_grafico:
-        st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional - {par_activo} | Cotización en Vivo: <span class='live-ticker'>{precio_formateado}</span></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>"
+            f"Gráfico {par_activo} | BID: <span class='live-ticker-bid'>{formato_str % bid_actual}</span> | "
+            f"ASK: <span class='live-ticker-ask'>{formato_str % ask_actual}</span> | "
+            f"Spread: <b style='color:#d1d4dc;'>{formato_str % spread_val}</b></div>", 
+            unsafe_allow_html=True
+        )
 
         fig = go.Figure()
 
@@ -892,14 +886,17 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_forex")
         sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01, key="sim_lote_forex")
 
-        default_sl = round(precio_actual_ref - dist_sl if sim_tipo == "BUY" else precio_actual_ref + dist_sl, n_decimals)
-        default_tp = round(precio_actual_ref + dist_tp if sim_tipo == "BUY" else precio_actual_ref - dist_tp, n_decimals)
+        # El precio de referencia para proyectar TP y SL depende del lado ejecutor (BUY en Ask, SELL en Bid)
+        precio_ref_orden = ask_actual if sim_tipo == "BUY" else bid_actual
+        default_sl = round(precio_ref_orden - dist_sl if sim_tipo == "BUY" else precio_ref_orden + dist_sl, n_decimals)
+        default_tp = round(precio_ref_orden + dist_tp if sim_tipo == "BUY" else precio_ref_orden - dist_tp, n_decimals)
         
         sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato_str, step=step_val, key="sim_sl_forex")
         sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato_str, step=step_val, key="sim_tp_forex")
 
-        if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_forex", use_container_width=True):
-            precio_ejecucion = precio_actual_ref
+        if st.button(f"🟢 COMPRAR @ {formato_str % ask_actual}" if sim_tipo == "BUY" else f"🔴 VENDER @ {formato_str % bid_actual}", key="btn_ejecutar_forex", use_container_width=True):
+            # COMPRA entra a precio ASK | VENTA entra a precio BID
+            precio_ejecucion = ask_actual if sim_tipo == "BUY" else bid_actual
             tiempo_apertura_str = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
             nueva_orden = {
                 "id": int(datetime.now().timestamp()),
@@ -911,26 +908,27 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 "entrada": float(precio_ejecucion),
                 "sl": float(sim_precio_sl),
                 "tp": float(sim_precio_tp),
-                "precio_vela_actual": float(precio_ejecucion)
+                "bid_vela_actual": float(bid_actual),
+                "ask_vela_actual": float(ask_actual)
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success(f"¡Orden ejecutada con éxito en {par_activo}: {formato_str % precio_ejecucion}!")
+            st.success(f"¡Orden {sim_tipo} abierta en {par_activo}: {formato_str % precio_ejecucion}!")
             st.rerun()
 
     # --- POSICIONES ACTIVAS ---
-    st.markdown("### 📊 Posiciones Abiertas (Monitoreo en Vivo)")
+    st.markdown("### 📊 Posiciones Abiertas (Monitoreo ECN en Vivo)")
     if st.session_state.posiciones_abiertas:
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
-            precio_vivo = pos.get("precio_vela_actual", pos["entrada"])
-            dec_pos, fmt_pos, _, _, _ = obtener_config_activo(pos["activo"])
+            p_salida = pos.get("bid_vela_actual", pos["entrada"]) if pos["tipo"] == "BUY" else pos.get("ask_vela_actual", pos["entrada"])
+            dec_pos, fmt_pos, _, _, _, _ = obtener_config_activo(pos["activo"])
             
-            pnl_card = calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], precio_vivo, pos["lotes"])
+            pnl_card = calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], p_salida, pos["lotes"])
 
             st.markdown(f"""
                 <div class="mt5-terminal-card">
                     <b>{pos['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}">{pos['tipo']}</span> | 
-                    Entrada: <code>{fmt_pos % pos['entrada']}</code> | Precio Vivo: <code style="color: #26a69a;">{fmt_pos % precio_vivo}</code> | 
+                    Entrada: <code>{fmt_pos % pos['entrada']}</code> | Salida Actual: <code style="color: #26a69a;">{fmt_pos % p_salida}</code> | 
                     TP: <span style="color:#26a69a;">{fmt_pos % pos['tp']}</span> | 
                     SL: <span style="color:#ef5350;">{fmt_pos % pos['sl']}</span> | 
                     PnL: <b style="color: {'#26a69a' if pnl_card>=0 else '#ef5350'}">${pnl_card:,.2f} USD</b>
@@ -946,7 +944,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     "S / L": round(pos['sl'], dec_pos),
                     "T / P": round(pos['tp'], dec_pos),
                     "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                    "Precio Cierre": round(precio_vivo, dec_pos),
+                    "Precio Cierre": round(p_salida, dec_pos),
                     "Beneficio": round(pnl_card, 2)
                 })
                 guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
@@ -980,7 +978,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             precio_out_val = float(item.get("Precio Cierre", item.get("entrada", 0.0)))
             beneficio = float(item.get("Beneficio", item.get("Resultado USD", 0.0)))
 
-            _, fmt_pos, _, _, _ = obtener_config_activo(simbolo)
+            _, fmt_pos, _, _, _, _ = obtener_config_activo(simbolo)
             sl_str = fmt_pos % sl_val
             tp_str = fmt_pos % tp_val
             precio_out_str = fmt_pos % precio_out_val
