@@ -632,7 +632,7 @@ if opcion_menu == "🧪 Simulador de Ejecución":
         import random
         data_puntos = []
         tiempo_actual = datetime.now(TZ_MEXICO) - timedelta(minutes=60)
-         precio_actual_sim = precio_base_inicial
+        precio_actual_sim = precio_base_inicial
 
         for i in range(60):
             cambio = (random.random() - 0.48) * (precio_actual_sim * 0.0004)
