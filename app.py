@@ -661,7 +661,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     import os
     from datetime import datetime
     import pytz
-    import requests
     import pandas as pd
     import yfinance as yf
 
@@ -708,8 +707,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
-    # Función robusta para obtener precio actual de mercado
-    def obtener_precio_instante(simbolo):
+    # Función única para obtener precio inicial del gráfico (solo al abrir orden o renderizar gráfico)
+    def obtener_precio_inicial(simbolo):
         mapa_tickers = {
             "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", 
             "USDJPY": "JPY=X", "XAUUSD": "GC=F", "BTCUSD": "BTC-USD"
@@ -717,13 +716,11 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         ticker_yf = mapa_tickers.get(simbolo, "EURUSD=X")
         try:
             t = yf.Ticker(ticker_yf)
-            # Intentar obtener el precio actual del ticker directamente
             todays_data = t.history(period="1d", interval="1m")
             if not todays_data.empty:
                 return float(todays_data['Close'].iloc[-1])
         except:
             pass
-        
         precios_base = {"EURUSD": 1.15781, "GBPUSD": 1.30000, "USDJPY": 155.200, "XAUUSD": 2600.00, "BTCUSD": 65000.00}
         return precios_base.get(simbolo, 1.15781)
 
@@ -732,14 +729,15 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_m1:
         st.metric("Balance", f"${st.session_state.balance_pedagogico:,.2f}")
     with col_m2:
+        # Cálculo de PnL flotante basado en precio de entrada estático vs precio base actual (sin bucles erróneos)
         pnl_flotante_total = 0.0
         for pos in st.session_state.posiciones_abiertas:
-            act_p = obtener_precio_instante(pos["activo"])
+            precio_actual_mercado = obtener_precio_inicial(pos["activo"])
             is_jpy_m = "JPY" in pos["activo"]
             is_mc_m = "XAU" in pos["activo"] or "BTC" in pos["activo"]
             mp = 100.0 if is_jpy_m else (1.0 if is_mc_m else 10000.0)
             vp = 7.0 if is_jpy_m else 10.0
-            pips_calc = (act_p - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - act_p)
+            pips_calc = (precio_actual_mercado - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_actual_mercado)
             pnl_flotante_total += (pips_calc * mp * vp * pos["lotes"])
         st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
     with col_m3:
@@ -795,7 +793,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
 
-        precio_referencia_vela = obtener_precio_instante(activo_sim)
+        precio_referencia_vela = obtener_precio_inicial(activo_sim)
         
         sim_precio_entrada = precio_referencia_vela
         if modo_ejecucion == "Pendiente":
@@ -819,7 +817,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         sim_precio_tp = st.number_input("Take Profit", value=default_tp, format=formato, step=step_val, key=f"tp_in_{sim_tipo}_{activo_sim}")
 
         if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_sim", use_container_width=True):
-            precio_ejecucion_final = obtener_precio_instante(activo_sim) if modo_ejecucion == "Ejecución por Mercado" else sim_precio_entrada
+            precio_ejecucion_final = obtener_precio_inicial(activo_sim) if modo_ejecucion == "Ejecución por Mercado" else sim_precio_entrada
             fecha_mx_str = str(datetime.now(TZ_MEXICO).date())
 
             nueva_orden = {
@@ -834,10 +832,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success(f"¡Orden ejecutada a {precio_ejecucion_final} con éxito!")
+            st.success(f"¡Orden ejecutada con éxito! Quedará abierta en el panel inferior.")
             st.rerun()
 
-    # --- PANEL INFERIOR: POSICIONES ABIERTAS (MONITOREO SEGURO) ---
+    # --- PANEL INFERIOR: POSICIONES ABIERTAS (PERMANECEN ABIERTAS HASTA CIERRE MANUAL O SIMULACIÓN DE TP/SL) ---
     st.markdown("### 📊 Posiciones Abiertas (Tiempo Real)")
 
     if st.session_state.posiciones_abiertas:
@@ -845,7 +843,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         posiciones_conservadas = []
         
         for pos in st.session_state.posiciones_abiertas:
-            precio_actual_vela = obtener_precio_instante(pos["activo"])
+            precio_actual_mercado = obtener_precio_inicial(pos["activo"])
             
             es_jpy = "JPY" in pos["activo"]
             is_mc = "XAU" in pos["activo"] or "BTC" in pos["activo"]
@@ -853,33 +851,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             
             mp = 100.0 if es_jpy else (1.0 if is_mc else 10000.0)
             vp = 7.0 if es_jpy else 10.0
-            pips = (precio_actual_vela - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_actual_vela)
+            pips = (precio_actual_mercado - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_actual_mercado)
             pnl = pips * mp * vp * pos["lotes"]
-
-            cierre_automatico = False
-            motivo_cierre = "Activa"
-            pips_finales = pips
-            pnl_final = pnl
-
-            # Evaluación estricta de TP y SL
-            if pos["tipo"] == "BUY":
-                if precio_actual_vela >= pos["tp"]:
-                    cierre_automatico, motivo_cierre = True, "Take Profit (TP)"
-                    pips_finales = (pos["tp"] - pos["entrada"])
-                    pnl_final = pips_finales * mp * vp * pos["lotes"]
-                elif precio_actual_vela <= pos["sl"]:
-                    cierre_automatico, motivo_cierre = True, "Stop Loss (SL)"
-                    pips_finales = (pos["sl"] - pos["entrada"])
-                    pnl_final = pips_finales * mp * vp * pos["lotes"]
-            else: # SELL
-                if precio_actual_vela <= pos["tp"]:
-                    cierre_automatico, motivo_cierre = True, "Take Profit (TP)"
-                    pips_finales = (pos["entrada"] - pos["tp"])
-                    pnl_final = pips_finales * mp * vp * pos["lotes"]
-                elif precio_actual_vela >= pos["sl"]:
-                    cierre_automatico, motivo_cierre = True, "Stop Loss (SL)"
-                    pips_finales = (pos["entrada"] - pos["sl"])
-                    pnl_final = pips_finales * mp * vp * pos["lotes"]
 
             with st.container():
                 st.markdown(f"""
@@ -900,39 +873,87 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                                 <td style="text-align:left; font-weight:bold; color: #fff;">{pos['activo']}</td>
                                 <td>{pos['lotes']} L</td>
                                 <td><code>{fmt % pos['entrada']}</code></td>
-                                <td><code style="color: #E2B714;">{fmt % precio_actual_vela}</code></td>
+                                <td><code style="color: #E2B714;">{fmt % precio_actual_mercado}</code></td>
                                 <td><code>{fmt % pos['tp']}</code></td>
                                 <td><code>{fmt % pos['sl']}</code></td>
                                 <td style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}; font-weight:bold;">{pos['tipo']}</td>
                                 <td style="color: {'#26a69a' if pnl>=0 else '#ef5350'}; font-weight:bold;">${pnl:,.2f}</td>
-                                <td style="color: {'#26a69a' if cierre_automatico else '#2962FF'};">{'● Cierre ' + motivo_cierre if cierre_automatico else '● Activa (Monitoreando)'}</td>
+                                <td style="color: #2962FF;">● Activa (Esperando TP/SL)</td>
                             </tr>
                         </table>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                col_info_btn, col_btn_cerrar = st.columns([4, 1])
-                with col_btn_cerrar:
-                    btn_manual = st.button(f"Cerrar #{str(pos['id'])[-4:]}", key=f"btn_cierre_manual_{pos['id']}", use_container_width=True)
+                # Botones de control por cada posición activa
+                col_btn1, col_btn2, col_btn3 = st.columns([2, 2, 2])
+                
+                with col_btn1:
+                    # Simular que tocó el TP (Cierre con Ganancia exacta calculada con el TP)
+                    if st.button(f"🎯 Simular TP #{str(pos['id'])[-4:]}", key=f"tp_{pos['id']}", use_container_width=True):
+                        pips_tp = (pos["tp"] - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - pos["tp"])
+                        pnl_tp = pips_tp * mp * vp * pos["lotes"]
+                        
+                        st.session_state.balance_pedagogico += pnl_tp
+                        ahora_mexico = datetime.now(TZ_MEXICO)
+                        
+                        registro_historial = {
+                            "Marca temporal": ahora_mexico.strftime("%d/%m/%Y %H:%M:%S"),
+                            "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
+                            "Fecha": pos['fecha'],
+                            "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"),
+                            "Tipo": pos['tipo'],
+                            "Lotes": pos['lotes'],
+                            "Pips": round(pips_tp, 1),
+                            "Resultado USD": round(pnl_tp, 2)
+                        }
+                        st.session_state.historial_cerradas.append(registro_historial)
+                        guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
+                        hubo_cambios = True
 
-                if cierre_automatico or btn_manual:
-                    st.session_state.balance_pedagogico += pnl_final
-                    ahora_mexico = datetime.now(TZ_MEXICO)
-                    
-                    registro_historial = {
-                        "Marca temporal": ahora_mexico.strftime("%d/%m/%Y %H:%M:%S"),
-                        "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
-                        "Fecha": pos['fecha'],
-                        "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"),
-                        "Tipo": pos['tipo'],
-                        "Lotes": pos['lotes'],
-                        "Pips": round(pips_finales, 1),
-                        "Resultado USD": round(pnl_final, 2)
-                    }
-                    st.session_state.historial_cerradas.append(registro_historial)
-                    guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
-                    hubo_cambios = True
-                else:
+                with col_btn2:
+                    # Simular que tocó el SL (Cierre con Pérdida exacta calculada con el SL)
+                    if st.button(f"🛑 Simular SL #{str(pos['id'])[-4:]}", key=f"sl_{pos['id']}", use_container_width=True):
+                        pips_sl = (pos["sl"] - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - pos["sl"])
+                        pnl_sl = pips_sl * mp * vp * pos["lotes"]
+                        
+                        st.session_state.balance_pedagogico += pnl_sl
+                        ahora_mexico = datetime.now(TZ_MEXICO)
+                        
+                        registro_historial = {
+                            "Marca temporal": ahora_mexico.strftime("%d/%m/%Y %H:%M:%S"),
+                            "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
+                            "Fecha": pos['fecha'],
+                            "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"),
+                            "Tipo": pos['tipo'],
+                            "Lotes": pos['lotes'],
+                            "Pips": round(pips_sl, 1),
+                            "Resultado USD": round(pnl_sl, 2)
+                        }
+                        st.session_state.historial_cerradas.append(registro_historial)
+                        guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
+                        hubo_cambios = True
+
+                with col_btn3:
+                    # Cierre manual en cualquier momento al precio de mercado actual
+                    if st.button(f"❌ Cerrar Manual #{str(pos['id'])[-4:]}", key=f"manual_{pos['id']}", use_container_width=True):
+                        st.session_state.balance_pedagogico += pnl
+                        ahora_mexico = datetime.now(TZ_MEXICO)
+                        
+                        registro_historial = {
+                            "Marca temporal": ahora_mexico.strftime("%d/%m/%Y %H:%M:%S"),
+                            "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
+                            "Fecha": pos['fecha'],
+                            "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"),
+                            "Tipo": pos['tipo'],
+                            "Lotes": pos['lotes'],
+                            "Pips": round(pips, 1),
+                            "Resultado USD": round(pnl, 2)
+                        }
+                        st.session_state.historial_cerradas.append(registro_historial)
+                        guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
+                        hubo_cambios = True
+
+                if not hubo_cambios:
                     posiciones_conservadas.append(pos)
 
         if hubo_cambios:
