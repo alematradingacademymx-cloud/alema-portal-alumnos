@@ -728,7 +728,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_grafico:
         par_activo = st.selectbox("Símbolo de Mercado", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSDT"], key="select_chart_asset")
         
-        # Usamos Lightweight Charts para tener control total del precio en JS y sincronizarlo
+        # Precio base inicial de referencia según el activo seleccionado
+        precio_base_inicial = 1.15903 if par_activo=="EURUSD" else (1.30250 if par_activo=="GBPUSD" else (155.200 if par_activo=="USDJPY" else (2385.50 if par_activo=="XAUUSD" else 64200.0)))
+
+        # Gráfico con Lightweight Charts y llaves de JavaScript correctamente escapadas ({{ y }})
         chart_html = f"""
         <div style="background-color: #131722; padding: 5px; border-radius: 4px;">
             <div id="tv_chart_container" style="width: 100%; height: 520px;"></div>
@@ -747,10 +750,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             const candlestickSeries = chart.addCandlestickSeries({{
                 upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
                 wickUpColor: '#26a69a', wickDownColor: '#ef5350'
-            }));
+            }});
 
-            // Datos base simulados en tiempo real alineados al activo actual
-            let basePrice = {1.15903 if par_activo=="EURUSD" else (1.30250 if par_activo=="GBPUSD" else (155.200 if par_activo=="USDJPY" else 2385.50))};
+            let basePrice = {precio_base_inicial};
             let now = Math.floor(Date.now() / 1000) - 300;
             let initialData = [];
             for(let i = 0; i < 50; i++) {{
@@ -764,7 +766,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             }}
             candlestickSeries.setData(initialData);
 
-            // Actualización de precio en vivo por cada tick
             setInterval(() => {{
                 let lastCandle = initialData[initialData.length - 1];
                 let movement = (Math.random() - 0.49) * (lastCandle.close * 0.0001);
@@ -773,7 +774,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 lastCandle.low = Math.min(lastCandle.low, lastCandle.close);
                 candlestickSeries.update(lastCandle);
                 
-                // Enviar precio actual al contenedor principal
                 window.parent.postMessage({{ type: 'TRADINGVIEW_PRICE', price: lastCandle.close }}, '*');
             }}, 1000);
         </script>
@@ -792,8 +792,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
 
-        # Precio referencial actual del gráfico
-        ref_precio = st.session_state.get('precio_live_tv', 1.15903)
+        ref_precio = precio_base_inicial
         
         dist_def_sl = 0.00200 if not es_jpy_sim and not es_crypto_oro else (0.200 if es_jpy_sim else 10.0)
         dist_def_tp = 0.00400 if not es_jpy_sim and not es_crypto_oro else (0.400 if es_jpy_sim else 20.0)
@@ -801,7 +800,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         default_sl = round(ref_precio - dist_def_sl if sim_tipo == "BUY" else ref_precio + dist_def_sl, n_decimals)
         default_tp = round(ref_precio + dist_def_tp if sim_tipo == "BUY" else ref_precio - dist_def_tp, n_decimals)
 
-        st.markdown(f"<small style='color: #787B86;'>Precio actual en gráfico: <b>{formato % ref_precio}</b></small>", unsafe_allow_html=True)
+        st.markdown(f"<small style='color: #787B86;'>Precio actual referencial: <b>{formato % ref_precio}</b></small>", unsafe_allow_html=True)
         
         sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key=f"sl_in_{sim_tipo}_{par_activo}")
         sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key=f"tp_in_{sim_tipo}_{par_activo}")
@@ -815,13 +814,13 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 "activo": par_activo,
                 "tipo": sim_tipo,
                 "lotes": float(sim_lotes),
-                "entrada": float(ref_precio), # Toma exactamente el precio sincronizado con el gráfico
+                "entrada": float(ref_precio),
                 "sl": float(sim_precio_sl),
                 "tp": float(sim_precio_tp)
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success(f"¡Orden ejecutada al precio exacto del gráfico: {formato % ref_precio}!")
+            st.success(f"¡Orden ejecutada al precio exacto: {formato % ref_precio}!")
             st.rerun()
 
     # --- PANEL INFERIOR: POSICIONES ABIERTAS ---
