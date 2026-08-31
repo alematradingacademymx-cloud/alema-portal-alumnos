@@ -687,18 +687,15 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     # Función para obtener el precio real de mercado al instante de la ejecución
     def obtener_precio_mercado_real(simbolo):
-        # Mapeo limpio para obtener precios institucionales en tiempo real sin Yahoo
         try:
             if "BTC" in simbolo:
                 res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=2)
                 return float(res.json()["price"])
             elif "XAU" in simbolo:
-                # Precio referencial institucional del oro
                 res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", timeout=2)
                 return float(res.json()["price"])
             else:
-                # Para Forex (EURUSD, GBPUSD, USDJPY) usando API pública de tasas de cambio en tiempo real
-                base = simbolo.split(":")[-1] # Ej: EURUSD
+                base = simbolo.split(":")[-1]
                 divisa_base = base[:3]
                 divisa_counter = base[3:]
                 res = requests.get(f"https://open.er-api.com/v6/latest/{divisa_base}", timeout=2)
@@ -708,7 +705,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         except Exception:
             pass
         
-        # Fallbacks matemáticos de seguridad basados estrictamente en el último precio observado en gráfico si no hay red
+        # Fallbacks de respaldo si no hay red
         if "EURUSD" in simbolo: return 1.15903
         if "GBPUSD" in simbolo: return 1.30250
         if "USDJPY" in simbolo: return 155.200
@@ -785,7 +782,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         st.components.v1.html(tradingview_html, height=550)
 
     with col_panel:
-        st.markdown("### 🎛️ Nueva Orden (Mercado)")
+        st.markdown("### 🎛️ Nueva Orden")
         activo_sim = par_activo.split(":")[-1]
         
         sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_direccion")
@@ -797,25 +794,25 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
 
-        st.info("⚡ Ejecución por Mercado:\nEl precio de entrada se capturará automáticamente al instante de hacer clic en el botón de orden.")
+        # Referencia base para calcular sugerencias automáticas iniciales en los inputs
+        ref_base = 1.15903 if activo_sim == "EURUSD" else (1.30250 if activo_sim == "GBPUSD" else (155.200 if es_jpy_sim else 2385.50))
+        
+        dist_def_sl = 0.00200 if not es_jpy_sim and not es_crypto_oro else (0.200 if es_jpy_sim else 10.0)
+        dist_def_tp = 0.00400 if not es_jpy_sim and not es_crypto_oro else (0.400 if es_jpy_sim else 20.0)
 
-        # Distancias estándar de SL y TP configurables por el alumno en pips/puntos
-        dist_sl_pips = st.number_input("Distancia Stop Loss (Puntos)", value=20.0, step=1.0, key=f"dist_sl_{activo_sim}")
-        dist_tp_pips = st.number_input("Distancia Take Profit (Puntos)", value=40.0, step=1.0, key=f"dist_tp_{activo_sim}")
+        default_sl = round(ref_base - dist_def_sl if sim_tipo == "BUY" else ref_base + dist_def_sl, n_decimals)
+        default_tp = round(ref_base + dist_def_tp if sim_tipo == "BUY" else ref_base - dist_def_tp, n_decimals)
 
-        if st.button(f"🟢 COMPRAR A MERCADO" if sim_tipo == "BUY" else f"🔴 VENDER A MERCADO", key="btn_ejecutar_sim", use_container_width=True):
-            # CAPTURA AUTOMÁTICA DEL PRECIO REAL EN EL MILISEGUNDO DE EJECUCIÓN
+        st.markdown("<small style='color: #787B86;'>Valores de gestión de riesgo (Modificables libremente):</small>", unsafe_allow_html=True)
+        
+        # AQUÍ ESTÁN DE NUEVO LOS CUADROS DE TEXTO EDITABLES PARA SL Y TP
+        sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key=f"sl_in_{sim_tipo}_{activo_sim}")
+        sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key=f"tp_in_{sim_tipo}_{activo_sim}")
+
+        if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_sim", use_container_width=True):
+            # Captura automática del precio de mercado real al presionar el botón
             precio_mercado_actual = obtener_precio_mercado_real(par_activo)
             
-            factor_escala = 0.0001 if not es_jpy_sim and not es_crypto_oro else (0.01 if es_jpy_sim else 1.0)
-            
-            if sim_tipo == "BUY":
-                precio_sl = round(precio_mercado_actual - (dist_sl_pips * factor_escala), n_decimals)
-                precio_tp = round(precio_mercado_actual + (dist_tp_pips * factor_escala), n_decimals)
-            else: # SELL
-                precio_sl = round(precio_mercado_actual + (dist_sl_pips * factor_escala), n_decimals)
-                precio_tp = round(precio_mercado_actual - (dist_tp_pips * factor_escala), n_decimals)
-
             fecha_mx_str = str(datetime.now(TZ_MEXICO).date())
 
             nueva_orden = {
@@ -824,13 +821,13 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 "activo": activo_sim,
                 "tipo": sim_tipo,
                 "lotes": float(sim_lotes),
-                "entrada": float(precio_mercado_actual),
-                "sl": float(precio_sl),
-                "tp": float(precio_tp)
+                "entrada": float(precio_mercado_actual), # El precio de entrada real del mercado al instante
+                "sl": float(sim_precio_sl),            # El Stop Loss exacto que escribiste en el cuadro
+                "tp": float(sim_precio_tp)             # El Take Profit exacto que escribiste en el cuadro
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success(f"¡Orden de mercado ejecutada al precio exacto: {formato % precio_mercado_actual}!")
+            st.success(f"¡Orden ejecutada a mercado! Entrada: {formato % precio_mercado_actual}")
             st.rerun()
 
     # --- PANEL INFERIOR: POSICIONES ABIERTAS ---
