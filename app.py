@@ -920,7 +920,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success(f"¡Orden ejecutada con éxito en {par_activo}: {precio_ejecucion}!")
+            st.success(f"¡Orden ejecutada con éxito en {par_activo}: {formato_str % precio_ejecucion}!")
             st.rerun()
 
     # --- POSICIONES ACTIVAS ---
@@ -961,7 +961,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     else:
         st.info("No hay posiciones activas.")
 
-    # --- BITÁCORA HISTÓRICA (TIEMPO DE CIERRE Y PRECIO DE CIERRE) ---
+    # --- BITÁCORA HISTÓRICA (TIEMPO DE CIERRE Y PRECIO DE CIERRE EXACTO CON CEROS A LA DERECHA) ---
     st.markdown("<br>", unsafe_allow_html=True)
     
     col_tit_bita, col_btn_bita = st.columns([3, 1])
@@ -980,10 +980,16 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             tipo = str(item.get("Tipo", "buy")).lower()
             volumen = float(item.get("Volumen", item.get("Lotes", 0.10)))
             simbolo = item.get("Símbolo", item.get("Activo", "EURUSD"))
-            sl = item.get("S / L", item.get("sl", 0.0))
-            tp = item.get("T / P", item.get("tp", 0.0))
-            precio_out = item.get("Precio Cierre", item.get("entrada", 0.0))
+            sl_val = float(item.get("S / L", item.get("sl", 0.0)))
+            tp_val = float(item.get("T / P", item.get("tp", 0.0)))
+            precio_out_val = float(item.get("Precio Cierre", item.get("entrada", 0.0)))
             beneficio = float(item.get("Beneficio", item.get("Resultado USD", 0.0)))
+
+            # Formateo dinámico exacto según la máscara de decimales del activo
+            _, fmt_pos, _, _, _ = obtener_config_activo(simbolo)
+            sl_str = fmt_pos % sl_val
+            tp_str = fmt_pos % tp_val
+            precio_out_str = fmt_pos % precio_out_val
 
             clase_tipo = "mt5-buy" if tipo == "buy" else "mt5-sell"
             clase_pnl = "mt5-profit" if beneficio >= 0 else "mt5-loss"
@@ -994,9 +1000,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 f'<td class="{clase_tipo}">{tipo}</td>'
                 f'<td>{volumen:.2f}</td>'
                 f'<td>{simbolo}</td>'
-                f'<td>{sl}</td>'
-                f'<td>{tp}</td>'
-                f'<td>{precio_out}</td>'
+                f'<td>{sl_str}</td>'
+                f'<td>{tp_str}</td>'
+                f'<td>{precio_out_str}</td>'
                 f'<td class="{clase_pnl}">{beneficio:+.2f}</td>'
                 f'</tr>'
             )
