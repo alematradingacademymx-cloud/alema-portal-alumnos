@@ -542,7 +542,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (MULTI-ASSET API - BITÁCORA MT5 REAL)
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (EJECUCIÓN INSTANTÁNEA AL TACTO TP/SL)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -556,7 +556,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     import plotly.graph_objects as go
     from streamlit_autorefresh import st_autorefresh
 
-    st_autorefresh(interval=6000, key="auto_refresh_terminal_forex_api_opt")
+    st_autorefresh(interval=5000, key="auto_refresh_terminal_forex_api_opt")
 
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
     ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
@@ -577,32 +577,24 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         except Exception:
             pass
 
-    # Función institucional de PnL exacta por tipo de activo
     def calcular_pnl_institucional(activo, tipo, entrada, salida, lotes):
         diferencia = (salida - entrada) if tipo == "BUY" else (entrada - salida)
         
         if "XAU" in activo:
-            # Oro: 1 lote = 100 oz troy ($1.00 de movimiento = $100.00 USD por lote)
             return diferencia * 100.0 * lotes
         elif "BTC" in activo:
-            # Bitcoin: 1 lote = 1 BTC ($1.00 de movimiento = $1.00 USD por lote)
             return diferencia * 1.0 * lotes
         elif "WTI" in activo or "BRENT" in activo:
-            # Petróleo: 1 lote = 1,000 barriles ($1.00 de movimiento = $1,000.00 USD por lote)
             return diferencia * 1000.0 * lotes
         elif any(idx in activo for idx in ["US30", "SPX500", "NAS100", "GER40"]):
-            # Índices bursátiles: 1 lote = $1.00 USD por punto completo de índice
             return diferencia * 1.0 * lotes
         elif "JPY" in activo:
-            # Pares Yen: Contrato Forex de 100,000 unidades convertido dinámicamente según la cotización en vivo
             valor_pip_usd_por_lote = 1000.0 / salida if salida != 0 else 6.80
             pips = diferencia * 100.0
             return pips * valor_pip_usd_por_lote * lotes
         else:
-            # Pares Forex Estándar (EURUSD, GBPUSD, AUDUSD, USDCAD, USDCHF, etc.): 100,000 unidades
             return diferencia * 100000.0 * lotes
 
-    # Helper para formateo de precios, precisión y distancias TP/SL por activo
     def obtener_config_activo(simbolo):
         if "JPY" in simbolo:
             return 3, "%.3f", 0.001, 0.500, 1.000
@@ -670,7 +662,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional Multi-Asset (En Vivo)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional (Ejecución Exacta)</div>', unsafe_allow_html=True)
 
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
@@ -686,10 +678,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     lista_activos = [
         "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", 
-        "XAUUSD", 
-        "WTIUSD", "BRENTUSD", 
-        "US30", "SPX500", "NAS100", "GER40", 
-        "BTCUSD"
+        "XAUUSD", "WTIUSD", "BRENTUSD", 
+        "US30", "SPX500", "NAS100", "GER40", "BTCUSD"
     ]
 
     par_activo = st.selectbox(
@@ -698,23 +688,15 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         key="select_chart_asset_forex"
     )
 
+    # --- PROVEEDOR DE PRECIOS SIN SKEW EN MISMO RENDER ---
     def obtener_precio_forex_real(simbolo):
+        dec, _, _, _, _ = obtener_config_activo(simbolo)
         simbolos_map = {
-            "EURUSD": "EUR/USD",
-            "GBPUSD": "GBP/USD",
-            "USDJPY": "USD/JPY",
-            "AUDUSD": "AUD/USD",
-            "USDCAD": "USD/CAD",
-            "USDCHF": "USD/CHF",
-            "GBPJPY": "GBP/JPY",
-            "XAUUSD": "XAU/USD",
-            "WTIUSD": "WTI/USD",
-            "BRENTUSD": "BRENT/USD",
-            "US30": "US30",
-            "SPX500": "SPX",
-            "NAS100": "NDX",
-            "GER40": "DAX",
-            "BTCUSD": "BTC/USD"
+            "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY",
+            "AUDUSD": "AUD/USD", "USDCAD": "USD/CAD", "USDCHF": "USD/CHF",
+            "GBPJPY": "GBP/JPY", "XAUUSD": "XAU/USD", "WTIUSD": "WTI/USD",
+            "BRENTUSD": "BRENT/USD", "US30": "US30", "SPX500": "SPX",
+            "NAS100": "NDX", "GER40": "DAX", "BTCUSD": "BTC/USD"
         }
         
         simbolo_api = simbolos_map.get(simbolo, "EUR/USD")
@@ -723,6 +705,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         ahora = time.time()
         tiempo_ultimo = st.session_state.ultimo_tiempo_api.get(simbolo, 0)
         
+        # 1. Consulta API real cada 12s
         if ahora - tiempo_ultimo > 12:
             try:
                 url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
@@ -730,30 +713,34 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 if res.status_code == 200:
                     data = res.json()
                     if "price" in data:
-                        nuevo_precio = float(data["price"])
+                        nuevo_precio = round(float(data["price"]), dec)
                         st.session_state.cache_precios_forex[simbolo] = nuevo_precio
                         st.session_state.ultimo_tiempo_api[simbolo] = ahora
                         return nuevo_precio
             except Exception:
                 pass
         
-        dec, _, _, _, _ = obtener_config_activo(simbolo)
+        # 2. Fluctuación coherente en cache
         if simbolo in st.session_state.cache_precios_forex:
-            precio_base = st.session_state.cache_precios_forex[simbolo]
-            variacion = np.random.normal(0, precio_base * 0.00001)
-            precio_actualizado = precio_base + variacion
-            return round(precio_actualizado, dec)
+            # Solo fluctuar si pasó al menos 1 segundo desde la última actualización interna
+            if ahora - tiempo_ultimo >= 1:
+                precio_base = st.session_state.cache_precios_forex[simbolo]
+                variacion = np.random.normal(0, precio_base * 0.00001)
+                precio_actualizado = round(precio_base + variacion, dec)
+                st.session_state.cache_precios_forex[simbolo] = precio_actualizado
+                st.session_state.ultimo_tiempo_api[simbolo] = ahora
+            return st.session_state.cache_precios_forex[simbolo]
             
         precios_fallback = {
             "EURUSD": 1.15919, "GBPUSD": 1.31210, "USDJPY": 146.850,
             "AUDUSD": 0.65500, "USDCAD": 1.35200, "USDCHF": 0.88400, "GBPJPY": 192.500,
-            "XAUUSD": 2512.30, 
-            "WTIUSD": 74.50, "BRENTUSD": 78.20,
+            "XAUUSD": 2512.30, "WTIUSD": 74.50, "BRENTUSD": 78.20,
             "US30": 41200.00, "SPX500": 5600.00, "NAS100": 19500.00, "GER40": 18500.00,
             "BTCUSD": 62500.00
         }
-        precio_inicial = precios_fallback.get(simbolo, 1.0000)
+        precio_inicial = round(precios_fallback.get(simbolo, 1.0000), dec)
         st.session_state.cache_precios_forex[simbolo] = precio_inicial
+        st.session_state.ultimo_tiempo_api[simbolo] = ahora
         return precio_inicial
 
     precio_actual_ref = obtener_precio_forex_real(par_activo)
@@ -784,7 +771,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, precio_actual_ref)
 
-    # --- MONITOREO AUTOMÁTICO DE TP / SL (EJECUCIÓN EXACTA AL TOCAR) ---
+    # --- MONITOREO AUTOMÁTICO INSTANTÁNEO DE TP / SL ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -793,25 +780,28 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             sim_pos = pos["activo"]
             dec_pos, _, _, _, _ = obtener_config_activo(sim_pos)
             
-            # Normalización y redondeo de precios para evitar desfasamientos por flotantes
-            p_vivo_pos = round(obtener_precio_forex_real(sim_pos), dec_pos)
+            p_vivo_pos = obtener_precio_forex_real(sim_pos)
             pos["precio_vela_actual"] = p_vivo_pos
 
             tp_exacto = round(pos["tp"], dec_pos)
             sl_exacto = round(pos["sl"], dec_pos)
 
+            # Margen de tolerancia de medio micro-pip según decimales del activo
+            eps = (10 ** -dec_pos) / 2.0
+
             cierre_por_tp_sl = False
             precio_ejecucion_salida = p_vivo_pos
 
             if pos["tipo"] == "BUY":
-                if p_vivo_pos >= tp_exacto:
+                # Al tocar o cruzar el TP/SL se activa de inmediato
+                if p_vivo_pos >= (tp_exacto - eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
-                elif p_vivo_pos <= sl_exacto:
+                elif p_vivo_pos <= (sl_exacto + eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, sl_exacto
             else: # SELL
-                if p_vivo_pos <= tp_exacto:
+                if p_vivo_pos <= (tp_exacto + eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
-                elif p_vivo_pos >= sl_exacto:
+                elif p_vivo_pos >= (sl_exacto - eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, sl_exacto
 
             if cierre_por_tp_sl:
