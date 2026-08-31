@@ -628,7 +628,7 @@ if opcion_menu == "🧪 Simulador de Ejecución":
 
         st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional En Vivo - {par_activo}</div>", unsafe_allow_html=True)
 
-        # Generador de datos simulados robusto para Altair (Velas / Línea de alta precisión)
+        # Generador de datos simulados robusto para Altair
         import random
         data_puntos = []
         tiempo_actual = datetime.now(TZ_MEXICO) - timedelta(minutes=60)
@@ -654,7 +654,6 @@ if opcion_menu == "🧪 Simulador de Ejecución":
 
         df_chart = pd.DataFrame(data_puntos)
 
-        # Gráfico de Altair profesional estilo TradingView oscuro
         base = alt.Chart(df_chart).encode(
             x=alt.X('Tiempo:N', sort=None, axis=alt.Axis(title='', labelColor='#94A3B8', tickColor='#2A2E39', domainColor='#2A2E39'))
         )
@@ -669,8 +668,8 @@ if opcion_menu == "🧪 Simulador de Ejecución":
             y2='Cierre:Q',
             color=alt.condition(
                 alt.datum.Cierre >= alt.datum.Apertura,
-                alt.value('#26a69a'), # Verde trading
-                alt.value('#ef5350')  # Rojo trading
+                alt.value('#26a69a'),
+                alt.value('#ef5350')
             )
         )
 
