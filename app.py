@@ -660,9 +660,13 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     import json
     import os
     from datetime import datetime
+    import pytz # Importado para manejo exacto de zonas horarias
     import requests
     import pandas as pd
     import yfinance as yf
+
+    # Definición de la zona horaria oficial de México
+    TZ_MEXICO = pytz.timezone("America/Mexico_City")
 
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
     ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
@@ -773,7 +777,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
 
-        # Función de captura de precio optimizada
         def obtener_precio_instante(simbolo):
             mapa_tickers = {
                 "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", 
@@ -788,7 +791,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
         precio_referencia_vela = obtener_precio_instante(activo_sim)
         
-        # Renderizado condicional del precio de entrada
         sim_precio_entrada = precio_referencia_vela
         if modo_ejecucion == "Pendiente":
             sim_precio_entrada = st.number_input(
@@ -804,7 +806,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         dist_sl = 0.00500 if not es_jpy_sim and not es_crypto_oro else (0.500 if es_jpy_sim else 20.0)
         dist_tp = 0.01000 if not es_jpy_sim and not es_crypto_oro else (1.000 if es_jpy_sim else 40.0)
 
-        # Cálculo default de SL/TP basado en la referencia actual
         default_sl = round(precio_referencia_vela - dist_sl if sim_tipo == "BUY" else precio_referencia_vela + dist_sl, n_decimals)
         default_tp = round(precio_referencia_vela + dist_tp if sim_tipo == "BUY" else precio_referencia_vela - dist_tp, n_decimals)
         
@@ -812,12 +813,14 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         sim_precio_tp = st.number_input("Take Profit", value=default_tp, format=formato, step=step_val, key=f"tp_in_{sim_tipo}_{activo_sim}")
 
         if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_sim", use_container_width=True):
-            # Captura de precio EXACTO al momento del clic si es ejecución por mercado
             precio_ejecucion_final = obtener_precio_instante(activo_sim) if modo_ejecucion == "Ejecución por Mercado" else sim_precio_entrada
             
+            # Fecha de apertura basada estrictamente en el horario de México
+            fecha_mx_str = str(datetime.now(TZ_MEXICO).date())
+
             nueva_orden = {
                 "id": len(st.session_state.posiciones_abiertas) + len(st.session_state.historial_cerradas) + 1,
-                "fecha": str(datetime.now().date()),
+                "fecha": fecha_mx_str,
                 "activo": activo_sim,
                 "tipo": sim_tipo,
                 "lotes": float(sim_lotes),
@@ -900,8 +903,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
                 if cierre_automatico or btn_manual:
                     st.session_state.balance_pedagogico += pnl
+                    
+                    # Marca temporal y fecha sincronizadas estrictamente con la hora de México
+                    ahora_mexico = datetime.now(TZ_MEXICO)
+                    
                     registro_historial = {
-                        "Marca temporal": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                        "Marca temporal": ahora_mexico.strftime("%d/%m/%Y %H:%M:%S"),
                         "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
                         "Fecha": pos['fecha'],
                         "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"),
