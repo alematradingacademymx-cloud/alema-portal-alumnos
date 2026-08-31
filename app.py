@@ -888,7 +888,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                                 <td><code>{fmt % pos['sl']}</code></td>
                                 <td style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}; font-weight:bold;">{pos['tipo']}</td>
                                 <td style="color: {'#26a69a' if pnl>=0 else '#ef5350'}; font-weight:bold;">${pnl:,.2f}</td>
-                                <td style="color: {'#26a69a' if cierre_automatico else '#2962FF'};">{'● Cierre ' + motivo_cierre if cierre_automatico else '● Activa'}</td>
+                                <td style="color: {'#26a69a' if cierre_automatico else '#2962FF'};">{'● Cierre ' + motivo_cierre if cierre_automatico else '● Activa (Esperando TP/SL)'}</td>
                             </tr>
                         </table>
                     </div>
