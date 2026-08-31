@@ -542,7 +542,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API - BITÁCORA ESTILO MT5)
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API - BITÁCORA MT5 PURA)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -681,7 +681,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, precio_actual_ref)
 
-    # --- MOTOR DE MONITOREO Y EVALUACIÓN AUTOMÁTICA DE TP / SL (ESTILO MT5) ---
+    # --- MOTOR DE MONITOREO Y EVALUACIÓN AUTOMÁTICA DE TP / SL ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -717,7 +717,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 
                 st.session_state.balance_pedagogico += pnl_real
                 
-                # Formato exacto de columnas estilo MT5 (Omitiendo Comisión, Tasa y Swap)
+                # Campos exactos estilo MT5 (Sin comisión, sin tasa, sin swap)
                 registro_historial = {
                     "Tiempo": pos.get('tiempo_apertura', datetime.now().strftime("%Y.%m.%d %H:%M:%S")),
                     "Ticket": pos['id'],
@@ -891,7 +891,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     else:
         st.info("No hay posiciones activas.")
 
-    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE (ESTILO MT5) ---
+    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE (ESTILO MT5 REDUCIDO) ---
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("### 📋 Bitácora Histórica Permanente")
     if st.session_state.historial_cerradas:
