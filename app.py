@@ -543,7 +543,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (PERSISTENCIA TOTAL + MONITOREO SL/TP ROBUSTO + CAPITAL NO RESETEABLE)
+# (PERSISTENCIA TOTAL + MONITOREO SL/TP ROBUSTO + NAVEGACIÓN TIPO TRADINGVIEW)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -708,7 +708,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         ahora = time.time()
         tiempo_ultimo = st.session_state.ultimo_tiempo_api.get(simbolo, 0)
         
-        # 1. Consulta a Twelve Data cada 12 segundos
         if ahora - tiempo_ultimo > 12:
             try:
                 url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
@@ -722,7 +721,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             except Exception:
                 pass
 
-        # 2. Precio Base
         if simbolo in st.session_state.cache_precios_forex:
             precio_base = st.session_state.cache_precios_forex[simbolo]
         else:
@@ -736,7 +734,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             precio_base = precios_fallback.get(simbolo, 1.0000)
             st.session_state.cache_precios_forex[simbolo] = precio_base
 
-        # 3. Micro-fluctuación dinámica en vivo
         ruido = np.random.normal(0, step_val * 0.3)
         precio_vivo = round(precio_base + ruido, dec)
         
@@ -773,7 +770,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, bid_actual)
 
-    # --- MONITOREO DE ORDENES ACTIVAS (EVALUACIÓN AUTOMÁTICA SL/TP ROBUSTA) ---
+    # --- MONITOREO DE ORDENES ACTIVAS (SL / TP) ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -793,7 +790,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             cierre_por_tp_sl = False
             precio_ejecucion_salida = p_bid if pos["tipo"] == "BUY" else p_ask
 
-            # Evaluación robusta: Detecta si tocó o rebasó los límites de TP o SL
             if pos["tipo"] == "BUY":
                 if p_bid >= tp_exacto:
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
@@ -808,7 +804,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             if cierre_por_tp_sl:
                 pnl_real = calcular_pnl_institucional(sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"])
                 
-                # Actualizar Balance y Guardar en Disco
                 st.session_state.balance_pedagogico += pnl_real
                 guardar_datos_json(ARCH_PERSISTENCIA_BALANCE, st.session_state.balance_pedagogico)
                 
@@ -885,17 +880,28 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 fig.add_hline(y=pos["tp"], line_dash="dot", line_color="#26a69a", annotation_text=f"TP ({pos['tp']})", annotation_font_color="#26a69a")
                 fig.add_hline(y=pos["sl"], line_dash="dot", line_color="#ef5350", annotation_text=f"SL ({pos['sl']})", annotation_font_color="#ef5350")
 
+        # --- AQUI SE AJUSTA LA NAVEGACIÓN FLUIDA ---
         fig.update_layout(
             template="plotly_dark",
             paper_bgcolor="#131722",
             plot_bgcolor="#131722",
             height=430,
             margin=dict(l=10, r=10, t=10, b=10),
-            xaxis=dict(showgrid=True, gridcolor='#2A2E39', title=''),
+            xaxis=dict(showgrid=True, gridcolor='#2A2E39', title='', rangeslider=dict(visible=False)),
             yaxis=dict(showgrid=True, gridcolor='#2A2E39', zeroline=False, title=''),
-            xaxis_rangeslider_visible=False
+            dragmode='pan'  # <--- Habilita ARRASTRAR/DESPLAZAR por defecto en vez de la lupa
         )
-        st.plotly_chart(fig, use_container_width=True)
+
+        # Habilitar scrollZoom para acercar/alejar con la rueda del ratón
+        st.plotly_chart(
+            fig, 
+            use_container_width=True,
+            config={
+                'scrollZoom': True,       # Permite Zoom con la rueda del ratón o scroll
+                'displayModeBar': True,   # Permite cambiar a la lupa manualmente si el usuario quiere
+                'displaylogo': False
+            }
+        )
 
     with col_panel:
         st.markdown("### 🎛️ Nueva Orden")
@@ -927,7 +933,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             
-            # Guardar en disco inmediatamente
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
             st.success(f"¡Orden {sim_tipo} abierta en {par_activo}: {formato_str % precio_ejecucion}!")
             st.rerun()
@@ -987,7 +992,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     
     if st.session_state.historial_cerradas:
         filas_html = []
-        # Renderiza las operaciones desde la más reciente hasta la más antigua
         for item in reversed(st.session_state.historial_cerradas):
             tiempo_fin = item.get("Tiempo Cierre", item.get("Tiempo", datetime.now().strftime("%Y.%m.%d %H:%M:%S")))
             tipo = str(item.get("Tipo", "buy")).lower()
