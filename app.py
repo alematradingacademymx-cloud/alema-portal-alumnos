@@ -542,7 +542,8 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (MOTOR CON SPREAD BID / ASK REAL)
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
+# (MOTOR CON SPREAD BID/ASK + COTIZACIÓN DINÁMICA EN TIEMPO REAL)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -556,7 +557,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     import plotly.graph_objects as go
     from streamlit_autorefresh import st_autorefresh
 
-    st_autorefresh(interval=5000, key="auto_refresh_terminal_forex_api_opt")
+    # Recarga automática de la pantalla cada 4 segundos para movimiento fluido
+    st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_live")
 
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
     ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
@@ -612,7 +614,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         else:
             return 5, "%.5f", 0.00001, 0.00500, 0.01000, 0.00012
 
-    # Estilos CSS de Terminal MetaTrader 5
+    # Estilos CSS estilo MetaTrader 5 / TradingView
     st.markdown("""
         <style>
             .mt5-terminal-card {
@@ -660,7 +662,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional (Spread Bid/Ask Real)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional (Spread Bid/Ask en Vivo)</div>', unsafe_allow_html=True)
 
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
@@ -686,9 +688,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         key="select_chart_asset_forex"
     )
 
-    # --- OBTENCIÓN DE PRECIOS BID / ASK REALES ---
+    # --- OBTENCIÓN DINÁMICA DE PRECIOS BID Y ASK ---
     def obtener_cotizacion_bid_ask(simbolo):
-        dec, _, _, _, _, spread_val = obtener_config_activo(simbolo)
+        dec, _, step_val, _, _, spread_val = obtener_config_activo(simbolo)
         simbolos_map = {
             "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY",
             "AUDUSD": "AUD/USD", "USDCAD": "USD/CAD", "USDCHF": "USD/CHF",
@@ -702,6 +704,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         ahora = time.time()
         tiempo_ultimo = st.session_state.ultimo_tiempo_api.get(simbolo, 0)
         
+        # 1. Consulta real a Twelve Data cada 12 segundos
         if ahora - tiempo_ultimo > 12:
             try:
                 url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
@@ -709,14 +712,15 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 if res.status_code == 200:
                     data = res.json()
                     if "price" in data:
-                        precio_bid = round(float(data["price"]), dec)
-                        st.session_state.cache_precios_forex[simbolo] = precio_bid
+                        precio_api = float(data["price"])
+                        st.session_state.cache_precios_forex[simbolo] = precio_api
                         st.session_state.ultimo_tiempo_api[simbolo] = ahora
             except Exception:
                 pass
 
+        # 2. Obtener precio base
         if simbolo in st.session_state.cache_precios_forex:
-            precio_bid = st.session_state.cache_precios_forex[simbolo]
+            precio_base = st.session_state.cache_precios_forex[simbolo]
         else:
             precios_fallback = {
                 "EURUSD": 1.15919, "GBPUSD": 1.31210, "USDJPY": 146.850,
@@ -725,11 +729,15 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 "US30": 41200.00, "SPX500": 5600.00, "NAS100": 19500.00, "GER40": 18500.00,
                 "BTCUSD": 62500.00
             }
-            precio_bid = round(precios_fallback.get(simbolo, 1.0000), dec)
-            st.session_state.cache_precios_forex[simbolo] = precio_bid
+            precio_base = precios_fallback.get(simbolo, 1.0000)
+            st.session_state.cache_precios_forex[simbolo] = precio_base
 
-        precio_ask = round(precio_bid + spread_val, dec)
-        return precio_bid, precio_ask
+        # 3. Micro-fluctuación dinámica entre peticiones (mantiene viva la pantalla sin perder el precio real)
+        ruido = np.random.normal(0, step_val * 0.3)
+        precio_bid_dinamico = round(precio_base + ruido, dec)
+        precio_ask_dinamico = round(precio_bid_dinamico + spread_val, dec)
+
+        return precio_bid_dinamico, precio_ask_dinamico
 
     bid_actual, ask_actual = obtener_cotizacion_bid_ask(par_activo)
 
@@ -759,7 +767,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, bid_actual)
 
-    # --- MONITOREO AUTOMÁTICO DE TP / SL SEGÚN REGLA BID/ASK ---
+    # --- MONITOREO DE ORDENES ACTIVAS ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -770,7 +778,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             
             p_bid, p_ask = obtener_cotizacion_bid_ask(sim_pos)
             
-            # Guardar cotizaciones vivas de referencia
             pos["bid_vela_actual"] = p_bid
             pos["ask_vela_actual"] = p_ask
 
@@ -782,13 +789,13 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             precio_ejecucion_salida = p_bid if pos["tipo"] == "BUY" else p_ask
 
             if pos["tipo"] == "BUY":
-                # Las Compras cierran en el precio BID (Venta)
+                # Las Compras se evalúan al precio BID (Venta)
                 if p_bid >= (tp_exacto - eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
                 elif p_bid <= (sl_exacto + eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, sl_exacto
             else: # SELL
-                # Las Ventas cierran en el precio ASK (Compra)
+                # Las Ventas se evalúan al precio ASK (Compra)
                 if p_ask <= (tp_exacto + eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
                 elif p_ask >= (sl_exacto - eps):
@@ -819,7 +826,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
             st.rerun()
 
-    # Panel de Métricas
+    # Métrica Dashboard
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.metric("Balance", f"${st.session_state.balance_pedagogico:,.2f}")
@@ -886,7 +893,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_forex")
         sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01, key="sim_lote_forex")
 
-        # El precio de referencia para proyectar TP y SL depende del lado ejecutor (BUY en Ask, SELL en Bid)
         precio_ref_orden = ask_actual if sim_tipo == "BUY" else bid_actual
         default_sl = round(precio_ref_orden - dist_sl if sim_tipo == "BUY" else precio_ref_orden + dist_sl, n_decimals)
         default_tp = round(precio_ref_orden + dist_tp if sim_tipo == "BUY" else precio_ref_orden - dist_tp, n_decimals)
@@ -895,7 +901,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato_str, step=step_val, key="sim_tp_forex")
 
         if st.button(f"🟢 COMPRAR @ {formato_str % ask_actual}" if sim_tipo == "BUY" else f"🔴 VENDER @ {formato_str % bid_actual}", key="btn_ejecutar_forex", use_container_width=True):
-            # COMPRA entra a precio ASK | VENTA entra a precio BID
             precio_ejecucion = ask_actual if sim_tipo == "BUY" else bid_actual
             tiempo_apertura_str = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
             nueva_orden = {
