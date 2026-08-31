@@ -543,7 +543,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (MOTOR CON SPREAD BID/ASK + COTIZACIÓN DINÁMICA EN TIEMPO REAL)
+# (BID/ASK + SPREAD + PRECIO DE MERCADO DINÁMICO EN TIEMPO REAL)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -625,6 +625,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 margin-bottom: 8px;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             }
+            .live-ticker-price { color: #f59e0b; font-weight: 700; font-size: 15px; }
             .live-ticker-bid { color: #ef5350; font-weight: 700; font-size: 15px; }
             .live-ticker-ask { color: #26a69a; font-weight: 700; font-size: 15px; }
             .mt5-table-container {
@@ -662,7 +663,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional (Spread Bid/Ask en Vivo)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional (Spread + Cotización Vivo)</div>', unsafe_allow_html=True)
 
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
@@ -688,8 +689,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         key="select_chart_asset_forex"
     )
 
-    # --- OBTENCIÓN DINÁMICA DE PRECIOS BID Y ASK ---
-    def obtener_cotizacion_bid_ask(simbolo):
+    # --- OBTENCIÓN DINÁMICA DE PRECIO BASE, BID Y ASK ---
+    def obtener_cotizacion_completa(simbolo):
         dec, _, step_val, _, _, spread_val = obtener_config_activo(simbolo)
         simbolos_map = {
             "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY",
@@ -704,7 +705,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         ahora = time.time()
         tiempo_ultimo = st.session_state.ultimo_tiempo_api.get(simbolo, 0)
         
-        # 1. Consulta real a Twelve Data cada 12 segundos
+        # 1. Consulta a Twelve Data cada 12 segundos
         if ahora - tiempo_ultimo > 12:
             try:
                 url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
@@ -718,7 +719,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             except Exception:
                 pass
 
-        # 2. Obtener precio base
+        # 2. Precio Base
         if simbolo in st.session_state.cache_precios_forex:
             precio_base = st.session_state.cache_precios_forex[simbolo]
         else:
@@ -732,14 +733,16 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             precio_base = precios_fallback.get(simbolo, 1.0000)
             st.session_state.cache_precios_forex[simbolo] = precio_base
 
-        # 3. Micro-fluctuación dinámica entre peticiones (mantiene viva la pantalla sin perder el precio real)
+        # 3. Micro-fluctuación dinámica en vivo
         ruido = np.random.normal(0, step_val * 0.3)
-        precio_bid_dinamico = round(precio_base + ruido, dec)
+        precio_vivo = round(precio_base + ruido, dec)
+        
+        precio_bid_dinamico = precio_vivo
         precio_ask_dinamico = round(precio_bid_dinamico + spread_val, dec)
 
-        return precio_bid_dinamico, precio_ask_dinamico
+        return precio_bid_dinamico, precio_ask_dinamico, precio_vivo
 
-    bid_actual, ask_actual = obtener_cotizacion_bid_ask(par_activo)
+    bid_actual, ask_actual, precio_vivo_actual = obtener_cotizacion_completa(par_activo)
 
     if 'mercado_forex_df' not in st.session_state:
         st.session_state.mercado_forex_df = {}
@@ -776,7 +779,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             sim_pos = pos["activo"]
             dec_pos, _, _, _, _, _ = obtener_config_activo(sim_pos)
             
-            p_bid, p_ask = obtener_cotizacion_bid_ask(sim_pos)
+            p_bid, p_ask, _ = obtener_cotizacion_completa(sim_pos)
             
             pos["bid_vela_actual"] = p_bid
             pos["ask_vela_actual"] = p_ask
@@ -789,13 +792,11 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             precio_ejecucion_salida = p_bid if pos["tipo"] == "BUY" else p_ask
 
             if pos["tipo"] == "BUY":
-                # Las Compras se evalúan al precio BID (Venta)
                 if p_bid >= (tp_exacto - eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
                 elif p_bid <= (sl_exacto + eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, sl_exacto
             else: # SELL
-                # Las Ventas se evalúan al precio ASK (Compra)
                 if p_ask <= (tp_exacto + eps):
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
                 elif p_ask >= (sl_exacto - eps):
@@ -848,9 +849,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     n_decimals, formato_str, step_val, dist_sl, dist_tp, spread_val = obtener_config_activo(par_activo)
 
     with col_grafico:
+        # AQUÍ SE MUESTRA EL PRECIO DE MERCADO EN TIEMPO REAL JUNTO AL SPREAD, BID Y ASK
         st.markdown(
             f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>"
-            f"Gráfico {par_activo} | BID: <span class='live-ticker-bid'>{formato_str % bid_actual}</span> | "
+            f"Gráfico {par_activo} | "
+            f"Precio Actual: <span class='live-ticker-price'>{formato_str % precio_vivo_actual}</span> | "
+            f"BID: <span class='live-ticker-bid'>{formato_str % bid_actual}</span> | "
             f"ASK: <span class='live-ticker-ask'>{formato_str % ask_actual}</span> | "
             f"Spread: <b style='color:#d1d4dc;'>{formato_str % spread_val}</b></div>", 
             unsafe_allow_html=True
