@@ -606,7 +606,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     def obtener_datos_completos_mercado(simbolo):
         ticker_yf = mapa_tickers.get(simbolo, "EURUSD=X")
         try:
-            df = yf.Ticker(ticker_yf).history(period="1d", interval="1m")
+            # period="5d", interval="15m" para garantizar velas sólidas y bien formadas
+            df = yf.Ticker(ticker_yf).history(period="5d", interval="15m")
             if not df.empty:
                 return df
         except Exception:
@@ -644,20 +645,18 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             motivo = ""
             precio_ejecucion_salida = precio_cierre_vivo
 
-            # Evaluación real evaluando si las mechas tocaron los límites del TP o SL
             if pos["tipo"] == "BUY":
                 if max_vela >= pos["tp"]:
                     cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "Take Profit (TP)", pos["tp"]
                 elif min_vela <= pos["sl"]:
                     cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "Stop Loss (SL)", pos["sl"]
-            else: # SELL
+            else: 
                 if min_vela <= pos["tp"]:
                     cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "Take Profit (TP)", pos["tp"]
                 elif max_vela >= pos["sl"]:
                     cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "Stop Loss (SL)", pos["sl"]
 
             if cierre_por_tp_sl:
-                # Recalcular PnL exacto al precio objetivo del TP/SL
                 pips_reales = (precio_ejecucion_salida - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_ejecucion_salida)
                 pnl_real = pips_reales * mp * vp * pos["lotes"]
                 
