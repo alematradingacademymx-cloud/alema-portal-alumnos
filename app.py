@@ -10,10 +10,6 @@ import yfinance as yf
 # Configuración de página
 st.set_page_config(page_title="ALEMA Trading Academy - Portal de Alumnos", page_icon="📈", layout="centered")
 
-# Variables globales iniciales por defecto (evitan errores antes del login)
-ARCH_PERSISTENCIA_HISTORIAL = "historial_invitado.json"
-ARCH_PERSISTENCIA_POSICIONES = "posiciones_invitado.json"
-
 # Estilos CSS personalizados con Fondo Azul Oscuro Elegante y Botón Verde
 st.markdown("""
     <style>
@@ -187,13 +183,18 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 if "usuario_actual" not in st.session_state:
-    st.session_state.usuario_actual = ""
+    st.session_state.usuario_actual = "invitado"
 
 if "tipo_usuario" not in st.session_state:
     st.session_state.tipo_usuario = "ALUMNO"
 
 if "journal_trades" not in st.session_state:
     st.session_state.journal_trades = []
+
+# Definir archivos dinámicos basados en la sesión actual
+matricula_actual = st.session_state.usuario_actual if st.session_state.usuario_actual else "invitado"
+ARCH_PERSISTENCIA_HISTORIAL = f"historial_{matricula_actual}.json"
+ARCH_PERSISTENCIA_POSICIONES = f"posiciones_{matricula_actual}.json"
 
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
@@ -235,21 +236,19 @@ if not st.session_state.autenticado:
                     # ASIGNAR CAPITAL INICIAL DESDE SHEETS AL ENTRAR
                     st.session_state.balance_pedagogico = float(user_info['capital_base'])
                     
-                    # --- CONFIGURAR ARCHIVOS INDIVIDUALES POR ALUMNO ---
-                    global ARCH_PERSISTENCIA_HISTORIAL, ARCH_PERSISTENCIA_POSICIONES
-                    ARCH_PERSISTENCIA_HISTORIAL = f"historial_{matricula_input}.json"
-                    ARCH_PERSISTENCIA_POSICIONES = f"posiciones_{matricula_input}.json"
+                    # Cargar archivos específicos del alumno autenticado
+                    archivo_pos = f"posiciones_{matricula_input}.json"
+                    archivo_hist = f"historial_{matricula_input}.json"
                     
-                    if os.path.exists(ARCH_PERSISTENCIA_POSICIONES):
-                        st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_POSICIONES, [])
+                    if os.path.exists(archivo_pos):
+                        st.session_state.posiciones_abiertas = cargar_datos_json(archivo_pos, [])
                     else:
                         st.session_state.posiciones_abiertas = []
 
-                    if os.path.exists(ARCH_PERSISTENCIA_HISTORIAL):
-                        st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
+                    if os.path.exists(archivo_hist):
+                        st.session_state.historial_cerradas = cargar_datos_json(archivo_hist, [])
                     else:
                         st.session_state.historial_cerradas = []
-                    # --------------------------------------------------
                     
                     st.success("¡Acceso concedido!")
                     st.rerun()
