@@ -542,12 +542,13 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API)
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API - OPTIMIZADO)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
     import json
     import os
+    import time
     from datetime import datetime, timedelta
     import requests
     import pandas as pd
@@ -555,8 +556,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     import plotly.graph_objects as go
     from streamlit_autorefresh import st_autorefresh
 
-    # Auto-refresco de la terminal cada 4 segundos para sincronización de Forex en vivo
-    st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_api")
+    # Auto-refresco optimizado a 6 segundos para proteger el límite de la API gratuita
+    st_autorefresh(interval=6000, key="auto_refresh_terminal_forex_api_opt")
 
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
     ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
@@ -604,6 +605,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
+    # Inicializar cachés de control de velocidad para la API
+    if 'cache_precios_forex' not in st.session_state:
+        st.session_state.cache_precios_forex = {}
+    if 'ultimo_tiempo_api' not in st.session_state:
+        st.session_state.ultimo_tiempo_api = {}
+
     # Selector principal de activo Forex y Oro
     par_activo = st.selectbox("Símbolo de Mercado (Forex)", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"], key="select_chart_asset_forex")
 
@@ -616,27 +623,41 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         }
         
         simbolo_api = simbolos_map.get(simbolo, "EUR/USD")
-        
-        # API Key oficial de ALEMA Trading Academy configurada
         api_key = "6223c6d78f7a43b2872fc3acbb3f578e"
         
-        try:
-            url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
-            res = requests.get(url, timeout=3)
-            if res.status_code == 200:
-                data = res.json()
-                if "price" in data:
-                    return float(data["price"])
-        except Exception:
-            pass
+        ahora = time.time()
+        tiempo_ultimo = st.session_state.ultimo_tiempo_api.get(simbolo, 0)
+        
+        # Consultar a la API externa solo si han pasado al menos 12 segundos para respetar tasa gratuita
+        if ahora - tiempo_ultimo > 12:
+            try:
+                url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
+                res = requests.get(url, timeout=3)
+                if res.status_code == 200:
+                    data = res.json()
+                    if "price" in data:
+                        nuevo_precio = float(data["price"])
+                        st.session_state.cache_precios_forex[simbolo] = nuevo_precio
+                        st.session_state.ultimo_tiempo_api[simbolo] = ahora
+                        return nuevo_precio
+            except Exception:
+                pass
+        
+        # Si ya tenemos un precio en memoria, evoluciona de manera fluida sin saltos bruscos
+        if simbolo in st.session_state.cache_precios_forex:
+            precio_base = st.session_state.cache_precios_forex[simbolo]
+            variacion = np.random.normal(0, precio_base * 0.00001)
+            precio_actualizado = precio_base + variacion
+            return round(precio_actualizado, 3 if "JPY" in simbolo else (2 if "XAU" in simbolo else 5))
             
+        # Respaldo inicial estricto por si arranca en frío
         precios_fallback = {
-            "EURUSD": 1.08540, "GBPUSD": 1.31210, 
+            "EURUSD": 1.15919, "GBPUSD": 1.31210, 
             "USDJPY": 146.850, "XAUUSD": 2512.30
         }
-        base = precios_fallback.get(simbolo, 1.0000)
-        variacion = np.random.normal(0, base * 0.00005)
-        return round(base + variacion, 3 if "JPY" in simbolo else (2 if "XAU" in simbolo else 5))
+        precio_inicial = precios_fallback.get(simbolo, 1.0000)
+        st.session_state.cache_precios_forex[simbolo] = precio_inicial
+        return precio_inicial
 
     precio_actual_ref = obtener_precio_forex_real(par_activo)
 
