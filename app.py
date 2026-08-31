@@ -543,7 +543,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (VERSIÓN 100% ESTABLE - BOTÓN FIJO Y TICKS SINCRONIZADOS)
+# (VERSIÓN 100% ESTABLE - SCALPING 10/20 PIPS Y BOTÓN FIJO)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -609,13 +609,14 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             return diferencia * 100000.0 * lotes
 
     def obtener_config_activo(simbolo):
-        if "JPY" in simbolo: return 3, "%.3f", 0.001, 0.500, 1.000, 0.015
-        elif "XAU" in simbolo: return 2, "%.2f", 0.10, 10.0, 20.0, 0.35
-        elif "WTI" in simbolo or "BRENT" in simbolo: return 2, "%.2f", 0.01, 1.0, 2.0, 0.04
-        elif "BTC" in simbolo: return 2, "%.2f", 1.0, 500.0, 1000.0, 25.00
-        elif any(idx in simbolo for idx in ["US30", "NAS100", "GER40"]): return 2, "%.2f", 1.0, 100.0, 200.0, 2.00
-        elif "SPX" in simbolo: return 2, "%.2f", 0.10, 20.0, 40.0, 0.40
-        else: return 5, "%.5f", 0.00001, 0.00500, 0.01000, 0.00012
+        # Configuración optimizada para Scalping (SL: 10 pips / TP: 20 pips aprox.)
+        if "JPY" in simbolo: return 3, "%.3f", 0.001, 0.100, 0.200, 0.015
+        elif "XAU" in simbolo: return 2, "%.2f", 0.10, 2.00, 4.00, 0.35
+        elif "WTI" in simbolo or "BRENT" in simbolo: return 2, "%.2f", 0.01, 0.30, 0.60, 0.04
+        elif "BTC" in simbolo: return 2, "%.2f", 1.0, 100.0, 200.0, 25.00
+        elif any(idx in simbolo for idx in ["US30", "NAS100", "GER40"]): return 2, "%.2f", 1.0, 20.0, 40.0, 2.00
+        elif "SPX" in simbolo: return 2, "%.2f", 0.10, 4.00, 8.00, 0.40
+        else: return 5, "%.5f", 0.00001, 0.00100, 0.00200, 0.00012
 
     # Estilos CSS
     st.markdown("""
@@ -787,7 +788,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         ])
         st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
     with col_m3: st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
-    with col_m4: st.metric("Estado Datos", "Sincronizado Exacto")
+    with col_m4: st.metric("Estado Datos", "Sincronizado Scalping")
 
     st.divider()
 
