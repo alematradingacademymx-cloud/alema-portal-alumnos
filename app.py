@@ -128,13 +128,16 @@ def cargar_usuarios_desde_sheets():
         df['Password'] = df['Password'].fillna('').str.strip()
         df['Tipo_Usuario'] = df['Tipo_Usuario'].fillna('ALUMNO').str.strip().str.upper()
         df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
+        # CAPTURA DE CAPITAL BASE (Predeterminado 300.0 si está vacío)
+        df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
         
         dict_usuarios = {}
         for _, row in df.iterrows():
             dict_usuarios[row['Matricula']] = {
                 'password': row['Password'],
                 'tipo': row['Tipo_Usuario'],
-                'vencimiento': row['Fecha_Vencimiento']
+                'vencimiento': row['Fecha_Vencimiento'],
+                'capital_base': float(row['Capital'])
             }
         return dict_usuarios
     except Exception:
@@ -146,13 +149,15 @@ def cargar_usuarios_desde_sheets():
             df['Password'] = df['Password'].fillna('').str.strip()
             df['Tipo_Usuario'] = df['Tipo_Usuario'].fillna('ALUMNO').str.strip().str.upper()
             df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
+            df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
             
             dict_usuarios = {}
             for _, row in df.iterrows():
                 dict_usuarios[row['Matricula']] = {
                     'password': row['Password'],
                     'tipo': row['Tipo_Usuario'],
-                    'vencimiento': row['Fecha_Vencimiento']
+                    'vencimiento': row['Fecha_Vencimiento'],
+                    'capital_base': float(row['Capital'])
                 }
             return dict_usuarios
         except Exception:
@@ -223,6 +228,10 @@ if not st.session_state.autenticado:
                     st.session_state.autenticado = True
                     st.session_state.usuario_actual = matricula_input
                     st.session_state.tipo_usuario = user_info['tipo']
+                    
+                    # ASIGNAR CAPITAL INICIAL DESDE SHEETS AL ENTRAR
+                    st.session_state.balance_pedagogico = float(user_info['capital_base'])
+                    
                     st.success("¡Acceso concedido!")
                     st.rerun()
             else:
@@ -247,7 +256,29 @@ if not st.session_state.autenticado:
     st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
     st.stop()
 
-
+# ==========================================
+# ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
+# ==========================================
+if st.session_state.get("tipo_usuario") == "ADMIN":
+    st.sidebar.divider()
+    st.sidebar.markdown("### ⚙️ Panel Coordinación Admin")
+    
+    lista_matriculas = list(USUARIOS_AUTORIZADOS.keys())
+    alumno_seleccionado = st.sidebar.selectbox("Gestionar Alumno", lista_matriculas, key="select_admin_alumno")
+    
+    if st.sidebar.button("🔄 Sincronizar / Reiniciar Capital", use_container_width=True):
+        cargar_usuarios_desde_sheets.clear()
+        datos_frescos = cargar_usuarios_desde_sheets()
+        capital_nuevo = datos_frescos.get(alumno_seleccionado, {}).get('capital_base', 300.0)
+        
+        # Si el admin resetea al usuario que está logueado actualmente en pantalla:
+        if alumno_seleccionado == st.session_state.usuario_actual:
+            st.session_state.balance_pedagogico = capital_nuevo
+            st.session_state.posiciones_abiertas = []
+            st.success(f"¡Tu cuenta ha sido reiniciada a ${capital_nuevo:,.2f}!")
+        else:
+            st.sidebar.success(f"Capital de {alumno_seleccionado} actualizado en base.")
+        st.rerun()
 
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
