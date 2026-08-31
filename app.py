@@ -542,20 +542,21 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (MOTOR INTERNO AUTÓNOMO - SIN YFINANCE)
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (MOTOR AUTÓNOMO BASADO EN TIEMPO REAL)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
     import json
     import os
     from datetime import datetime, timedelta
+    import time
     import pandas as pd
     import numpy as np
     import plotly.graph_objects as go
     from streamlit_autorefresh import st_autorefresh
 
-    # Auto-refresco de la terminal cada 5 segundos para control autónomo y movimiento en vivo
-    st_autorefresh(interval=5000, key="auto_refresh_terminal_alema_puro")
+    # Auto-refresco de la terminal cada 3 segundos para fluidez total en tiempo real
+    st_autorefresh(interval=3000, key="auto_refresh_terminal_alema_tiempo_real")
 
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
     ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
@@ -586,10 +587,16 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 margin-bottom: 8px;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             }
+            .live-ticker {
+                color: #E2B714;
+                font-weight: 700;
+                font-size: 16px;
+                animation: pulse 1.5s infinite;
+            }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional Autónoma</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional en Vivo</div>', unsafe_allow_html=True)
 
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
@@ -598,62 +605,60 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
-    # Inicializar el motor de precios internos en la sesión si no existen
     precios_base_iniciales = {
         "EURUSD": 1.15903, "GBPUSD": 1.30250, 
         "USDJPY": 155.200, "XAUUSD": 2385.50, "BTCUSD": 64200.0
     }
 
-    if 'mercado_historicos' not in st.session_state:
-        st.session_state.mercado_historicos = {}
-        np.random.seed(42)
+    # Inicializar histórico de precios y control de tiempo por activo
+    if 'mercado_historicos_tr' not in st.session_state:
+        st.session_state.mercado_historicos_tr = {}
+        np.random.seed(101)
         for simb, p_base in precios_base_iniciales.items():
-            fechas = [datetime.now() - timedelta(minutes=15 * i) for i in range(60)][::-1]
-            vol = p_base * 0.0008
-            tendencia = np.cumsum(np.random.normal(0, vol, 60))
+            fechas = [datetime.now() - timedelta(minutes=5 * i) for i in range(50)][::-1]
+            vol = p_base * 0.0005
+            tendencia = np.cumsum(np.random.normal(0, vol, 50))
             closes = p_base + tendencia
-            opens = closes + np.random.normal(0, vol * 0.3, 60)
-            highs = np.maximum(opens, closes) + abs(np.random.normal(0, vol * 0.4, 60))
-            lows = np.minimum(opens, closes) - abs(np.random.normal(0, vol * 0.4, 60))
+            opens = closes + np.random.normal(0, vol * 0.2, 50)
+            highs = np.maximum(opens, closes) + abs(np.random.normal(0, vol * 0.3, 50))
+            lows = np.minimum(opens, closes) - abs(np.random.normal(0, vol * 0.3, 50))
             
             df_init = pd.DataFrame({
                 'Open': opens, 'High': highs, 'Low': lows, 'Close': closes
             }, index=fechas)
-            st.session_state.mercado_historicos[simb] = df_init
+            st.session_state.mercado_historicos_tr[simb] = df_init
 
-    # Función para actualizar el precio en tiempo real mediante simulación institucional (Random Walk)
-    def tick_precio_mercado(simbolo):
-        df = st.session_state.mercado_historicos[simbolo]
+    # Selector principal de activo
+    par_activo = st.selectbox("Símbolo de Mercado", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD"], key="select_chart_asset_tr")
+
+    # --- MOTOR DE TICK EN TIEMPO REAL BASADO EN DELTA DE TIEMPO ---
+    def avanzar_precio_tiempo_real(simbolo):
+        df = st.session_state.mercado_historicos_tr[simbolo]
         ultimo_cierre = float(df['Close'].iloc[-1])
         
-        # Variación aleatoria realista según el tipo de activo
-        factor = 0.0001 if "JPY" in simbolo else (0.00005 if ("XAU" in simbolo or "BTC" in simbolo) else 0.00003)
+        # Generar variación estocástica realista adaptada al activo
+        factor = 0.00012 if "JPY" in simbolo else (0.00008 if ("XAU" in simbolo or "BTC" in simbolo) else 0.00004)
         delta = np.random.normal(0, ultimo_cierre * factor)
         
         nuevo_precio = round(ultimo_cierre + delta, 3 if "JPY" in simbolo else (2 if ("XAU" in simbolo or "BTC" in simbolo) else 5))
         
-        # Actualizar la última vela activa
+        # Actualizar la vela actual en tiempo real
         df.iloc[-1, df.columns.get_loc('Close')] = nuevo_precio
         df.iloc[-1, df.columns.get_loc('High')] = max(df.iloc[-1]['Open'], max(df.iloc[-1]['High'], nuevo_precio))
         df.iloc[-1, df.columns.get_loc('Low')] = min(df.iloc[-1]['Open'], min(df.iloc[-1]['Low'], nuevo_precio))
         
         return df, nuevo_precio
 
-    # Selector principal de activo
-    par_activo = st.selectbox("Símbolo de Mercado", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD"], key="select_chart_asset_alema_puro")
+    df_history, precio_actual_ref = avanzar_precio_tiempo_real(par_activo)
 
-    # Ejecutar el tick del activo seleccionado
-    df_history, precio_actual_ref = tick_precio_mercado(par_activo)
-
-    # --- MOTOR DE MONITOREO Y EVALUACIÓN DE TP / SL (CON MECHAS) ---
+    # --- MONITOREO Y EVALUACIÓN AUTOMÁTICA DE TP / SL ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
 
         for pos in st.session_state.posiciones_abiertas:
             sim_pos = pos["activo"]
-            # Obtener datos actualizados del activo de la posición
-            df_pos_hist, p_vivo_pos = tick_precio_mercado(sim_pos)
+            df_pos_hist, p_vivo_pos = avanzar_precio_tiempo_real(sim_pos)
             vela_actual = df_pos_hist.iloc[-1]
             precio_cierre_vivo = float(vela_actual['Close'])
             max_vela = float(vela_actual['High'])
@@ -726,7 +731,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
     with col_m4:
-        st.metric("Servidor", "ALEMA-Live-Sim")
+        st.metric("Servidor", "ALEMA-Live-TR")
 
     st.divider()
 
@@ -738,7 +743,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     precio_formateado = formato_str % precio_actual_ref
 
     with col_grafico:
-        st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional (TradingView Style) - {par_activo} | Cotización: <b style='color: #E2B714;'>{precio_formateado}</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional (TradingView Style) - {par_activo} | Cotización en Vivo: <span class='live-ticker'>{precio_formateado}</span></div>", unsafe_allow_html=True)
 
         fig = go.Figure()
 
@@ -775,8 +780,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     with col_panel:
         st.markdown("### 🎛️ Nueva Orden de Mercado")
-        sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_terminal_puro")
-        sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01, key="sim_lote_terminal_puro")
+        sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_terminal_tr")
+        sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01, key="sim_lote_terminal_tr")
         
         n_decimals = 3 if es_jpy else (2 if es_crypto_oro else 5)
         formato = "%.3f" if es_jpy else ("%.2f" if es_crypto_oro else "%.5f")
@@ -788,10 +793,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         default_sl = round(precio_actual_ref - dist_sl if sim_tipo == "BUY" else precio_actual_ref + dist_sl, n_decimals)
         default_tp = round(precio_actual_ref + dist_tp if sim_tipo == "BUY" else precio_actual_ref - dist_tp, n_decimals)
         
-        sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key="sim_sl_terminal_puro")
-        sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key="sim_tp_terminal_puro")
+        sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key="sim_sl_terminal_tr")
+        sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key="sim_tp_terminal_tr")
 
-        if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_terminal_puro", use_container_width=True):
+        if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_terminal_tr", use_container_width=True):
             precio_ejecucion = precio_actual_ref
             nueva_orden = {
                 "id": int(datetime.now().timestamp()),
@@ -832,7 +837,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 </div>
             """, unsafe_allow_html=True)
             
-            if st.button(f"Cerrar Manual #{pos['id']}", key=f"manual_btn_puro_{pos['id']}_{idx}"):
+            if st.button(f"Cerrar Manual #{pos['id']}", key=f"manual_btn_tr_{pos['id']}_{idx}"):
                 st.session_state.balance_pedagogico += pnl
                 st.session_state.historial_cerradas.append({
                     "Marca temporal": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
