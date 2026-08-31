@@ -297,7 +297,6 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         else:
             st.sidebar.success(f"Capital de {alumno_seleccionado} actualizado en base.")
         st.rerun()
-
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
