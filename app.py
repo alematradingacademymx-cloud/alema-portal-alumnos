@@ -542,7 +542,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API - BITÁCORA ESTILO MT5 REAL)
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API - BITÁCORA MT5 REAL)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -577,7 +577,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         except Exception:
             pass
 
-    # Estilos CSS de Terminal MT5
+    # Estilos CSS
     st.markdown("""
         <style>
             .mt5-terminal-card {
@@ -602,22 +602,22 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             .mt5-table {
                 width: 100%;
                 border-collapse: collapse;
-                font-family: 'Consolas', 'Segoe UI', monospace;
-                font-size: 12.5px;
+                font-family: 'Segoe UI', Tahoma, sans-serif;
+                font-size: 13px;
                 background-color: #131722;
                 color: #d1d4dc;
             }
             .mt5-table th {
                 background-color: #1e222d;
                 color: #848e9c;
-                padding: 7px 10px;
+                padding: 8px 12px;
                 text-align: left;
                 border-bottom: 1px solid #2A2E39;
                 font-weight: 600;
                 white-space: nowrap;
             }
             .mt5-table td {
-                padding: 6px 10px;
+                padding: 7px 12px;
                 border-bottom: 1px solid #1e222d;
                 white-space: nowrap;
             }
@@ -714,7 +714,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, precio_actual_ref)
 
-    # --- MOTOR DE MONITOREO Y EVALUACIÓN AUTOMÁTICA DE TP / SL ---
+    # --- MONITOREO AUTOMÁTICO DE TP / SL ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -750,7 +750,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 
                 st.session_state.balance_pedagogico += pnl_real
                 
-                # ESTRUCTURA EXACTA MT5 (Campos idénticos a la imagen)
                 registro_historial = {
                     "Tiempo": pos.get('tiempo_apertura', datetime.now().strftime("%Y.%m.%d %H:%M:%S")),
                     "Ticket": pos['id'],
@@ -775,7 +774,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
             st.rerun()
 
-    # Panel de Métricas Superior
+    # Panel de Métricas
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.metric("Balance", f"${st.session_state.balance_pedagogico:,.2f}")
@@ -877,7 +876,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.success(f"¡Orden ejecutada con éxito al precio de Forex: {precio_ejecucion}!")
             st.rerun()
 
-    # --- PANEL INFERIOR: POSICIONES ACTIVAS ---
+    # --- POSICIONES ACTIVAS ---
     st.markdown("### 📊 Posiciones Abiertas (Monitoreo en Vivo Forex)")
     if st.session_state.posiciones_abiertas:
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
@@ -924,76 +923,48 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     else:
         st.info("No hay posiciones activas.")
 
-    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE (TABLA ESTILO MT5 EXACTO) ---
+    # --- BITÁCORA HISTÓRICA (RENDERIZADO HTML SIN SANGRÍA) ---
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("### 📋 Bitácora Histórica (MetaTrader 5)")
     
     if st.session_state.historial_cerradas:
-        # CONVERSIÓN Y DEPURACIÓN AUTOMÁTICA DE REGISTROS ANTIGUOS
-        registros_mt5_limpios = []
+        filas_html = []
         for item in st.session_state.historial_cerradas:
-            registros_mt5_limpios.append({
-                "Tiempo": item.get("Tiempo", item.get("Marca temporal", datetime.now().strftime("%Y.%m.%d %H:%M:%S"))),
-                "Ticket": item.get("Ticket", item.get("id", "9990000000")),
-                "Tipo": str(item.get("Tipo", "buy")).lower(),
-                "Volumen": item.get("Volumen", item.get("Lotes", 0.10)),
-                "Símbolo": item.get("Símbolo", item.get("Activo", "EURUSD")),
-                "Precio": item.get("Precio", item.get("entrada", 0.0)),
-                "S / L": item.get("S / L", item.get("sl", 0.0)),
-                "T / P": item.get("T / P", item.get("tp", 0.0)),
-                "Tiempo Cierre": item.get("Tiempo Cierre", datetime.now().strftime("%Y.%m.%d %H:%M:%S")),
-                "Precio Cierre": item.get("Precio Cierre", item.get("entrada", 0.0)),
-                "Beneficio": float(item.get("Beneficio", item.get("Resultado USD", 0.0)))
-            })
+            tiempo_ini = item.get("Tiempo", item.get("Marca temporal", datetime.now().strftime("%Y.%m.%d %H:%M:%S")))
+            ticket = item.get("Ticket", item.get("id", "9990000000"))
+            tipo = str(item.get("Tipo", "buy")).lower()
+            volumen = float(item.get("Volumen", item.get("Lotes", 0.10)))
+            simbolo = item.get("Símbolo", item.get("Activo", "EURUSD"))
+            precio_in = item.get("Precio", item.get("entrada", 0.0))
+            sl = item.get("S / L", item.get("sl", 0.0))
+            tp = item.get("T / P", item.get("tp", 0.0))
+            tiempo_fin = item.get("Tiempo Cierre", datetime.now().strftime("%Y.%m.%d %H:%M:%S"))
+            precio_out = item.get("Precio Cierre", item.get("entrada", 0.0))
+            beneficio = float(item.get("Beneficio", item.get("Resultado USD", 0.0)))
 
-        # CONSTRUCCIÓN DE TABLA MT5 CON ESTILOS VISUALES DEDICADOS
-        html_tabla = """
-        <div class="mt5-table-container">
-            <table class="mt5-table">
-                <thead>
-                    <tr>
-                        <th>Tiempo</th>
-                        <th>Ticket</th>
-                        <th>Tipo</th>
-                        <th>Volumen</th>
-                        <th>Símbolo</th>
-                        <th>Precio</th>
-                        <th>S / L</th>
-                        <th>T / P</th>
-                        <th>Tiempo</th>
-                        <th>Precio</th>
-                        <th>Beneficio</th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
+            clase_tipo = "mt5-buy" if tipo == "buy" else "mt5-sell"
+            clase_pnl = "mt5-profit" if beneficio >= 0 else "mt5-loss"
+
+            filas_html.append(
+                f'<tr>'
+                f'<td>{tiempo_ini}</td>'
+                f'<td>{ticket}</td>'
+                f'<td class="{clase_tipo}">{tipo}</td>'
+                f'<td>{volumen:.2f}</td>'
+                f'<td>{simbolo}</td>'
+                f'<td>{precio_in}</td>'
+                f'<td>{sl}</td>'
+                f'<td>{tp}</td>'
+                f'<td>{tiempo_fin}</td>'
+                f'<td>{precio_out}</td>'
+                f'<td class="{clase_pnl}">{beneficio:+.2f}</td>'
+                f'</tr>'
+            )
+
+        filas_concat = "".join(filas_html)
+        tabla_html_completa = f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Ticket</th><th>Tipo</th><th>Volumen</th><th>Símbolo</th><th>Precio</th><th>S / L</th><th>T / P</th><th>Tiempo</th><th>Precio</th><th>Beneficio</th></tr></thead><tbody>{filas_concat}</tbody></table></div>'
         
-        for r in registros_mt5_limpios:
-            clase_tipo = "mt5-buy" if r["Tipo"] == "buy" else "mt5-sell"
-            clase_pnl = "mt5-profit" if r["Beneficio"] >= 0 else "mt5-loss"
-            
-            html_tabla += f"""
-                <tr>
-                    <td>{r['Tiempo']}</td>
-                    <td>{r['Ticket']}</td>
-                    <td class="{clase_tipo}">{r['Tipo']}</td>
-                    <td>{r['Volumen']:.2f}</td>
-                    <td>{r['Símbolo']}</td>
-                    <td>{r['Precio']}</td>
-                    <td>{r['S / L']}</td>
-                    <td>{r['T / P']}</td>
-                    <td>{r['Tiempo Cierre']}</td>
-                    <td>{r['Precio Cierre']}</td>
-                    <td class="{clase_pnl}">{r['Beneficio']:+.2f}</td>
-                </tr>
-            """
-            
-        html_tabla += """
-                </tbody>
-            </table>
-        </div>
-        """
-        st.markdown(html_tabla, unsafe_allow_html=True)
+        st.markdown(tabla_html_completa, unsafe_allow_html=True)
     else:
         st.info("Aún no hay operaciones cerradas en la bitácora MT5.")
 # ==========================================
