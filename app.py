@@ -773,7 +773,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, bid_actual)
 
-    # --- MONITOREO DE ORDENES ACTIVAS (EVALUACIÓN AUTOMÁTICA SL/TP) ---
+   # --- MONITOREO DE ORDENES ACTIVAS (EVALUACIÓN AUTOMÁTICA SL/TP ROBUSTA) ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -789,24 +789,51 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
             tp_exacto = round(pos["tp"], dec_pos)
             sl_exacto = round(pos["sl"], dec_pos)
-            eps = (10 ** -dec_pos) / 2.0
 
             cierre_por_tp_sl = False
             precio_ejecucion_salida = p_bid if pos["tipo"] == "BUY" else p_ask
 
+            # Evaluación robusta: Detecta si tocó o rebasó los límites de TP o SL
             if pos["tipo"] == "BUY":
-                if p_bid >= (tp_exacto - eps):
+                # Si el BID sube y toca o supera el TP, o cae y toca o rompe el SL
+                if p_bid >= tp_exacto:
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
-                elif p_bid <= (sl_exacto + eps):
+                elif p_bid <= sl_exacto:
                     cierre_por_tp_sl, precio_ejecucion_salida = True, sl_exacto
             else: # SELL
-                if p_ask <= (tp_exacto + eps):
+                # Si el ASK baja y toca o supera el TP, o sube y toca o rompe el SL
+                if p_ask <= tp_exacto:
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
-                elif p_ask >= (sl_exacto - eps):
+                elif p_ask >= sl_exacto:
                     cierre_por_tp_sl, precio_ejecucion_salida = True, sl_exacto
 
             if cierre_por_tp_sl:
                 pnl_real = calcular_pnl_institucional(sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"])
+                
+                # Actualizar Balance y Guardar en Disco
+                st.session_state.balance_pedagogico += pnl_real
+                guardar_datos_json(ARCH_PERSISTENCIA_BALANCE, st.session_state.balance_pedagogico)
+                
+                registro_historial = {
+                    "Tipo": pos['tipo'].lower(),
+                    "Volumen": pos['lotes'],
+                    "Símbolo": sim_pos,
+                    "S / L": sl_exacto,
+                    "T / P": tp_exacto,
+                    "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                    "Precio Cierre": precio_ejecucion_salida,
+                    "Beneficio": round(pnl_real, 2)
+                }
+                st.session_state.historial_cerradas.append(registro_historial)
+                guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
+                hubo_cambios_auto = True
+            else:
+                posiciones_conservadas.append(pos)
+
+        if hubo_cambios_auto:
+            st.session_state.posiciones_abiertas = posiciones_conservadas
+            guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
+            st.rerun()
                 
                 # Actualizar Balance y Guardar
                 st.session_state.balance_pedagogico += pnl_real
