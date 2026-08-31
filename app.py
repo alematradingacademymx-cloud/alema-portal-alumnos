@@ -3,12 +3,30 @@ import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
 import os
+import json
 import pandas as pd
 from datetime import datetime
 import yfinance as yf
 
 # Configuración de página
 st.set_page_config(page_title="ALEMA Trading Academy - Portal de Alumnos", page_icon="📈", layout="centered")
+
+# Funciones de persistencia JSON auxiliares
+def cargar_datos_json(filepath, default_value):
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return default_value
+    return default_value
+
+def guardar_datos_json(filepath, data):
+    try:
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except Exception:
+        pass
 
 # Estilos CSS personalizados con Fondo Azul Oscuro Elegante y Botón Verde
 st.markdown("""
@@ -183,7 +201,7 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 if "usuario_actual" not in st.session_state:
-    st.session_state.usuario_actual = "invitado"
+    st.session_state.usuario_actual = ""
 
 if "tipo_usuario" not in st.session_state:
     st.session_state.tipo_usuario = "ALUMNO"
@@ -191,10 +209,11 @@ if "tipo_usuario" not in st.session_state:
 if "journal_trades" not in st.session_state:
     st.session_state.journal_trades = []
 
-# Definir archivos dinámicos basados en la sesión actual
-matricula_actual = st.session_state.usuario_actual if st.session_state.usuario_actual else "invitado"
-ARCH_PERSISTENCIA_HISTORIAL = f"historial_{matricula_actual}.json"
-ARCH_PERSISTENCIA_POSICIONES = f"posiciones_{matricula_actual}.json"
+# Inicializar rutas por defecto seguras en session_state
+if "archivo_pos" not in st.session_state:
+    st.session_state.archivo_pos = "posiciones_invitado.json"
+if "archivo_hist" not in st.session_state:
+    st.session_state.archivo_hist = "historial_invitado.json"
 
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
@@ -232,21 +251,20 @@ if not st.session_state.autenticado:
                     st.session_state.autenticado = True
                     st.session_state.usuario_actual = matricula_input
                     st.session_state.tipo_usuario = user_info['tipo']
-                    
-                    # ASIGNAR CAPITAL INICIAL DESDE SHEETS AL ENTRAR
                     st.session_state.balance_pedagogico = float(user_info['capital_base'])
                     
-                    # Cargar archivos específicos del alumno autenticado
-                    archivo_pos = f"posiciones_{matricula_input}.json"
-                    archivo_hist = f"historial_{matricula_input}.json"
+                    # BLINDAJE DE SESIÓN: Fijar rutas únicas directamente en st.session_state
+                    st.session_state.archivo_pos = f"posiciones_{matricula_input}.json"
+                    st.session_state.archivo_hist = f"historial_{matricula_input}.json"
                     
-                    if os.path.exists(archivo_pos):
-                        st.session_state.posiciones_abiertas = cargar_datos_json(archivo_pos, [])
+                    # Cargar archivos específicos del alumno autenticado
+                    if os.path.exists(st.session_state.archivo_pos):
+                        st.session_state.posiciones_abiertas = cargar_datos_json(st.session_state.archivo_pos, [])
                     else:
                         st.session_state.posiciones_abiertas = []
 
-                    if os.path.exists(archivo_hist):
-                        st.session_state.historial_cerradas = cargar_datos_json(archivo_hist, [])
+                    if os.path.exists(st.session_state.archivo_hist):
+                        st.session_state.historial_cerradas = cargar_datos_json(st.session_state.archivo_hist, [])
                     else:
                         st.session_state.historial_cerradas = []
                     
@@ -292,6 +310,7 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         if alumno_seleccionado == st.session_state.usuario_actual:
             st.session_state.balance_pedagogico = capital_nuevo
             st.session_state.posiciones_abiertas = []
+            guardar_datos_json(st.session_state.archivo_pos, [])
             st.success(f"¡Tu cuenta ha sido reiniciada a ${capital_nuevo:,.2f}!")
         else:
             st.sidebar.success(f"Capital de {alumno_seleccionado} actualizado en base.")
