@@ -543,7 +543,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (PERSISTENCIA TOTAL + MONITOREO SL/TP ROBUSTO + TICKER EN VIVO)
+# (PERSISTENCIA TOTAL + MONITOREO SL/TP ROBUSTO + CAPITAL NO RESETEABLE)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -976,14 +976,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     # --- BITÁCORA HISTÓRICA ---
     st.markdown("<br>", unsafe_allow_html=True)
     
-    col_tit_bita, col_btn_bita1, col_btn_bita2 = st.columns([2.5, 1, 1])
+    col_tit_bita, col_btn_bita2 = st.columns([3.0, 1.0])
     with col_tit_bita:
         st.markdown("### 📋 Bitácora Histórica (MetaTrader 5)")
-    with col_btn_bita1:
-        if st.button("🔄 Restablecer Balance ($300)", key="btn_reset_balance_mt5"):
-            st.session_state.balance_pedagogico = 300.00
-            guardar_datos_json(ARCH_PERSISTENCIA_BALANCE, 300.00)
-            st.rerun()
     with col_btn_bita2:
         if st.button("🗑️ Limpiar Historial", key="btn_reset_bitacora_mt5"):
             st.session_state.historial_cerradas = []
