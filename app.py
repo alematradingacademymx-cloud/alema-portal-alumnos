@@ -542,7 +542,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API - BITÁCORA MT5 REAL)
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (MULTI-ASSET API - BITÁCORA MT5 REAL)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -577,22 +577,47 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         except Exception:
             pass
 
-    # --- FÓRMULA MATEMÁTICA INSTITUCIONAL PARA CÁLCULO DE PNL EN USD ---
+    # Función institucional de PnL exacta por tipo de activo
     def calcular_pnl_institucional(activo, tipo, entrada, salida, lotes):
         diferencia = (salida - entrada) if tipo == "BUY" else (entrada - salida)
         
         if "XAU" in activo:
-            # Contrato estándar de Oro: 100 oz troy (1.00 USD de movimiento = $100 USD por lote)
+            # Oro: 1 lote = 100 oz troy ($1.00 de movimiento = $100.00 USD por lote)
             return diferencia * 100.0 * lotes
+        elif "BTC" in activo:
+            # Bitcoin: 1 lote = 1 BTC ($1.00 de movimiento = $1.00 USD por lote)
+            return diferencia * 1.0 * lotes
+        elif "WTI" in activo or "BRENT" in activo:
+            # Petróleo: 1 lote = 1,000 barriles ($1.00 de movimiento = $1,000.00 USD por lote)
+            return diferencia * 1000.0 * lotes
+        elif any(idx in activo for idx in ["US30", "SPX500", "NAS100", "GER40"]):
+            # Índices bursátiles: 1 lote = $1.00 USD por punto completo de índice
+            return diferencia * 1.0 * lotes
         elif "JPY" in activo:
-            # Contrato Forex estándar de Yenes (100,000 JPY por lote).
-            # Valor exacto del Pip en USD convertido en tiempo real según el precio actual
+            # Pares Yen: Contrato Forex de 100,000 unidades convertido dinámicamente según la cotización en vivo
             valor_pip_usd_por_lote = 1000.0 / salida if salida != 0 else 6.80
             pips = diferencia * 100.0
             return pips * valor_pip_usd_por_lote * lotes
         else:
-            # Pares estándar Forex Directos e Indirectos (EURUSD, GBPUSD, etc.): 100,000 unidades base
+            # Pares Forex Estándar (EURUSD, GBPUSD, AUDUSD, USDCAD, USDCHF, etc.): 100,000 unidades
             return diferencia * 100000.0 * lotes
+
+    # Helper para formateo de precios, precisión y distancias TP/SL por activo
+    def obtener_config_activo(simbolo):
+        if "JPY" in simbolo:
+            return 3, "%.3f", 0.001, 0.500, 1.000
+        elif "XAU" in simbolo:
+            return 2, "%.2f", 0.10, 10.0, 20.0
+        elif "WTI" in simbolo or "BRENT" in simbolo:
+            return 2, "%.2f", 0.01, 1.0, 2.0
+        elif "BTC" in simbolo:
+            return 2, "%.2f", 1.0, 500.0, 1000.0
+        elif any(idx in simbolo for idx in ["US30", "NAS100", "GER40"]):
+            return 2, "%.2f", 1.0, 100.0, 200.0
+        elif "SPX" in simbolo:
+            return 2, "%.2f", 0.10, 20.0, 40.0
+        else:
+            return 5, "%.5f", 0.00001, 0.00500, 0.01000
 
     # Estilos CSS
     st.markdown("""
@@ -640,12 +665,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             }
             .mt5-buy { color: #2962FF; font-weight: 600; }
             .mt5-sell { color: #ef5350; font-weight: 600; }
-            .mt5-profit { color: #2962FF; font-weight: 600; }
+            .mt5-profit { color: #26a69a; font-weight: 600; }
             .mt5-loss { color: #ef5350; font-weight: 600; }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional Forex (En Vivo)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional Multi-Asset (En Vivo)</div>', unsafe_allow_html=True)
 
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
@@ -659,14 +684,37 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if 'ultimo_tiempo_api' not in st.session_state:
         st.session_state.ultimo_tiempo_api = {}
 
-    par_activo = st.selectbox("Símbolo de Mercado (Forex)", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"], key="select_chart_asset_forex")
+    lista_activos = [
+        "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", 
+        "XAUUSD", 
+        "WTIUSD", "BRENTUSD", 
+        "US30", "SPX500", "NAS100", "GER40", 
+        "BTCUSD"
+    ]
+
+    par_activo = st.selectbox(
+        "Símbolo de Mercado (Forex / Metales / Commodities / Índices / Cripto)", 
+        lista_activos, 
+        key="select_chart_asset_forex"
+    )
 
     def obtener_precio_forex_real(simbolo):
         simbolos_map = {
             "EURUSD": "EUR/USD",
             "GBPUSD": "GBP/USD",
             "USDJPY": "USD/JPY",
-            "XAUUSD": "XAU/USD"
+            "AUDUSD": "AUD/USD",
+            "USDCAD": "USD/CAD",
+            "USDCHF": "USD/CHF",
+            "GBPJPY": "GBP/JPY",
+            "XAUUSD": "XAU/USD",
+            "WTIUSD": "WTI/USD",
+            "BRENTUSD": "BRENT/USD",
+            "US30": "US30",
+            "SPX500": "SPX",
+            "NAS100": "NDX",
+            "GER40": "DAX",
+            "BTCUSD": "BTC/USD"
         }
         
         simbolo_api = simbolos_map.get(simbolo, "EUR/USD")
@@ -689,15 +737,20 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             except Exception:
                 pass
         
+        dec, _, _, _, _ = obtener_config_activo(simbolo)
         if simbolo in st.session_state.cache_precios_forex:
             precio_base = st.session_state.cache_precios_forex[simbolo]
             variacion = np.random.normal(0, precio_base * 0.00001)
             precio_actualizado = precio_base + variacion
-            return round(precio_actualizado, 3 if "JPY" in simbolo else (2 if "XAU" in simbolo else 5))
+            return round(precio_actualizado, dec)
             
         precios_fallback = {
-            "EURUSD": 1.15919, "GBPUSD": 1.31210, 
-            "USDJPY": 146.850, "XAUUSD": 2512.30
+            "EURUSD": 1.15919, "GBPUSD": 1.31210, "USDJPY": 146.850,
+            "AUDUSD": 0.65500, "USDCAD": 1.35200, "USDCHF": 0.88400, "GBPJPY": 192.500,
+            "XAUUSD": 2512.30, 
+            "WTIUSD": 74.50, "BRENTUSD": 78.20,
+            "US30": 41200.00, "SPX500": 5600.00, "NAS100": 19500.00, "GER40": 18500.00,
+            "BTCUSD": 62500.00
         }
         precio_inicial = precios_fallback.get(simbolo, 1.0000)
         st.session_state.cache_precios_forex[simbolo] = precio_inicial
@@ -731,7 +784,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, precio_actual_ref)
 
-    # --- MONITOREO AUTOMÁTICO DE TP / SL (USANDO CÁLCULO INSTITUCIONAL) ---
+    # --- MONITOREO AUTOMÁTICO DE TP / SL ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -741,9 +794,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             p_vivo_pos = obtener_precio_forex_real(sim_pos)
             pos["precio_vela_actual"] = p_vivo_pos
 
-            es_jpy = "JPY" in sim_pos
-            is_oro = "XAU" in sim_pos
-            
             cierre_por_tp_sl = False
             precio_ejecucion_salida = p_vivo_pos
 
@@ -759,11 +809,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     cierre_por_tp_sl, precio_ejecucion_salida = True, pos["sl"]
 
             if cierre_por_tp_sl:
-                pnl_real = calcular_pnl_institucional(
-                    sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"]
-                )
+                pnl_real = calcular_pnl_institucional(sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"])
                 
                 st.session_state.balance_pedagogico += pnl_real
+                dec_out, _, _, _, _ = obtener_config_activo(sim_pos)
                 
                 registro_historial = {
                     "Tipo": pos['tipo'].lower(),
@@ -772,7 +821,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     "S / L": pos['sl'],
                     "T / P": pos['tp'],
                     "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                    "Precio Cierre": round(precio_ejecucion_salida, 3 if es_jpy else (2 if is_oro else 5)),
+                    "Precio Cierre": round(precio_ejecucion_salida, dec_out),
                     "Beneficio": round(pnl_real, 2)
                 }
                 st.session_state.historial_cerradas.append(registro_historial)
@@ -794,26 +843,22 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         pnl_flotante_total = 0.0
         for pos in st.session_state.posiciones_abiertas:
             act_p = pos.get("precio_vela_actual", pos["entrada"])
-            pnl_flotante_total += calcular_pnl_institucional(
-                pos["activo"], pos["tipo"], pos["entrada"], act_p, pos["lotes"]
-            )
+            pnl_flotante_total += calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], act_p, pos["lotes"])
         st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
     with col_m4:
-        st.metric("Servidor", "ALEMA-Forex-Live")
+        st.metric("Servidor", "ALEMA-Live-Feed")
 
     st.divider()
 
     col_grafico, col_panel = st.columns([2.4, 1.0])
 
-    es_jpy = "JPY" in par_activo
-    es_oro = "XAU" in par_activo
-    formato_str = "%.3f" if es_jpy else ("%.2f" if es_oro else "%.5f")
+    n_decimals, formato_str, step_val, dist_sl, dist_tp = obtener_config_activo(par_activo)
     precio_formateado = formato_str % precio_actual_ref
 
     with col_grafico:
-        st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional Forex - {par_activo} | Cotización en Vivo: <span class='live-ticker'>{precio_formateado}</span></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional - {par_activo} | Cotización en Vivo: <span class='live-ticker'>{precio_formateado}</span></div>", unsafe_allow_html=True)
 
         fig = go.Figure()
 
@@ -848,22 +893,15 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         st.plotly_chart(fig, use_container_width=True)
 
     with col_panel:
-        st.markdown("### 🎛️ Nueva Orden Forex")
+        st.markdown("### 🎛️ Nueva Orden")
         sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_forex")
         sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01, key="sim_lote_forex")
-        
-        n_decimals = 3 if es_jpy else (2 if es_oro else 5)
-        formato = "%.3f" if es_jpy else ("%.2f" if es_oro else "%.5f")
-        step_val = 0.001 if es_jpy else (0.10 if es_oro else 0.00001)
-
-        dist_sl = 0.00500 if not es_jpy and not es_oro else (0.500 if es_jpy else 10.0)
-        dist_tp = 0.01000 if not es_jpy and not es_oro else (1.000 if es_jpy else 20.0)
 
         default_sl = round(precio_actual_ref - dist_sl if sim_tipo == "BUY" else precio_actual_ref + dist_sl, n_decimals)
         default_tp = round(precio_actual_ref + dist_tp if sim_tipo == "BUY" else precio_actual_ref - dist_tp, n_decimals)
         
-        sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key="sim_sl_forex")
-        sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key="sim_tp_forex")
+        sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato_str, step=step_val, key="sim_sl_forex")
+        sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato_str, step=step_val, key="sim_tp_forex")
 
         if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_forex", use_container_width=True):
             precio_ejecucion = precio_actual_ref
@@ -882,26 +920,22 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success(f"¡Orden ejecutada con éxito al precio de Forex: {precio_ejecucion}!")
+            st.success(f"¡Orden ejecutada con éxito en {par_activo}: {precio_ejecucion}!")
             st.rerun()
 
     # --- POSICIONES ACTIVAS ---
-    st.markdown("### 📊 Posiciones Abiertas (Monitoreo en Vivo Forex)")
+    st.markdown("### 📊 Posiciones Abiertas (Monitoreo en Vivo)")
     if st.session_state.posiciones_abiertas:
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
             precio_vivo = pos.get("precio_vela_actual", pos["entrada"])
-            es_jpy_pos = "JPY" in pos["activo"]
-            is_oro_pos = "XAU" in pos["activo"]
-            fmt_pos = "%.3f" if es_jpy_pos else ("%.2f" if is_oro_pos else "%.5f")
+            dec_pos, fmt_pos, _, _, _ = obtener_config_activo(pos["activo"])
             
-            pnl_card = calcular_pnl_institucional(
-                pos["activo"], pos["tipo"], pos["entrada"], precio_vivo, pos["lotes"]
-            )
+            pnl_card = calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], precio_vivo, pos["lotes"])
 
             st.markdown(f"""
                 <div class="mt5-terminal-card">
                     <b>{pos['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}">{pos['tipo']}</span> | 
-                    Entrada: <code>{fmt_pos % pos['entrada']}</code> | Vivo Forex: <code style="color: #26a69a;">{fmt_pos % precio_vivo}</code> | 
+                    Entrada: <code>{fmt_pos % pos['entrada']}</code> | Precio Vivo: <code style="color: #26a69a;">{fmt_pos % precio_vivo}</code> | 
                     TP: <span style="color:#26a69a;">{fmt_pos % pos['tp']}</span> | 
                     SL: <span style="color:#ef5350;">{fmt_pos % pos['sl']}</span> | 
                     PnL: <b style="color: {'#26a69a' if pnl_card>=0 else '#ef5350'}">${pnl_card:,.2f} USD</b>
@@ -917,7 +951,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     "S / L": pos['sl'],
                     "T / P": pos['tp'],
                     "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                    "Precio Cierre": round(precio_vivo, 3 if es_jpy_pos else (2 if is_oro_pos else 5)),
+                    "Precio Cierre": round(precio_vivo, dec_pos),
                     "Beneficio": round(pnl_card, 2)
                 })
                 guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
@@ -927,7 +961,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     else:
         st.info("No hay posiciones activas.")
 
-    # --- BITÁCORA HISTÓRICA (SOLO TIEMPO DE CIERRE Y PRECIO DE CIERRE) ---
+    # --- BITÁCORA HISTÓRICA (TIEMPO DE CIERRE Y PRECIO DE CIERRE) ---
     st.markdown("<br>", unsafe_allow_html=True)
     
     col_tit_bita, col_btn_bita = st.columns([3, 1])
@@ -968,7 +1002,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             )
 
         filas_concat = "".join(filas_html)
-        tabla_html_completa = f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Volumen</th><th>Símbolo</th><th>S / L</th><th>T / P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{filas_concat}</tbody></table></div>'
+        tabla_html_completa = f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo Cierre</th><th>Tipo</th><th>Volumen</th><th>Símbolo</th><th>S / L</th><th>T / P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{filas_concat}</tbody></table></div>'
         
         st.markdown(tabla_html_completa, unsafe_allow_html=True)
     else:
