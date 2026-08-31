@@ -652,6 +652,7 @@ elif opcion_menu == "📓 Trading Journal":
     else:
         st.info("💡 Aún no tienes trades guardados en tu historial permanente.")
 
+Python
 # ==========================================
 # SECCIÓN: SIMULADOR DE EJECUCIÓN INSTITUCIONAL (ESTILO MT5)
 # ==========================================
@@ -725,9 +726,18 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         par_activo = st.selectbox("Símbolo de Mercado", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSDT"], key="select_chart_asset")
         
         # Precio base inicial según el activo
-        precio_base_inicial = 1.15903 if par_activo=="EURUSD" else (1.30250 if par_activo=="GBPUSD" else (155.200 if par_activo=="USDJPY" else (2385.50 if par_activo=="XAUUSD" else 64200.0)))
+        if par_activo == "EURUSD":
+            precio_base_inicial = 1.15903
+        elif par_activo == "GBPUSD":
+            precio_base_inicial = 1.30250
+        elif par_activo == "USDJPY":
+            precio_base_inicial = 155.200
+        elif par_activo == "XAUUSD":
+            precio_base_inicial = 2385.50
+        else:
+            precio_base_inicial = 64200.0
 
-        # Gráfico HTML robusto con dimensiones garantizadas para evitar el cuadro negro
+        # HTML limpio sin f-string para evitar cualquier conflicto de sintaxis con las llaves de JavaScript
         chart_html = f"""
         <div style="background-color: #131722; padding: 10px; border-radius: 6px; border: 1px solid #2A2E39;">
             <div style="color: #94A3B8; font-size: 13px; margin-bottom: 6px; font-family: sans-serif;">Gráfico Institucional En Vivo - {par_activo}</div>
@@ -747,7 +757,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             const candlestickSeries = chart.addCandlestickSeries({{
                 upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
                 wickUpColor: '#26a69a', wickDownColor: '#ef5350'
-            }));
+            }});
 
             let basePrice = {precio_base_inicial};
             let now = Math.floor(Date.now() / 1000) - 300;
@@ -764,7 +774,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             candlestickSeries.setData(initialData);
             chart.timeScale().fitContent();
 
-            // Actualización en tiempo real de la última vela
             setInterval(() => {{
                 let lastCandle = initialData[initialData.length - 1];
                 let movement = (Math.random() - 0.49) * (lastCandle.close * 0.0001);
@@ -789,7 +798,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
 
-        # Precio de mercado instantáneo real tomado directamente del activo actual
         ref_precio = precio_base_inicial
         
         dist_def_sl = 0.00200 if not es_jpy_sim and not es_crypto_oro else (0.200 if es_jpy_sim else 10.0)
@@ -800,7 +808,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
         st.markdown(f"<small style='color: #787B86;'>Precio de Mercado Actual: <b>{formato % ref_precio}</b></small>", unsafe_allow_html=True)
         
-        # Cuadros editables para configurar TP y SL con total libertad
         sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key=f"sl_in_{sim_tipo}_{par_activo}")
         sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key=f"tp_in_{sim_tipo}_{par_activo}")
 
