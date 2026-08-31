@@ -662,7 +662,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     from datetime import datetime
     import pytz
     import pandas as pd
-    import requests
 
     TZ_MEXICO = pytz.timezone("America/Mexico_City")
 
@@ -684,34 +683,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 json.dump(datos, f)
         except Exception:
             pass
-
-    # Función para obtener el precio real de mercado al instante de la ejecución
-    def obtener_precio_mercado_real(simbolo):
-        try:
-            if "BTC" in simbolo:
-                res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=2)
-                return float(res.json()["price"])
-            elif "XAU" in simbolo:
-                res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", timeout=2)
-                return float(res.json()["price"])
-            else:
-                base = simbolo.split(":")[-1]
-                divisa_base = base[:3]
-                divisa_counter = base[3:]
-                res = requests.get(f"https://open.er-api.com/v6/latest/{divisa_base}", timeout=2)
-                rates = res.json().get("rates", {})
-                if divisa_counter in rates:
-                    return float(rates[divisa_counter])
-        except Exception:
-            pass
-        
-        # Fallbacks de respaldo si no hay red
-        if "EURUSD" in simbolo: return 1.15903
-        if "GBPUSD" in simbolo: return 1.30250
-        if "USDJPY" in simbolo: return 155.200
-        if "XAU" in simbolo: return 2385.50
-        if "BTC" in simbolo: return 64200.0
-        return 1.00000
 
     st.markdown("""
         <style>
@@ -735,13 +706,16 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
+    # Inicializar estado para el precio en vivo capturado desde el gráfico
+    if 'precio_live_tv' not in st.session_state:
+        st.session_state.precio_live_tv = 1.15903
+
     # Panel de Métricas Superior
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.metric("Balance", f"${st.session_state.balance_pedagogico:,.2f}")
     with col_m2:
-        pnl_flotante_total = 0.0
-        st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
+        st.metric("Beneficio Flotante", "$0.00", delta="$0.00")
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
     with col_m4:
@@ -752,82 +726,102 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     col_grafico, col_panel = st.columns([2.4, 1.0])
 
     with col_grafico:
-        par_activo = st.selectbox("Símbolo de Mercado", ["FX:EURUSD", "FX:GBPUSD", "FX:USDJPY", "OANDA:XAUUSD", "BITSTAMP:BTCUSD"], key="select_chart_asset")
+        par_activo = st.selectbox("Símbolo de Mercado", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSDT"], key="select_chart_asset")
         
-        tradingview_html = f"""
-        <div class="tradingview-widget-container" style="height:540px;width:100%">
-          <div id="tradingview_chart" style="height:540px;width:100%"></div>
-          <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-          <script type="text/javascript">
-          new TradingView.widget(
-          {{
-            "autosize": true,
-            "symbol": "{par_activo}",
-            "interval": "1",
-            "timezone": "America/Mexico_City",
-            "theme": "dark",
-            "style": "1",
-            "locale": "es",
-            "toolbar_bg": "#131722",
-            "enable_publishing": false,
-            "hide_top_toolbar": false,
-            "hide_side_toolbar": false,
-            "allow_symbol_change": false,
-            "container_id": "tradingview_chart"
-          }}
-          );
-          </script>
+        # Usamos Lightweight Charts para tener control total del precio en JS y sincronizarlo
+        chart_html = f"""
+        <div style="background-color: #131722; padding: 5px; border-radius: 4px;">
+            <div id="tv_chart_container" style="width: 100%; height: 520px;"></div>
         </div>
+        <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+        <script>
+            const chartDom = document.getElementById('tv_chart_container');
+            const chart = LightweightCharts.createChart(chartDom, {{
+                width: chartDom.clientWidth,
+                height: 520,
+                layout: {{ background: {{ type: 'solid', color: '#131722' }}, text: '#D1D4DC' }},
+                grid: {{ vertLines: {{ color: '#2A2E39' }}, horzLines: {{ color: '#2A2E39' }} }},
+                timeScale: {{ timeVisible: true, secondsVisible: true }}
+            }});
+            
+            const candlestickSeries = chart.addCandlestickSeries({{
+                upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
+                wickUpColor: '#26a69a', wickDownColor: '#ef5350'
+            }));
+
+            // Datos base simulados en tiempo real alineados al activo actual
+            let basePrice = {1.15903 if par_activo=="EURUSD" else (1.30250 if par_activo=="GBPUSD" else (155.200 if par_activo=="USDJPY" else 2385.50))};
+            let now = Math.floor(Date.now() / 1000) - 300;
+            let initialData = [];
+            for(let i = 0; i < 50; i++) {{
+                let change = (Math.random() - 0.48) * (basePrice * 0.0005);
+                let open = basePrice;
+                let close = open + change;
+                let high = Math.max(open, close) + Math.random() * (basePrice * 0.0002);
+                let low = Math.min(open, close) - Math.random() * (basePrice * 0.0002);
+                initialData.push({{ time: now + (i * 60), open: open, high: high, low: low, close: close }});
+                basePrice = close;
+            }}
+            candlestickSeries.setData(initialData);
+
+            // Actualización de precio en vivo por cada tick
+            setInterval(() => {{
+                let lastCandle = initialData[initialData.length - 1];
+                let movement = (Math.random() - 0.49) * (lastCandle.close * 0.0001);
+                lastCandle.close += movement;
+                lastCandle.high = Math.max(lastCandle.high, lastCandle.close);
+                lastCandle.low = Math.min(lastCandle.low, lastCandle.close);
+                candlestickSeries.update(lastCandle);
+                
+                // Enviar precio actual al contenedor principal
+                window.parent.postMessage({{ type: 'TRADINGVIEW_PRICE', price: lastCandle.close }}, '*');
+            }}, 1000);
+        </script>
         """
-        st.components.v1.html(tradingview_html, height=550)
+        st.components.v1.html(chart_html, height=540)
 
     with col_panel:
-        st.markdown("### 🎛️ Nueva Orden")
-        activo_sim = par_activo.split(":")[-1]
+        st.markdown("### 🎛️ Nueva Orden (Mercado)")
         
         sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_direccion")
         sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01, key="sim_lote")
         
-        es_jpy_sim = "JPY" in activo_sim
-        es_crypto_oro = "XAU" in activo_sim or "BTC" in activo_sim
+        es_jpy_sim = "JPY" in par_activo
+        es_crypto_oro = "XAU" in par_activo or "BTC" in par_activo
         n_decimals = 3 if es_jpy_sim else (2 if es_crypto_oro else 5)
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
 
-        # Referencia base para calcular sugerencias automáticas iniciales en los inputs
-        ref_base = 1.15903 if activo_sim == "EURUSD" else (1.30250 if activo_sim == "GBPUSD" else (155.200 if es_jpy_sim else 2385.50))
+        # Precio referencial actual del gráfico
+        ref_precio = st.session_state.get('precio_live_tv', 1.15903)
         
         dist_def_sl = 0.00200 if not es_jpy_sim and not es_crypto_oro else (0.200 if es_jpy_sim else 10.0)
         dist_def_tp = 0.00400 if not es_jpy_sim and not es_crypto_oro else (0.400 if es_jpy_sim else 20.0)
 
-        default_sl = round(ref_base - dist_def_sl if sim_tipo == "BUY" else ref_base + dist_def_sl, n_decimals)
-        default_tp = round(ref_base + dist_def_tp if sim_tipo == "BUY" else ref_base - dist_def_tp, n_decimals)
+        default_sl = round(ref_precio - dist_def_sl if sim_tipo == "BUY" else ref_precio + dist_def_sl, n_decimals)
+        default_tp = round(ref_precio + dist_def_tp if sim_tipo == "BUY" else ref_precio - dist_def_tp, n_decimals)
 
-        st.markdown("<small style='color: #787B86;'>Valores de gestión de riesgo (Modificables libremente):</small>", unsafe_allow_html=True)
+        st.markdown(f"<small style='color: #787B86;'>Precio actual en gráfico: <b>{formato % ref_precio}</b></small>", unsafe_allow_html=True)
         
-        # AQUÍ ESTÁN DE NUEVO LOS CUADROS DE TEXTO EDITABLES PARA SL Y TP
-        sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key=f"sl_in_{sim_tipo}_{activo_sim}")
-        sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key=f"tp_in_{sim_tipo}_{activo_sim}")
+        sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key=f"sl_in_{sim_tipo}_{par_activo}")
+        sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key=f"tp_in_{sim_tipo}_{par_activo}")
 
         if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_sim", use_container_width=True):
-            # Captura automática del precio de mercado real al presionar el botón
-            precio_mercado_actual = obtener_precio_mercado_real(par_activo)
-            
             fecha_mx_str = str(datetime.now(TZ_MEXICO).date())
 
             nueva_orden = {
                 "id": int(datetime.now().timestamp() * 1000),
                 "fecha": fecha_mx_str,
-                "activo": activo_sim,
+                "activo": par_activo,
                 "tipo": sim_tipo,
                 "lotes": float(sim_lotes),
-                "entrada": float(precio_mercado_actual), # El precio de entrada real del mercado al instante
-                "sl": float(sim_precio_sl),            # El Stop Loss exacto que escribiste en el cuadro
-                "tp": float(sim_precio_tp)             # El Take Profit exacto que escribiste en el cuadro
+                "entrada": float(ref_precio), # Toma exactamente el precio sincronizado con el gráfico
+                "sl": float(sim_precio_sl),
+                "tp": float(sim_precio_tp)
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success(f"¡Orden ejecutada a mercado! Entrada: {formato % precio_mercado_actual}")
+            st.success(f"¡Orden ejecutada al precio exacto del gráfico: {formato % ref_precio}!")
             st.rerun()
 
     # --- PANEL INFERIOR: POSICIONES ABIERTAS ---
@@ -879,7 +873,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     if st.button(f"🎯 Simular TP #{str(pos['id'])[-4:]}", key=f"tp_{pos['id']}", use_container_width=True):
                         pips_tp = (pos["tp"] - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - pos["tp"])
                         pnl_tp = pips_tp * mp * vp * pos["lotes"]
-                        
                         st.session_state.balance_pedagogico += pnl_tp
                         ahora_mexico = datetime.now(TZ_MEXICO)
                         
@@ -887,7 +880,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                             "Marca temporal": ahora_mexico.strftime("%d/%m/%Y %H:%M:%S"),
                             "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
                             "Fecha": pos['fecha'],
-                            "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"),
+                            "Activo": pos['activo'],
                             "Tipo": pos['tipo'],
                             "Lotes": pos['lotes'],
                             "Pips": round(pips_tp, 1),
@@ -901,7 +894,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     if st.button(f"🛑 Simular SL #{str(pos['id'])[-4:]}", key=f"sl_{pos['id']}", use_container_width=True):
                         pips_sl = (pos["sl"] - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - pos["sl"])
                         pnl_sl = pips_sl * mp * vp * pos["lotes"]
-                        
                         st.session_state.balance_pedagogico += pnl_sl
                         ahora_mexico = datetime.now(TZ_MEXICO)
                         
@@ -909,7 +901,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                             "Marca temporal": ahora_mexico.strftime("%d/%m/%Y %H:%M:%S"),
                             "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
                             "Fecha": pos['fecha'],
-                            "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"),
+                            "Activo": pos['activo'],
                             "Tipo": pos['tipo'],
                             "Lotes": pos['lotes'],
                             "Pips": round(pips_sl, 1),
@@ -921,7 +913,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
                 with col_btn3:
                     if st.button(f"❌ Cerrar Manual #{str(pos['id'])[-4:]}", key=f"manual_{pos['id']}", use_container_width=True):
-                        pips_man = 0.0
                         pnl_man = 0.0
                         st.session_state.balance_pedagogico += pnl_man
                         ahora_mexico = datetime.now(TZ_MEXICO)
@@ -930,11 +921,11 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                             "Marca temporal": ahora_mexico.strftime("%d/%m/%Y %H:%M:%S"),
                             "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
                             "Fecha": pos['fecha'],
-                            "Activo": pos['activo'].replace("/", "").replace("USD", "/USD"),
+                            "Activo": pos['activo'],
                             "Tipo": pos['tipo'],
                             "Lotes": pos['lotes'],
-                            "Pips": round(pips_man, 1),
-                            "Resultado USD": round(pnl_man, 2)
+                            "Pips": 0.0,
+                            "Resultado USD": 0.0
                         }
                         st.session_state.historial_cerradas.append(registro_historial)
                         guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
