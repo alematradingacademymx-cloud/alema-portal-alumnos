@@ -542,7 +542,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SOLUCIÓN 1: SIMULADOR CON AUTO-REFRESCAMIENTO Y CIERRE AUTOMÁTICO
+# SECCIÓN: SIMULADOR DE EJECUCIÓN INSTITUCIONAL (ESTILO MT5)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -551,9 +551,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     from datetime import datetime
     import pandas as pd
     import yfinance as yf
+    import plotly.graph_objects as go
     from streamlit_autorefresh import st_autorefresh
 
-    # Auto-refrescar la app cada 5 segundos (5000 ms) para comprobar precios en vivo
+    # Auto-refresco de la terminal cada 5 segundos para control autónomo de TP/SL
     st_autorefresh(interval=5000, key="auto_refresh_terminal_alema")
 
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
@@ -597,7 +598,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
-    # Función de captura de precio en tiempo real con yfinance
     def obtener_precio_instante(simbolo):
         mapa_tickers = {
             "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", 
@@ -612,7 +612,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         precios_base = {"EURUSD": 1.15781, "GBPUSD": 1.30000, "USDJPY": 155.200, "XAUUSD": 2600.00, "BTCUSD": 65000.00}
         return precios_base.get(simbolo, 1.15781)
 
-    # --- PROCESAMIENTO AUTOMÁTICO DE TP / SL EN SEGUNDO PLANO ---
+    # --- MONITOREO AUTOMÁTICO EN SEGUNDO PLANO (TP / SL) ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -631,13 +631,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             cierre_por_tp_sl = False
             motivo = ""
 
-            # Evaluación matemática de TP y SL
             if pos["tipo"] == "BUY":
                 if precio_actual_mercado >= pos["tp"]:
                     cierre_por_tp_sl, motivo = True, "Take Profit (TP)"
                 elif precio_actual_mercado <= pos["sl"]:
                     cierre_por_tp_sl, motivo = True, "Stop Loss (SL)"
-            else: # SELL
+            else: 
                 if precio_actual_mercado <= pos["tp"]:
                     cierre_por_tp_sl, motivo = True, "Take Profit (TP)"
                 elif precio_actual_mercado >= pos["sl"]:
@@ -693,24 +692,47 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     with col_grafico:
         par_activo = st.selectbox("Símbolo de Mercado", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD"], key="select_chart_asset")
-        precio_actual_ref = obtener_precio_instante(par_activo)
         
-        st.markdown(f"<div style='color: #E2B714; font-size: 13px; margin-bottom: 4px;'>Precio de Cotización en Vivo ({par_activo}): <b>{precio_actual_ref}</b></div>", unsafe_allow_html=True)
-        
-        # Gráfico nativo con Plotly para interactuar y mostrar los niveles visuales claramente
-        import plotly.graph_objects as go
-        df_dummy = pd.DataFrame({
-            "Tiempo": [datetime.now()],
-            "Precio": [precio_actual_ref]
-        })
-        
-        fig = go.Figure(go.Indicator(
-            mode = "number+delta",
-            value = precio_actual_ref,
-            title = {"text": f"Cotización Actual - {par_activo}"},
-            delta = {"reference": precio_actual_ref * 0.9999}
-        ))
-        fig.update_layout(paper_bgcolor="#131722", font_color="white", height=200, margin=dict(t=10, b=10, l=10, r=10))
+        mapa_tickers = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "JPY=X", "XAUUSD": "GC=F", "BTCUSD": "BTC-USD"}
+        try:
+            df_history = yf.Ticker(mapa_tickers.get(par_activo, "EURUSD=X")).history(period="1d", interval="1m")
+        except Exception:
+            df_history = pd.DataFrame()
+
+        if not df_history.empty:
+            precio_actual_ref = float(df_history['Close'].iloc[-1])
+        else:
+            precios_base = {"EURUSD": 1.15903, "GBPUSD": 1.30250, "USDJPY": 155.200, "XAUUSD": 2385.50, "BTCUSD": 64200.0}
+            precio_actual_ref = precios_base.get(par_activo, 1.15903)
+
+        es_jpy = "JPY" in par_activo
+        es_crypto_oro = "XAU" in par_activo or "BTC" in par_activo
+        formato_str = "%.3f" if es_jpy else ("%.2f" if es_crypto_oro else "%.5f")
+        precio_formateado = formato_str % precio_actual_ref
+
+        st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional En Vivo - {par_activo} | Cotización: <b style='color: #E2B714;'>{precio_formateado}</b></div>", unsafe_allow_html=True)
+
+        fig = go.Figure()
+        if not df_history.empty:
+            fig.add_trace(go.Scatter(
+                x=df_history.index, 
+                y=df_history['Close'], 
+                mode='lines', 
+                name='Precio',
+                line=dict(color='#26a69a', width=2),
+                fill='tozeroy',
+                fillcolor='rgba(38, 166, 154, 0.05)'
+            ))
+
+        fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="#131722",
+            plot_bgcolor="#131722",
+            height=430,
+            margin=dict(l=10, r=10, t=10, b=10),
+            xaxis=dict(showgrid=True, gridcolor='#2A2E39', title=''),
+            yaxis=dict(showgrid=True, gridcolor='#2A2E39', zeroline=False, title='')
+        )
         st.plotly_chart(fig, use_container_width=True)
 
     with col_panel:
@@ -718,14 +740,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_direccion")
         sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01, key="sim_lote")
         
-        es_jpy_sim = "JPY" in par_activo
-        es_crypto_oro = "XAU" in par_activo or "BTC" in par_activo
-        n_decimals = 3 if es_jpy_sim else (2 if es_crypto_oro else 5)
-        formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
-        step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
+        n_decimals = 3 if es_jpy else (2 if es_crypto_oro else 5)
+        formato = "%.3f" if es_jpy else ("%.2f" if es_crypto_oro else "%.5f")
+        step_val = 0.001 if es_jpy else (0.10 if es_crypto_oro else 0.00001)
 
-        dist_sl = 0.00500 if not es_jpy_sim and not es_crypto_oro else (0.500 if es_jpy_sim else 20.0)
-        dist_tp = 0.01000 if not es_jpy_sim and not es_crypto_oro else (1.000 if es_jpy_sim else 40.0)
+        dist_sl = 0.00500 if not es_jpy and not es_crypto_oro else (0.500 if es_jpy else 20.0)
+        dist_tp = 0.01000 if not es_jpy and not es_crypto_oro else (1.000 if es_jpy else 40.0)
 
         default_sl = round(precio_actual_ref - dist_sl if sim_tipo == "BUY" else precio_actual_ref + dist_sl, n_decimals)
         default_tp = round(precio_actual_ref + dist_tp if sim_tipo == "BUY" else precio_actual_ref - dist_tp, n_decimals)
@@ -756,19 +776,19 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if st.session_state.posiciones_abiertas:
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
             precio_vivo = obtener_precio_instante(pos["activo"])
-            es_jpy = "JPY" in pos["activo"]
-            is_mc = "XAU" in pos["activo"] or "BTC" in pos["activo"]
-            fmt = "%.3f" if es_jpy else ("%.2f" if is_mc else "%.5f")
-            mp = 100.0 if es_jpy else (1.0 if is_mc else 10000.0)
-            vp = 7.0 if es_jpy else 10.0
+            es_jpy_pos = "JPY" in pos["activo"]
+            is_mc_pos = "XAU" in pos["activo"] or "BTC" in pos["activo"]
+            fmt_pos = "%.3f" if es_jpy_pos else ("%.2f" if is_mc_pos else "%.5f")
+            mp = 100.0 if es_jpy_pos else (1.0 if is_mc_pos else 10000.0)
+            vp = 7.0 if es_jpy_pos else 10.0
             pips = (precio_vivo - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_vivo)
             pnl = pips * mp * vp * pos["lotes"]
 
             st.markdown(f"""
                 <div class="mt5-terminal-card">
                     <b>{pos['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}">{pos['tipo']}</span> | 
-                    Entrada: <code>{fmt % pos['entrada']}</code> | Vivo: <code style="color: #E2B714;">{fmt % precio_vivo}</code> | 
-                    TP: <code>{fmt % pos['tp']}</code> | SL: <code>{fmt % pos['sl']}</code> | 
+                    Entrada: <code>{fmt_pos % pos['entrada']}</code> | Vivo: <code style="color: #E2B714;">{fmt_pos % precio_vivo}</code> | 
+                    TP: <code>{fmt_pos % pos['tp']}</code> | SL: <code>{fmt_pos % pos['sl']}</code> | 
                     PnL: <b style="color: {'#26a69a' if pnl>=0 else '#ef5350'}">${pnl:,.2f} USD</b>
                 </div>
             """, unsafe_allow_html=True)
@@ -792,6 +812,15 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 st.rerun()
     else:
         st.info("No hay posiciones activas. El sistema monitoreará el TP/SL automáticamente al abrir operaciones.")
+
+    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("### 📋 Bitácora Histórica Permanente")
+    if st.session_state.historial_cerradas:
+        df_historial = pd.DataFrame(st.session_state.historial_cerradas)
+        st.dataframe(df_historial, use_container_width=True, hide_index=False)
+    else:
+        st.info("Aún no hay operaciones cerradas.")
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
