@@ -751,12 +751,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 st.session_state.balance_pedagogico += pnl_real
                 
                 registro_historial = {
-                    "Tiempo": pos.get('tiempo_apertura', datetime.now().strftime("%Y.%m.%d %H:%M:%S")),
-                    "Ticket": pos['id'],
                     "Tipo": pos['tipo'].lower(),
                     "Volumen": pos['lotes'],
                     "Símbolo": sim_pos,
-                    "Precio": pos['entrada'],
                     "S / L": pos['sl'],
                     "T / P": pos['tp'],
                     "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
@@ -904,12 +901,9 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             if st.button(f"Cerrar Manual #{pos['id']}", key=f"manual_btn_forex_{pos['id']}_{idx}"):
                 st.session_state.balance_pedagogico += pnl_card
                 st.session_state.historial_cerradas.append({
-                    "Tiempo": pos.get('tiempo_apertura', datetime.now().strftime("%Y.%m.%d %H:%M:%S")),
-                    "Ticket": pos['id'],
                     "Tipo": pos['tipo'].lower(),
                     "Volumen": pos['lotes'],
                     "Símbolo": pos['activo'],
-                    "Precio": pos['entrada'],
                     "S / L": pos['sl'],
                     "T / P": pos['tp'],
                     "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
@@ -923,22 +917,27 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     else:
         st.info("No hay posiciones activas.")
 
-    # --- BITÁCORA HISTÓRICA (RENDERIZADO HTML SIN SANGRÍA) ---
+    # --- BITÁCORA HISTÓRICA (SOLO TIEMPO DE CIERRE Y PRECIO DE CIERRE) ---
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("### 📋 Bitácora Histórica (MetaTrader 5)")
+    
+    col_tit_bita, col_btn_bita = st.columns([3, 1])
+    with col_tit_bita:
+        st.markdown("### 📋 Bitácora Histórica (MetaTrader 5)")
+    with col_btn_bita:
+        if st.button("🗑️ Reiniciar Bitácora", key="btn_reset_bitacora_mt5"):
+            st.session_state.historial_cerradas = []
+            guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
+            st.rerun()
     
     if st.session_state.historial_cerradas:
         filas_html = []
         for item in st.session_state.historial_cerradas:
-            tiempo_ini = item.get("Tiempo", item.get("Marca temporal", datetime.now().strftime("%Y.%m.%d %H:%M:%S")))
-            ticket = item.get("Ticket", item.get("id", "9990000000"))
+            tiempo_fin = item.get("Tiempo Cierre", item.get("Tiempo", datetime.now().strftime("%Y.%m.%d %H:%M:%S")))
             tipo = str(item.get("Tipo", "buy")).lower()
             volumen = float(item.get("Volumen", item.get("Lotes", 0.10)))
             simbolo = item.get("Símbolo", item.get("Activo", "EURUSD"))
-            precio_in = item.get("Precio", item.get("entrada", 0.0))
             sl = item.get("S / L", item.get("sl", 0.0))
             tp = item.get("T / P", item.get("tp", 0.0))
-            tiempo_fin = item.get("Tiempo Cierre", datetime.now().strftime("%Y.%m.%d %H:%M:%S"))
             precio_out = item.get("Precio Cierre", item.get("entrada", 0.0))
             beneficio = float(item.get("Beneficio", item.get("Resultado USD", 0.0)))
 
@@ -947,22 +946,19 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
             filas_html.append(
                 f'<tr>'
-                f'<td>{tiempo_ini}</td>'
-                f'<td>{ticket}</td>'
+                f'<td>{tiempo_fin}</td>'
                 f'<td class="{clase_tipo}">{tipo}</td>'
                 f'<td>{volumen:.2f}</td>'
                 f'<td>{simbolo}</td>'
-                f'<td>{precio_in}</td>'
                 f'<td>{sl}</td>'
                 f'<td>{tp}</td>'
-                f'<td>{tiempo_fin}</td>'
                 f'<td>{precio_out}</td>'
                 f'<td class="{clase_pnl}">{beneficio:+.2f}</td>'
                 f'</tr>'
             )
 
         filas_concat = "".join(filas_html)
-        tabla_html_completa = f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Ticket</th><th>Tipo</th><th>Volumen</th><th>Símbolo</th><th>Precio</th><th>S / L</th><th>T / P</th><th>Tiempo</th><th>Precio</th><th>Beneficio</th></tr></thead><tbody>{filas_concat}</tbody></table></div>'
+        tabla_html_completa = f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Volumen</th><th>Símbolo</th><th>S / L</th><th>T / P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{filas_concat}</tbody></table></div>'
         
         st.markdown(tabla_html_completa, unsafe_allow_html=True)
     else:
