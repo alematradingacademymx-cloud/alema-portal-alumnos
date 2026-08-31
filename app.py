@@ -784,44 +784,49 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, precio_actual_ref)
 
-    # --- MONITOREO AUTOMÁTICO DE TP / SL ---
+    # --- MONITOREO AUTOMÁTICO DE TP / SL (EJECUCIÓN EXACTA AL TOCAR) ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
 
         for pos in st.session_state.posiciones_abiertas:
             sim_pos = pos["activo"]
-            p_vivo_pos = obtener_precio_forex_real(sim_pos)
+            dec_pos, _, _, _, _ = obtener_config_activo(sim_pos)
+            
+            # Normalización y redondeo de precios para evitar desfasamientos por flotantes
+            p_vivo_pos = round(obtener_precio_forex_real(sim_pos), dec_pos)
             pos["precio_vela_actual"] = p_vivo_pos
+
+            tp_exacto = round(pos["tp"], dec_pos)
+            sl_exacto = round(pos["sl"], dec_pos)
 
             cierre_por_tp_sl = False
             precio_ejecucion_salida = p_vivo_pos
 
             if pos["tipo"] == "BUY":
-                if p_vivo_pos >= pos["tp"]:
-                    cierre_por_tp_sl, precio_ejecucion_salida = True, pos["tp"]
-                elif p_vivo_pos <= pos["sl"]:
-                    cierre_por_tp_sl, precio_ejecucion_salida = True, pos["sl"]
-            else: 
-                if p_vivo_pos <= pos["tp"]:
-                    cierre_por_tp_sl, precio_ejecucion_salida = True, pos["tp"]
-                elif p_vivo_pos >= pos["sl"]:
-                    cierre_por_tp_sl, precio_ejecucion_salida = True, pos["sl"]
+                if p_vivo_pos >= tp_exacto:
+                    cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
+                elif p_vivo_pos <= sl_exacto:
+                    cierre_por_tp_sl, precio_ejecucion_salida = True, sl_exacto
+            else: # SELL
+                if p_vivo_pos <= tp_exacto:
+                    cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
+                elif p_vivo_pos >= sl_exacto:
+                    cierre_por_tp_sl, precio_ejecucion_salida = True, sl_exacto
 
             if cierre_por_tp_sl:
                 pnl_real = calcular_pnl_institucional(sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"])
                 
                 st.session_state.balance_pedagogico += pnl_real
-                dec_out, _, _, _, _ = obtener_config_activo(sim_pos)
                 
                 registro_historial = {
                     "Tipo": pos['tipo'].lower(),
                     "Volumen": pos['lotes'],
                     "Símbolo": sim_pos,
-                    "S / L": pos['sl'],
-                    "T / P": pos['tp'],
+                    "S / L": sl_exacto,
+                    "T / P": tp_exacto,
                     "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                    "Precio Cierre": round(precio_ejecucion_salida, dec_out),
+                    "Precio Cierre": precio_ejecucion_salida,
                     "Beneficio": round(pnl_real, 2)
                 }
                 st.session_state.historial_cerradas.append(registro_historial)
@@ -948,8 +953,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     "Tipo": pos['tipo'].lower(),
                     "Volumen": pos['lotes'],
                     "Símbolo": pos['activo'],
-                    "S / L": pos['sl'],
-                    "T / P": pos['tp'],
+                    "S / L": round(pos['sl'], dec_pos),
+                    "T / P": round(pos['tp'], dec_pos),
                     "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
                     "Precio Cierre": round(precio_vivo, dec_pos),
                     "Beneficio": round(pnl_card, 2)
@@ -961,7 +966,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     else:
         st.info("No hay posiciones activas.")
 
-    # --- BITÁCORA HISTÓRICA (TIEMPO DE CIERRE Y PRECIO DE CIERRE EXACTO CON CEROS A LA DERECHA) ---
+    # --- BITÁCORA HISTÓRICA ---
     st.markdown("<br>", unsafe_allow_html=True)
     
     col_tit_bita, col_btn_bita = st.columns([3, 1])
@@ -985,7 +990,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             precio_out_val = float(item.get("Precio Cierre", item.get("entrada", 0.0)))
             beneficio = float(item.get("Beneficio", item.get("Resultado USD", 0.0)))
 
-            # Formateo dinámico exacto según la máscara de decimales del activo
             _, fmt_pos, _, _, _ = obtener_config_activo(simbolo)
             sl_str = fmt_pos % sl_val
             tp_str = fmt_pos % tp_val
