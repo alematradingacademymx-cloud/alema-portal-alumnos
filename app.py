@@ -542,7 +542,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API - BITÁCORA MT5 PURA)
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API - BITÁCORA ESTILO MT5 REAL)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -577,6 +577,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         except Exception:
             pass
 
+    # Estilos CSS de Terminal MT5
     st.markdown("""
         <style>
             .mt5-terminal-card {
@@ -592,6 +593,38 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 font-weight: 700;
                 font-size: 16px;
             }
+            .mt5-table-container {
+                overflow-x: auto;
+                border: 1px solid #2A2E39;
+                border-radius: 4px;
+                margin-top: 10px;
+            }
+            .mt5-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-family: 'Consolas', 'Segoe UI', monospace;
+                font-size: 12.5px;
+                background-color: #131722;
+                color: #d1d4dc;
+            }
+            .mt5-table th {
+                background-color: #1e222d;
+                color: #848e9c;
+                padding: 7px 10px;
+                text-align: left;
+                border-bottom: 1px solid #2A2E39;
+                font-weight: 600;
+                white-space: nowrap;
+            }
+            .mt5-table td {
+                padding: 6px 10px;
+                border-bottom: 1px solid #1e222d;
+                white-space: nowrap;
+            }
+            .mt5-buy { color: #2962FF; font-weight: 600; }
+            .mt5-sell { color: #ef5350; font-weight: 600; }
+            .mt5-profit { color: #2962FF; font-weight: 600; }
+            .mt5-loss { color: #ef5350; font-weight: 600; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -717,7 +750,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 
                 st.session_state.balance_pedagogico += pnl_real
                 
-                # Campos exactos estilo MT5 (Sin comisión, sin tasa, sin swap)
+                # ESTRUCTURA EXACTA MT5 (Campos idénticos a la imagen)
                 registro_historial = {
                     "Tiempo": pos.get('tiempo_apertura', datetime.now().strftime("%Y.%m.%d %H:%M:%S")),
                     "Ticket": pos['id'],
@@ -727,8 +760,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     "Precio": pos['entrada'],
                     "S / L": pos['sl'],
                     "T / P": pos['tp'],
-                    "Cierre Tiempo": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                    "Cierre Precio": round(precio_ejecucion_salida, 3 if es_jpy else (2 if is_oro else 5)),
+                    "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                    "Precio Cierre": round(precio_ejecucion_salida, 3 if es_jpy else (2 if is_oro else 5)),
                     "Beneficio": round(pnl_real, 2)
                 }
                 st.session_state.historial_cerradas.append(registro_historial)
@@ -880,8 +913,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     "Precio": pos['entrada'],
                     "S / L": pos['sl'],
                     "T / P": pos['tp'],
-                    "Cierre Tiempo": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                    "Cierre Precio": round(precio_vivo, 3 if es_jpy_pos else (2 if is_oro_pos else 5)),
+                    "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                    "Precio Cierre": round(precio_vivo, 3 if es_jpy_pos else (2 if is_oro_pos else 5)),
                     "Beneficio": round(pnl_card, 2)
                 })
                 guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
@@ -891,14 +924,78 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     else:
         st.info("No hay posiciones activas.")
 
-    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE (ESTILO MT5 REDUCIDO) ---
+    # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE (TABLA ESTILO MT5 EXACTO) ---
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("### 📋 Bitácora Histórica Permanente")
+    st.markdown("### 📋 Bitácora Histórica (MetaTrader 5)")
+    
     if st.session_state.historial_cerradas:
-        df_historial = pd.DataFrame(st.session_state.historial_cerradas)
-        st.dataframe(df_historial, use_container_width=True, hide_index=False)
+        # CONVERSIÓN Y DEPURACIÓN AUTOMÁTICA DE REGISTROS ANTIGUOS
+        registros_mt5_limpios = []
+        for item in st.session_state.historial_cerradas:
+            registros_mt5_limpios.append({
+                "Tiempo": item.get("Tiempo", item.get("Marca temporal", datetime.now().strftime("%Y.%m.%d %H:%M:%S"))),
+                "Ticket": item.get("Ticket", item.get("id", "9990000000")),
+                "Tipo": str(item.get("Tipo", "buy")).lower(),
+                "Volumen": item.get("Volumen", item.get("Lotes", 0.10)),
+                "Símbolo": item.get("Símbolo", item.get("Activo", "EURUSD")),
+                "Precio": item.get("Precio", item.get("entrada", 0.0)),
+                "S / L": item.get("S / L", item.get("sl", 0.0)),
+                "T / P": item.get("T / P", item.get("tp", 0.0)),
+                "Tiempo Cierre": item.get("Tiempo Cierre", datetime.now().strftime("%Y.%m.%d %H:%M:%S")),
+                "Precio Cierre": item.get("Precio Cierre", item.get("entrada", 0.0)),
+                "Beneficio": float(item.get("Beneficio", item.get("Resultado USD", 0.0)))
+            })
+
+        # CONSTRUCCIÓN DE TABLA MT5 CON ESTILOS VISUALES DEDICADOS
+        html_tabla = """
+        <div class="mt5-table-container">
+            <table class="mt5-table">
+                <thead>
+                    <tr>
+                        <th>Tiempo</th>
+                        <th>Ticket</th>
+                        <th>Tipo</th>
+                        <th>Volumen</th>
+                        <th>Símbolo</th>
+                        <th>Precio</th>
+                        <th>S / L</th>
+                        <th>T / P</th>
+                        <th>Tiempo</th>
+                        <th>Precio</th>
+                        <th>Beneficio</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        
+        for r in registros_mt5_limpios:
+            clase_tipo = "mt5-buy" if r["Tipo"] == "buy" else "mt5-sell"
+            clase_pnl = "mt5-profit" if r["Beneficio"] >= 0 else "mt5-loss"
+            
+            html_tabla += f"""
+                <tr>
+                    <td>{r['Tiempo']}</td>
+                    <td>{r['Ticket']}</td>
+                    <td class="{clase_tipo}">{r['Tipo']}</td>
+                    <td>{r['Volumen']:.2f}</td>
+                    <td>{r['Símbolo']}</td>
+                    <td>{r['Precio']}</td>
+                    <td>{r['S / L']}</td>
+                    <td>{r['T / P']}</td>
+                    <td>{r['Tiempo Cierre']}</td>
+                    <td>{r['Precio Cierre']}</td>
+                    <td class="{clase_pnl}">{r['Beneficio']:+.2f}</td>
+                </tr>
+            """
+            
+        html_tabla += """
+                </tbody>
+            </table>
+        </div>
+        """
+        st.markdown(html_tabla, unsafe_allow_html=True)
     else:
-        st.info("Aún no hay operaciones cerradas.")
+        st.info("Aún no hay operaciones cerradas en la bitácora MT5.")
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
