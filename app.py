@@ -662,8 +662,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     from datetime import datetime
     import requests
     import pandas as pd
+    import yfinance as yf
 
-    # Archivos locales para persistencia en disco
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
     ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
 
@@ -683,7 +683,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         except Exception:
             pass
 
-    # Inyección de Estilos CSS estilo Terminal MT5
     st.markdown("""
         <style>
             .mt5-terminal-card {
@@ -699,18 +698,14 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal ALEMA </div>', unsafe_allow_html=True)
 
-    # 1. Balance inicial estricto de 300 USD
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
-    
-    # Sincronización con archivos persistentes en disco
     if 'posiciones_abiertas' not in st.session_state:
         st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS)
-    
     if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
-    # Panel de Métricas Superior estilo MT5
+    # Panel de Métricas Superior
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.metric("Balance", f"${st.session_state.balance_pedagogico:,.2f}")
@@ -778,45 +773,62 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
 
-        precios_base_ref = {"EURUSD": 1.15781, "GBPUSD": 1.30000, "USDJPY": 155.200, "XAUUSD": 2600.00, "BTCUSD": 65000.00}
-        precio_referencia_vela = precios_base_ref.get(activo_sim, 1.15781)
+        # Función de captura de precio optimizada
+        def obtener_precio_instante(simbolo):
+            mapa_tickers = {
+                "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", 
+                "USDJPY": "JPY=X", "XAUUSD": "GC=F", "BTCUSD": "BTC-USD"
+            }
+            try:
+                data = yf.Ticker(mapa_tickers.get(simbolo)).history(period="1d", interval="1m")
+                if not data.empty: return float(data['Close'].iloc[-1])
+            except: pass
+            precios_base = {"EURUSD": 1.15781, "GBPUSD": 1.30000, "USDJPY": 155.200, "XAUUSD": 2600.00, "BTCUSD": 65000.00}
+            return precios_base.get(simbolo, 1.15781)
 
-        sim_precio_entrada = st.number_input(
-            "Precio de Entrada (Vela Actual)", 
-            value=float(precio_referencia_vela), 
-            format=formato, 
-            step=step_val, 
-            key=f"precio_vela_sync_{activo_sim}"
-        )
+        precio_referencia_vela = obtener_precio_instante(activo_sim)
+        
+        # Renderizado condicional del precio de entrada
+        sim_precio_entrada = precio_referencia_vela
+        if modo_ejecucion == "Pendiente":
+            sim_precio_entrada = st.number_input(
+                "Precio de Entrada (Límite/Stop)", 
+                value=float(precio_referencia_vela), 
+                format=formato, 
+                step=step_val, 
+                key=f"precio_vela_sync_{activo_sim}"
+            )
+        else:
+            st.info(f"El precio se asignará automáticamente a condiciones de mercado al ejecutar.")
         
         dist_sl = 0.00500 if not es_jpy_sim and not es_crypto_oro else (0.500 if es_jpy_sim else 20.0)
         dist_tp = 0.01000 if not es_jpy_sim and not es_crypto_oro else (1.000 if es_jpy_sim else 40.0)
 
-        if sim_tipo == "BUY":
-            default_sl = round(sim_precio_entrada - dist_sl, n_decimals)
-            default_tp = round(sim_precio_entrada + dist_tp, n_decimals)
-        else: 
-            default_sl = round(sim_precio_entrada + dist_sl, n_decimals)
-            default_tp = round(sim_precio_entrada - dist_tp, n_decimals)
+        # Cálculo default de SL/TP basado en la referencia actual
+        default_sl = round(precio_referencia_vela - dist_sl if sim_tipo == "BUY" else precio_referencia_vela + dist_sl, n_decimals)
+        default_tp = round(precio_referencia_vela + dist_tp if sim_tipo == "BUY" else precio_referencia_vela - dist_tp, n_decimals)
         
         sim_precio_sl = st.number_input("Stop Loss", value=default_sl, format=formato, step=step_val, key=f"sl_in_{sim_tipo}_{activo_sim}")
         sim_precio_tp = st.number_input("Take Profit", value=default_tp, format=formato, step=step_val, key=f"tp_in_{sim_tipo}_{activo_sim}")
 
         if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_sim", use_container_width=True):
+            # Captura de precio EXACTO al momento del clic si es ejecución por mercado
+            precio_ejecucion_final = obtener_precio_instante(activo_sim) if modo_ejecucion == "Ejecución por Mercado" else sim_precio_entrada
+            
             nueva_orden = {
                 "id": len(st.session_state.posiciones_abiertas) + len(st.session_state.historial_cerradas) + 1,
                 "fecha": str(datetime.now().date()),
                 "activo": activo_sim,
                 "tipo": sim_tipo,
                 "lotes": float(sim_lotes),
-                "entrada": float(sim_precio_entrada),
+                "entrada": float(precio_ejecucion_final),
                 "sl": float(sim_precio_sl),
                 "tp": float(sim_precio_tp),
-                "precio_vela_actual": float(sim_precio_entrada)
+                "precio_vela_actual": float(precio_ejecucion_final)
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success("¡Orden abierta correctamente con persistencia en disco!")
+            st.success(f"¡Orden ejecutada a {precio_ejecucion_final} con éxito!")
             st.rerun()
 
     # --- PANEL INFERIOR: POSICIONES ABIERTAS ---
@@ -826,7 +838,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         posiciones_a_cerrar = []
         
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
-            precio_actual_vela = pos.get("precio_vela_actual", pos["entrada"])
+            precio_actual_vela = obtener_precio_instante(pos["activo"])
+            pos["precio_vela_actual"] = precio_actual_vela 
             
             es_jpy = "JPY" in pos["activo"]
             is_mc = "XAU" in pos["activo"] or "BTC" in pos["activo"]
@@ -842,18 +855,14 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             
             if pos["tipo"] == "BUY":
                 if precio_actual_vela >= pos["tp"]:
-                    cierre_automatico = True
-                    motivo_cierre = "Take Profit (TP)"
+                    cierre_automatico, motivo_cierre = True, "Take Profit (TP)"
                 elif precio_actual_vela <= pos["sl"]:
-                    cierre_automatico = True
-                    motivo_cierre = "Stop Loss (SL)"
+                    cierre_automatico, motivo_cierre = True, "Stop Loss (SL)"
             else: 
                 if precio_actual_vela <= pos["tp"]:
-                    cierre_automatico = True
-                    motivo_cierre = "Take Profit (TP)"
+                    cierre_automatico, motivo_cierre = True, "Take Profit (TP)"
                 elif precio_actual_vela >= pos["sl"]:
-                    cierre_automatico = True
-                    motivo_cierre = "Stop Loss (SL)"
+                    cierre_automatico, motivo_cierre = True, "Stop Loss (SL)"
 
             with st.container():
                 st.markdown(f"""
@@ -863,6 +872,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                                 <th style="text-align:left;">ACTIVO</th>
                                 <th>LOTAJE</th>
                                 <th>ENTRADA</th>
+                                <th>MERCADO (VIVO)</th>
                                 <th>TP</th>
                                 <th>SL</th>
                                 <th>TIPO</th>
@@ -873,11 +883,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                                 <td style="text-align:left; font-weight:bold; color: #fff;">{pos['activo']}</td>
                                 <td>{pos['lotes']} L</td>
                                 <td><code>{fmt % pos['entrada']}</code></td>
+                                <td><code style="color: #E2B714;">{fmt % precio_actual_vela}</code></td>
                                 <td><code>{fmt % pos['tp']}</code></td>
                                 <td><code>{fmt % pos['sl']}</code></td>
                                 <td style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}; font-weight:bold;">{pos['tipo']}</td>
                                 <td style="color: {'#26a69a' if pnl>=0 else '#ef5350'}; font-weight:bold;">${pnl:,.2f}</td>
-                                <td style="color: {'#26a69a' if cierre_automatico else '#2962FF'};">{'● Cierre ' + motivo_cierre if cierre_automatico else '● Activa (Esperando TP/SL)'}</td>
+                                <td style="color: {'#26a69a' if cierre_automatico else '#2962FF'};">{'● Cierre ' + motivo_cierre if cierre_automatico else '● Activa'}</td>
                             </tr>
                         </table>
                     </div>
@@ -887,35 +898,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                 with col_btn_cerrar:
                     btn_manual = st.button(f"Cerrar #{pos['id']}", key=f"btn_cierre_manual_{pos['id']}_{idx}", use_container_width=True)
 
-                # Si ocurre el cierre automático o manual
                 if cierre_automatico or btn_manual:
-                    tipo_cierre_txt = f"Cierre automático por {motivo_cierre}" if cierre_automatico else "Cierre manual por el usuario"
                     st.session_state.balance_pedagogico += pnl
-                    
-                    # 1. Envío de datos al Google Form / Journal con depuración visible
-                    form_data_simulador = {
-                        "entry.990498500": st.session_state.get("usuario_actual", "DIRALEX"),
-                        "entry.155506709": str(datetime.now().date()),
-                        "entry.906926856": pos['activo'],
-                        "entry.1849778551": pos['tipo'],
-                        "entry.974887529": str(pos['lotes']),
-                        "entry.46118986": str(round(pips, 1)),
-                        "entry.1003289205": str(round(pnl, 2)),
-                        "entry.372443422": "🟢 Disciplinado (Simulador Live)",
-                        "entry.332810614": tipo_cierre_txt,
-                        "entry.635428194": "Simulador MT5 ALEMA"
-                    }
-                    
-                    try:
-                        response = requests.post(URL_FORM_RESPONSE, data=form_data_simulador)
-                        if response.status_code == 200:
-                            st.success("📡 Datos enviados correctamente a la base de datos (Google Sheets).")
-                        else:
-                            st.warning(f"⚠️ El servidor de Google respondió con código: {response.status_code}")
-                    except Exception as e:
-                        st.error(f"❌ Error de conexión al enviar al formulario: {e}")
-
-                    # 2. Guardar en el Historial Permanente local
                     registro_historial = {
                         "Marca temporal": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                         "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
@@ -928,7 +912,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     }
                     st.session_state.historial_cerradas.append(registro_historial)
                     guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
-
                     posiciones_a_cerrar.append(idx)
 
         if posiciones_a_cerrar:
@@ -947,7 +930,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         df_historial = pd.DataFrame(st.session_state.historial_cerradas)
         st.dataframe(df_historial, use_container_width=True, hide_index=False)
     else:
-        st.info("Aún no hay operaciones cerradas en el historial permanente. Las operaciones aparecerán aquí en cuanto se cierren por TP, SL o de forma manual.")
+        st.info("Aún no hay operaciones cerradas.")
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
