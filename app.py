@@ -987,7 +987,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     
     if st.session_state.historial_cerradas:
         filas_html = []
-        for item in st.session_state.historial_cerradas:
+        # Renderiza las operaciones desde la más reciente hasta la más antigua
+        for item in reversed(st.session_state.historial_cerradas):
             tiempo_fin = item.get("Tiempo Cierre", item.get("Tiempo", datetime.now().strftime("%Y.%m.%d %H:%M:%S")))
             tipo = str(item.get("Tipo", "buy")).lower()
             volumen = float(item.get("Volumen", item.get("Lotes", 0.10)))
