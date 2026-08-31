@@ -543,7 +543,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (PERSISTENCIA TOTAL EN DISCO: BALANCE + ORDENES ABIERTAS + BITÁCORA)
+# (PERSISTENCIA TOTAL + MONITOREO SL/TP ROBUSTO + TICKER EN VIVO)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -678,7 +678,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional (Persistencia Permanente)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional</div>', unsafe_allow_html=True)
 
     lista_activos = [
         "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", 
@@ -773,7 +773,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, bid_actual)
 
-   # --- MONITOREO DE ORDENES ACTIVAS (EVALUACIÓN AUTOMÁTICA SL/TP ROBUSTA) ---
+    # --- MONITOREO DE ORDENES ACTIVAS (EVALUACIÓN AUTOMÁTICA SL/TP ROBUSTA) ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -795,13 +795,11 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
             # Evaluación robusta: Detecta si tocó o rebasó los límites de TP o SL
             if pos["tipo"] == "BUY":
-                # Si el BID sube y toca o supera el TP, o cae y toca o rompe el SL
                 if p_bid >= tp_exacto:
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
                 elif p_bid <= sl_exacto:
                     cierre_por_tp_sl, precio_ejecucion_salida = True, sl_exacto
             else: # SELL
-                # Si el ASK baja y toca o supera el TP, o sube y toca o rompe el SL
                 if p_ask <= tp_exacto:
                     cierre_por_tp_sl, precio_ejecucion_salida = True, tp_exacto
                 elif p_ask >= sl_exacto:
@@ -834,33 +832,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.session_state.posiciones_abiertas = posiciones_conservadas
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
             st.rerun()
-                
-                # Actualizar Balance y Guardar
-                st.session_state.balance_pedagogico += pnl_real
-                guardar_datos_json(ARCH_PERSISTENCIA_BALANCE, st.session_state.balance_pedagogico)
-                
-                registro_historial = {
-                    "Tipo": pos['tipo'].lower(),
-                    "Volumen": pos['lotes'],
-                    "Símbolo": sim_pos,
-                    "S / L": sl_exacto,
-                    "T / P": tp_exacto,
-                    "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                    "Precio Cierre": precio_ejecucion_salida,
-                    "Beneficio": round(pnl_real, 2)
-                }
-                st.session_state.historial_cerradas.append(registro_historial)
-                guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
-                hubo_cambios_auto = True
-            else:
-                posiciones_conservadas.append(pos)
 
-        if hubo_cambios_auto:
-            st.session_state.posiciones_abiertas = posiciones_conservadas
-            guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.rerun()
-
-    # Métrica Dashboard (Con botón para resetear la cuenta completa si se desea)
+    # Métrica Dashboard
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.metric("Balance", f"${st.session_state.balance_pedagogico:,.2f}")
@@ -873,7 +846,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
     with col_m4:
-        st.metric("Estado Datos", "Alema serividor")
+        st.metric("Estado Datos", "Alema Servidor")
 
     st.divider()
 
