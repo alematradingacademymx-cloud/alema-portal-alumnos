@@ -542,7 +542,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (MOTOR WEB CON APIS HTTP EN VIVO)
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -555,8 +555,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     import plotly.graph_objects as go
     from streamlit_autorefresh import st_autorefresh
 
-    # Auto-refresco de la terminal cada 4 segundos para sincronización web en vivo
-    st_autorefresh(interval=4000, key="auto_refresh_terminal_web_api")
+    # Auto-refresco de la terminal cada 4 segundos para sincronización de Forex en vivo
+    st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_api")
 
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
     ARCH_PERSISTENCIA_HISTORIAL = "historial_cerradas_alema.json"
@@ -595,7 +595,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Web en Tiempo Real</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional Forex (En Vivo)</div>', unsafe_allow_html=True)
 
     if 'balance_pedagogico' not in st.session_state:
         st.session_state.balance_pedagogico = 300.00
@@ -604,54 +604,51 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
-    # Selector principal de activo
-    par_activo = st.selectbox("Símbolo de Mercado", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD"], key="select_chart_asset_web")
+    # Selector principal de activo Forex y Oro
+    par_activo = st.selectbox("Símbolo de Mercado (Forex)", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"], key="select_chart_asset_forex")
 
-    def obtener_precio_web_real(simbolo):
-        # 1. Obtener precio real de criptomonedas vía Binance Public API
-        if simbolo == "BTCUSD":
-            try:
-                res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=2)
-                if res.status_code == 200:
-                    precio = float(res.json()["price"])
-                    return precio
-            except Exception:
-                pass
-        
-        # 2. Obtener precios de Forex y Oro mediante API pública de tipos de cambio con respaldo estricto institucional
-        precios_fallback = {
-            "EURUSD": 1.15903, "GBPUSD": 1.30250, 
-            "USDJPY": 155.200, "XAUUSD": 2385.50, "BTCUSD": 64200.0
+    def obtener_precio_forex_real(simbolo):
+        simbolos_map = {
+            "EURUSD": "EUR/USD",
+            "GBPUSD": "GBP/USD",
+            "USDJPY": "USD/JPY",
+            "XAUUSD": "XAU/USD"
         }
         
+        simbolo_api = simbolos_map.get(simbolo, "EUR/USD")
+        
+        # API Key oficial de ALEMA Trading Academy configurada
+        api_key = "6223c6d78f7a43b2872fc3acbb3f578e"
+        
         try:
-            if simbolo in ["EURUSD", "GBPUSD", "USDJPY"]:
-                res = requests.get("https://api.frankfurter.app/latest?from=USD", timeout=2)
-                if res.status_code == 200:
-                    rates = res.json().get("rates", {})
-                    if simbolo == "EURUSD": return 1.0 / rates.get("EUR", 0.86)
-                    if simbolo == "GBPUSD": return 1.0 / rates.get("GBP", 0.77)
-                    if simbolo == "USDJPY": return rates.get("JPY", 155.0)
+            url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
+            res = requests.get(url, timeout=3)
+            if res.status_code == 200:
+                data = res.json()
+                if "price" in data:
+                    return float(data["price"])
         except Exception:
             pass
             
-        # Respaldo matemático dinámico si la red sufre interrupciones
-        base = precios_base = precios_fallback.get(simbolo, 1.0000)
-        variacion = np.random.normal(0, base * 0.0001)
-        return round(base + variacion, 3 if "JPY" in simbolo else (2 if "XAU" in simbolo or "BTC" in simbolo else 5))
+        precios_fallback = {
+            "EURUSD": 1.08540, "GBPUSD": 1.31210, 
+            "USDJPY": 146.850, "XAUUSD": 2512.30
+        }
+        base = precios_fallback.get(simbolo, 1.0000)
+        variacion = np.random.normal(0, base * 0.00005)
+        return round(base + variacion, 3 if "JPY" in simbolo else (2 if "XAU" in simbolo else 5))
 
-    precio_actual_ref = obtener_precio_web_real(par_activo)
+    precio_actual_ref = obtener_precio_forex_real(par_activo)
 
-    # Generar estructura de historial de velas para el gráfico basadas en el precio real actual
-    if 'mercado_web_df' not in st.session_state:
-        st.session_state.mercado_web_df = {}
+    if 'mercado_forex_df' not in st.session_state:
+        st.session_state.mercado_forex_df = {}
 
-    def obtener_dataframe_velas(simbolo, precio_actual):
-        if simbolo not in st.session_state.mercado_web_df:
+    def obtener_dataframe_forex(simbolo, precio_actual):
+        if simbolo not in st.session_state.mercado_forex_df:
             fechas = [datetime.now() - timedelta(minutes=15 * i) for i in range(50)][::-1]
-            vol = precio_actual * 0.0005
-            np.random.seed(42)
-            closes = np.linspace(precio_actual - (vol * 5), precio_actual, 50) + np.random.normal(0, vol * 0.2, 50)
+            vol = precio_actual * 0.0004
+            np.random.seed(123)
+            closes = np.linspace(precio_actual - (vol * 4), precio_actual, 50) + np.random.normal(0, vol * 0.2, 50)
             opens = closes + np.random.normal(0, vol * 0.1, 50)
             highs = np.maximum(opens, closes) + abs(np.random.normal(0, vol * 0.2, 50))
             lows = np.minimum(opens, closes) - abs(np.random.normal(0, vol * 0.2, 50))
@@ -659,16 +656,15 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             df_init = pd.DataFrame({
                 'Open': opens, 'High': highs, 'Low': lows, 'Close': closes
             }, index=fechas)
-            st.session_state.mercado_web_df[simbolo] = df_init
+            st.session_state.mercado_forex_df[simbolo] = df_init
             
-        df = st.session_state.mercado_web_df[simbolo]
-        # Actualizar la última vela con el precio web real obtenido
+        df = st.session_state.mercado_forex_df[simbolo]
         df.iloc[-1, df.columns.get_loc('Close')] = precio_actual
         df.iloc[-1, df.columns.get_loc('High')] = max(df.iloc[-1]['Open'], max(df.iloc[-1]['High'], precio_actual))
         df.iloc[-1, df.columns.get_loc('Low')] = min(df.iloc[-1]['Open'], min(df.iloc[-1]['Low'], precio_actual))
         return df
 
-    df_history = obtener_dataframe_velas(par_activo, precio_actual_ref)
+    df_history = obtener_dataframe_forex(par_activo, precio_actual_ref)
 
     # --- MOTOR DE MONITOREO Y EVALUACIÓN AUTOMÁTICA DE TP / SL ---
     if st.session_state.posiciones_abiertas:
@@ -677,8 +673,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
         for pos in st.session_state.posiciones_abiertas:
             sim_pos = pos["activo"]
-            p_vivo_pos = obtener_precio_web_real(sim_pos)
-            df_pos_hist = obtener_dataframe_velas(sim_pos, p_vivo_pos)
+            p_vivo_pos = obtener_precio_forex_real(sim_pos)
+            df_pos_hist = obtener_dataframe_forex(sim_pos, p_vivo_pos)
             
             vela_actual = df_pos_hist.iloc[-1]
             precio_cierre_vivo = float(vela_actual['Close'])
@@ -688,8 +684,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             pos["precio_vela_actual"] = precio_cierre_vivo
 
             es_jpy = "JPY" in sim_pos
-            is_mc = "XAU" in sim_pos or "BTC" in sim_pos
-            mp = 100.0 if es_jpy else (1.0 if is_mc else 10000.0)
+            is_oro = "XAU" in sim_pos
+            mp = 100.0 if es_jpy else (1.0 if is_oro else 10000.0)
             vp = 7.0 if es_jpy else 10.0
             
             cierre_por_tp_sl = False
@@ -743,8 +739,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         for pos in st.session_state.posiciones_abiertas:
             act_p = pos.get("precio_vela_actual", pos["entrada"])
             is_jpy_m = "JPY" in pos["activo"]
-            is_mc_m = "XAU" in pos["activo"] or "BTC" in pos["activo"]
-            mp = 100.0 if is_jpy_m else (1.0 if is_mc_m else 10000.0)
+            is_oro_m = "XAU" in pos["activo"]
+            mp = 100.0 if is_jpy_m else (1.0 if is_oro_m else 10000.0)
             vp = 7.0 if is_jpy_m else 10.0
             pips_calc = (act_p - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - act_p)
             pnl_flotante_total += (pips_calc * mp * vp * pos["lotes"])
@@ -752,19 +748,19 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
     with col_m4:
-        st.metric("Servidor", "ALEMA-Cloud-API")
+        st.metric("Servidor", "ALEMA-Forex-Live")
 
     st.divider()
 
     col_grafico, col_panel = st.columns([2.4, 1.0])
 
     es_jpy = "JPY" in par_activo
-    es_crypto_oro = "XAU" in par_activo or "BTC" in par_activo
-    formato_str = "%.3f" if es_jpy else ("%.2f" if es_crypto_oro else "%.5f")
+    es_oro = "XAU" in par_activo
+    formato_str = "%.3f" if es_jpy else ("%.2f" if es_oro else "%.5f")
     precio_formateado = formato_str % precio_actual_ref
 
     with col_grafico:
-        st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional (Web API) - {par_activo} | Cotización en Vivo: <span class='live-ticker'>{precio_formateado}</span></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional Forex - {par_activo} | Cotización en Vivo: <span class='live-ticker'>{precio_formateado}</span></div>", unsafe_allow_html=True)
 
         fig = go.Figure()
 
@@ -799,24 +795,24 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         st.plotly_chart(fig, use_container_width=True)
 
     with col_panel:
-        st.markdown("### 🎛️ Nueva Orden Web")
-        sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_web")
-        sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01, key="sim_lote_web")
+        st.markdown("### 🎛️ Nueva Orden Forex")
+        sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_forex")
+        sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01, key="sim_lote_forex")
         
-        n_decimals = 3 if es_jpy else (2 if es_crypto_oro else 5)
-        formato = "%.3f" if es_jpy else ("%.2f" if es_crypto_oro else "%.5f")
-        step_val = 0.001 if es_jpy else (0.10 if es_crypto_oro else 0.00001)
+        n_decimals = 3 if es_jpy else (2 if es_oro else 5)
+        formato = "%.3f" if es_jpy else ("%.2f" if es_oro else "%.5f")
+        step_val = 0.001 if es_jpy else (0.10 if es_oro else 0.00001)
 
-        dist_sl = 0.00500 if not es_jpy and not es_crypto_oro else (0.500 if es_jpy else 20.0)
-        dist_tp = 0.01000 if not es_jpy and not es_crypto_oro else (1.000 if es_jpy else 40.0)
+        dist_sl = 0.00500 if not es_jpy and not es_oro else (0.500 if es_jpy else 10.0)
+        dist_tp = 0.01000 if not es_jpy and not es_oro else (1.000 if es_jpy else 20.0)
 
         default_sl = round(precio_actual_ref - dist_sl if sim_tipo == "BUY" else precio_actual_ref + dist_sl, n_decimals)
         default_tp = round(precio_actual_ref + dist_tp if sim_tipo == "BUY" else precio_actual_ref - dist_tp, n_decimals)
         
-        sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key="sim_sl_web")
-        sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key="sim_tp_web")
+        sim_precio_sl = st.number_input("Stop Loss", value=float(default_sl), format=formato, step=step_val, key="sim_sl_forex")
+        sim_precio_tp = st.number_input("Take Profit", value=float(default_tp), format=formato, step=step_val, key="sim_tp_forex")
 
-        if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_web", use_container_width=True):
+        if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_forex", use_container_width=True):
             precio_ejecucion = precio_actual_ref
             nueva_orden = {
                 "id": int(datetime.now().timestamp()),
@@ -831,18 +827,18 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             }
             st.session_state.posiciones_abiertas.append(nueva_orden)
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.success(f"¡Orden ejecutada con éxito al precio web: {precio_ejecucion}!")
+            st.success(f"¡Orden ejecutada con éxito al precio de Forex: {precio_ejecucion}!")
             st.rerun()
 
     # --- PANEL INFERIOR: POSICIONES ACTIVAS ---
-    st.markdown("### 📊 Posiciones Abiertas (Monitoreo en Vivo)")
+    st.markdown("### 📊 Posiciones Abiertas (Monitoreo en Vivo Forex)")
     if st.session_state.posiciones_abiertas:
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
             precio_vivo = pos.get("precio_vela_actual", pos["entrada"])
             es_jpy_pos = "JPY" in pos["activo"]
-            is_mc_pos = "XAU" in pos["activo"] or "BTC" in pos["activo"]
-            fmt_pos = "%.3f" if es_jpy_pos else ("%.2f" if is_mc_pos else "%.5f")
-            mp = 100.0 if es_jpy_pos else (1.0 if is_mc_pos else 10000.0)
+            is_oro_pos = "XAU" in pos["activo"]
+            fmt_pos = "%.3f" if es_jpy_pos else ("%.2f" if is_oro_pos else "%.5f")
+            mp = 100.0 if es_jpy_pos else (1.0 if is_oro_pos else 10000.0)
             vp = 7.0 if es_jpy_pos else 10.0
             pips = (precio_vivo - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_vivo)
             pnl = pips * mp * vp * pos["lotes"]
@@ -850,14 +846,14 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.markdown(f"""
                 <div class="mt5-terminal-card">
                     <b>{pos['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}">{pos['tipo']}</span> | 
-                    Entrada: <code>{fmt_pos % pos['entrada']}</code> | Vivo Web: <code style="color: #26a69a;">{fmt_pos % precio_vivo}</code> | 
+                    Entrada: <code>{fmt_pos % pos['entrada']}</code> | Vivo Forex: <code style="color: #26a69a;">{fmt_pos % precio_vivo}</code> | 
                     TP: <span style="color:#26a69a;">{fmt_pos % pos['tp']}</span> | 
                     SL: <span style="color:#ef5350;">{fmt_pos % pos['sl']}</span> | 
                     PnL: <b style="color: {'#26a69a' if pnl>=0 else '#ef5350'}">${pnl:,.2f} USD</b>
                 </div>
             """, unsafe_allow_html=True)
             
-            if st.button(f"Cerrar Manual #{pos['id']}", key=f"manual_btn_web_{pos['id']}_{idx}"):
+            if st.button(f"Cerrar Manual #{pos['id']}", key=f"manual_btn_forex_{pos['id']}_{idx}"):
                 st.session_state.balance_pedagogico += pnl
                 st.session_state.historial_cerradas.append({
                     "Marca temporal": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
