@@ -1,6 +1,6 @@
 streamlit
+streamlit-autorefresh
 plotly
-datetime
 pandas
 requests
 yfinance
