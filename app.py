@@ -548,9 +548,10 @@ if opcion_menu == "🧪 Simulador de Ejecución":
     
     import json
     import os
-    from datetime import datetime
+    from datetime import datetime, timedelta
     import pytz
     import pandas as pd
+    import altair as alt
 
     TZ_MEXICO = pytz.timezone("America/Mexico_City")
 
@@ -625,53 +626,65 @@ if opcion_menu == "🧪 Simulador de Ejecución":
         else:
             precio_base_inicial = 64200.0
 
-        chart_html = f"""
-        <div style="background-color: #131722; padding: 10px; border-radius: 6px; border: 1px solid #2A2E39;">
-            <div style="color: #94A3B8; font-size: 13px; margin-bottom: 6px; font-family: sans-serif;">Gráfico Institucional En Vivo - {par_activo}</div>
-            <div id="tv_chart_container" style="width: 100%; height: 500px;"></div>
-        </div>
-        <script type="text/javascript" src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-        <script type="text/javascript">
-            const chartDom = document.getElementById('tv_chart_container');
-            const chart = LightweightCharts.createChart(chartDom, {{
-                width: chartDom.clientWidth,
-                height: 500,
-                layout: {{ background: {{ type: 'solid', color: '#131722' }}, text: '#D1D4DC' }},
-                grid: {{ vertLines: {{ color: '#2A2E39' }}, horzLines: {{ color: '#2A2E39' }} }},
-                timeScale: {{ timeVisible: true, secondsVisible: true }}
-            }});
+        st.markdown(f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>Gráfico Institucional En Vivo - {par_activo}</div>", unsafe_allow_html=True)
+
+        # Generador de datos simulados robusto para Altair (Velas / Línea de alta precisión)
+        import random
+        data_puntos = []
+        tiempo_actual = datetime.now(TZ_MEXICO) - timedelta(minutes=60)
+         precio_actual_sim = precio_base_inicial
+
+        for i in range(60):
+            cambio = (random.random() - 0.48) * (precio_actual_sim * 0.0004)
+            open_p = precio_actual_sim
+            close_p = open_p + cambio
+            high_p = max(open_p, close_p) + random.random() * (precio_actual_sim * 0.0002)
+            low_p = min(open_p, close_p) - random.random() * (precio_actual_sim * 0.0002)
             
-            const candlestickSeries = chart.addCandlestickSeries({{
-                upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
-                wickUpColor: '#26a69a', wickDownColor: '#ef5350'
-            }});
+            data_puntos.append({
+                "Tiempo": tiempo_actual.strftime("%H:%M:%S"),
+                "Apertura": open_p,
+                "Cierre": close_p,
+                "Máximo": high_p,
+                "Mínimo": low_p,
+                "Tipo": "Alcista" if close_p >= open_p else "Bajista"
+            })
+            precio_actual_sim = close_p
+            tiempo_actual += timedelta(minutes=1)
 
-            let basePrice = {precio_base_inicial};
-            let now = Math.floor(Date.now() / 1000) - 300;
-            let initialData = [];
-            for(let i = 0; i < 60; i++) {{
-                let change = (Math.random() - 0.48) * (basePrice * 0.0004);
-                let open = basePrice;
-                let close = open + change;
-                let high = Math.max(open, close) + Math.random() * (basePrice * 0.0002);
-                let low = Math.min(open, close) - Math.random() * (basePrice * 0.0002);
-                initialData.push({{ time: now + (i * 60), open: open, high: high, low: low, close: close }});
-                basePrice = close;
-            }}
-            candlestickSeries.setData(initialData);
-            chart.timeScale().fitContent();
+        df_chart = pd.DataFrame(data_puntos)
 
-            setInterval(() => {{
-                let lastCandle = initialData[initialData.length - 1];
-                let movement = (Math.random() - 0.49) * (lastCandle.close * 0.0001);
-                lastCandle.close += movement;
-                lastCandle.high = Math.max(lastCandle.high, lastCandle.close);
-                lastCandle.low = Math.min(lastCandle.low, lastCandle.close);
-                candlestickSeries.update(lastCandle);
-            }}, 1000);
-        </script>
-        """
-        st.components.v1.html(chart_html, height=560)
+        # Gráfico de Altair profesional estilo TradingView oscuro
+        base = alt.Chart(df_chart).encode(
+            x=alt.X('Tiempo:N', sort=None, axis=alt.Axis(title='', labelColor='#94A3B8', tickColor='#2A2E39', domainColor='#2A2E39'))
+        )
+
+        lines = base.mark_rule(color='#2A2E39').encode(
+            y=alt.Y('Mínimo:Q', scale=alt.ZeroBased(False), axis=alt.Axis(title='', labelColor='#94A3B8', gridColor='#2A2E39')),
+            y2='Máximo:Q'
+        )
+
+        bars = base.mark_bar(size=6).encode(
+            y='Apertura:Q',
+            y2='Cierre:Q',
+            color=alt.condition(
+                alt.datum.Cierre >= alt.datum.Apertura,
+                alt.value('#26a69a'), # Verde trading
+                alt.value('#ef5350')  # Rojo trading
+            )
+        )
+
+        chart_final = (lines + bars).properties(
+            height=430
+        ).configure_background(
+            color='#131722'
+        ).configure_view(
+            stroke='#2A2E39'
+        )
+
+        st.altair_chart(chart_final, use_container_width=True)
+
+        ref_precio = precio_actual_sim
 
     with col_panel:
         st.markdown("### 🎛️ Nueva Orden (Mercado)")
@@ -685,8 +698,6 @@ if opcion_menu == "🧪 Simulador de Ejecución":
         formato = "%.3f" if es_jpy_sim else ("%.2f" if es_crypto_oro else "%.5f")
         step_val = 0.001 if es_jpy_sim else (0.10 if es_crypto_oro else 0.00001)
 
-        ref_precio = precio_base_inicial
-        
         dist_def_sl = 0.00200 if not es_jpy_sim and not es_crypto_oro else (0.200 if es_jpy_sim else 10.0)
         dist_def_tp = 0.00400 if not es_jpy_sim and not es_crypto_oro else (0.400 if es_jpy_sim else 20.0)
 
