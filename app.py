@@ -681,7 +681,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, precio_actual_ref)
 
-    # --- MOTOR DE MONITOREO Y EVALUACIÓN AUTOMÁTICA DE TP / SL ---
+    # --- MOTOR DE MONITOREO Y EVALUACIÓN AUTOMÁTICA DE TP / SL (ESTILO MT5) ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -698,30 +698,28 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             val_pip_base = 7.0 if es_jpy else 10.0
             
             cierre_por_tp_sl = False
-            motivo = ""
             precio_ejecucion_salida = p_vivo_pos
 
             if pos["tipo"] == "BUY":
                 if p_vivo_pos >= pos["tp"]:
-                    cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "TP", pos["tp"]
+                    cierre_por_tp_sl, precio_ejecucion_salida = True, pos["tp"]
                 elif p_vivo_pos <= pos["sl"]:
-                    cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "SL", pos["sl"]
+                    cierre_por_tp_sl, precio_ejecucion_salida = True, pos["sl"]
             else: 
                 if p_vivo_pos <= pos["tp"]:
-                    cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "TP", pos["tp"]
+                    cierre_por_tp_sl, precio_ejecucion_salida = True, pos["tp"]
                 elif p_vivo_pos >= pos["sl"]:
-                    cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "SL", pos["sl"]
+                    cierre_por_tp_sl, precio_ejecucion_salida = True, pos["sl"]
 
             if cierre_por_tp_sl:
-                n_dec_res = 3 if es_jpy else (2 if is_oro else 5)
                 pips_reales = (precio_ejecucion_salida - pos["entrada"]) * mult_pips if pos["tipo"] == "BUY" else (pos["entrada"] - precio_ejecucion_salida) * mult_pips
                 pnl_real = pips_reales * val_pip_base * pos["lotes"]
                 
                 st.session_state.balance_pedagogico += pnl_real
                 
-                # Bitácora limpia estilo MT5 exacta (sin comisión, tasa ni swap)
+                # Formato exacto de columnas estilo MT5 (Omitiendo Comisión, Tasa y Swap)
                 registro_historial = {
-                    "Tiempo Apertura": pos['tiempo_apertura'],
+                    "Tiempo": pos.get('tiempo_apertura', datetime.now().strftime("%Y.%m.%d %H:%M:%S")),
                     "Ticket": pos['id'],
                     "Tipo": pos['tipo'].lower(),
                     "Volumen": pos['lotes'],
@@ -729,8 +727,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     "Precio": pos['entrada'],
                     "S / L": pos['sl'],
                     "T / P": pos['tp'],
-                    "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                    "Precio Cierre": round(precio_ejecucion_salida, n_dec_res),
+                    "Cierre Tiempo": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                    "Cierre Precio": round(precio_ejecucion_salida, 3 if es_jpy else (2 if is_oro else 5)),
                     "Beneficio": round(pnl_real, 2)
                 }
                 st.session_state.historial_cerradas.append(registro_historial)
@@ -828,9 +826,11 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
         if st.button(f"🟢 COMPRAR" if sim_tipo == "BUY" else f"🔴 VENDER", key="btn_ejecutar_forex", use_container_width=True):
             precio_ejecucion = precio_actual_ref
+            tiempo_apertura_str = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
             nueva_orden = {
                 "id": int(datetime.now().timestamp()),
-                "tiempo_apertura": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                "tiempo_apertura": tiempo_apertura_str,
+                "fecha": str(datetime.now().date()),
                 "activo": par_activo,
                 "tipo": sim_tipo,
                 "lotes": float(sim_lotes),
@@ -871,9 +871,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             
             if st.button(f"Cerrar Manual #{pos['id']}", key=f"manual_btn_forex_{pos['id']}_{idx}"):
                 st.session_state.balance_pedagogico += pnl_card
-                n_dec_man = 3 if es_jpy_pos else (2 if is_oro_pos else 5)
                 st.session_state.historial_cerradas.append({
-                    "Tiempo Apertura": pos['tiempo_apertura'],
+                    "Tiempo": pos.get('tiempo_apertura', datetime.now().strftime("%Y.%m.%d %H:%M:%S")),
                     "Ticket": pos['id'],
                     "Tipo": pos['tipo'].lower(),
                     "Volumen": pos['lotes'],
@@ -881,8 +880,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     "Precio": pos['entrada'],
                     "S / L": pos['sl'],
                     "T / P": pos['tp'],
-                    "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                    "Precio Cierre": round(precio_vivo, n_dec_man),
+                    "Cierre Tiempo": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                    "Cierre Precio": round(precio_vivo, 3 if es_jpy_pos else (2 if is_oro_pos else 5)),
                     "Beneficio": round(pnl_card, 2)
                 })
                 guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
@@ -894,7 +893,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     # --- SECCIÓN: BITÁCORA HISTÓRICA PERMANENTE (ESTILO MT5) ---
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("### 📋 Bitácora Histórica Permanente (MT5 History)")
+    st.markdown("### 📋 Bitácora Histórica Permanente")
     if st.session_state.historial_cerradas:
         df_historial = pd.DataFrame(st.session_state.historial_cerradas)
         st.dataframe(df_historial, use_container_width=True, hide_index=False)
