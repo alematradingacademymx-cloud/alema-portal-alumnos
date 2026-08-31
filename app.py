@@ -542,7 +542,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API - OPTIMIZADO)
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY (FOREX & METALS API - CORREGIDO Y ESTABLE)
 # ==========================================
 elif opcion_menu == "🧪 Simulador de Ejecución":
     
@@ -556,7 +556,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     import plotly.graph_objects as go
     from streamlit_autorefresh import st_autorefresh
 
-    # Auto-refresco optimizado a 6 segundos para proteger el límite de la API gratuita
     st_autorefresh(interval=6000, key="auto_refresh_terminal_forex_api_opt")
 
     ARCH_PERSISTENCIA_ACTIVAS = "posiciones_activas_alema.json"
@@ -605,13 +604,11 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if 'historial_cerradas' not in st.session_state:
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL)
 
-    # Inicializar cachés de control de velocidad para la API
     if 'cache_precios_forex' not in st.session_state:
         st.session_state.cache_precios_forex = {}
     if 'ultimo_tiempo_api' not in st.session_state:
         st.session_state.ultimo_tiempo_api = {}
 
-    # Selector principal de activo Forex y Oro
     par_activo = st.selectbox("Símbolo de Mercado (Forex)", ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"], key="select_chart_asset_forex")
 
     def obtener_precio_forex_real(simbolo):
@@ -628,7 +625,6 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         ahora = time.time()
         tiempo_ultimo = st.session_state.ultimo_tiempo_api.get(simbolo, 0)
         
-        # Consultar a la API externa solo si han pasado al menos 12 segundos para respetar tasa gratuita
         if ahora - tiempo_ultimo > 12:
             try:
                 url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
@@ -643,14 +639,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             except Exception:
                 pass
         
-        # Si ya tenemos un precio en memoria, evoluciona de manera fluida sin saltos bruscos
         if simbolo in st.session_state.cache_precios_forex:
             precio_base = st.session_state.cache_precios_forex[simbolo]
             variacion = np.random.normal(0, precio_base * 0.00001)
             precio_actualizado = precio_base + variacion
             return round(precio_actualizado, 3 if "JPY" in simbolo else (2 if "XAU" in simbolo else 5))
             
-        # Respaldo inicial estricto por si arranca en frío
         precios_fallback = {
             "EURUSD": 1.15919, "GBPUSD": 1.31210, 
             "USDJPY": 146.850, "XAUUSD": 2512.30
@@ -687,7 +681,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
 
     df_history = obtener_dataframe_forex(par_activo, precio_actual_ref)
 
-    # --- MOTOR DE MONITOREO Y EVALUACIÓN AUTOMÁTICA DE TP / SL ---
+    # --- MOTOR DE MONITOREO Y EVALUACIÓN AUTOMÁTICA DE TP / SL (BASADO EN PRECIO VIVO) ---
     if st.session_state.posiciones_abiertas:
         posiciones_conservadas = []
         hubo_cambios_auto = False
@@ -695,38 +689,34 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         for pos in st.session_state.posiciones_abiertas:
             sim_pos = pos["activo"]
             p_vivo_pos = obtener_precio_forex_real(sim_pos)
-            df_pos_hist = obtener_dataframe_forex(sim_pos, p_vivo_pos)
-            
-            vela_actual = df_pos_hist.iloc[-1]
-            precio_cierre_vivo = float(vela_actual['Close'])
-            max_vela = float(vela_actual['High'])
-            min_vela = float(vela_actual['Low'])
-
-            pos["precio_vela_actual"] = precio_cierre_vivo
+            pos["precio_vela_actual"] = p_vivo_pos
 
             es_jpy = "JPY" in sim_pos
             is_oro = "XAU" in sim_pos
-            mp = 100.0 if es_jpy else (1.0 if is_oro else 10000.0)
-            vp = 7.0 if es_jpy else 10.0
+            
+            # Factores institucionales de conversión de pips y valor por lote
+            # EURUSD/GBPUSD: 1 pip = 0.0001 -> $10 por lote estándar -> $1 por 0.1 lote
+            mult_pips = 100.0 if es_jpy else (10.0 if is_oro else 10000.0)
+            val_pip_base = 7.0 if es_jpy else 10.0
             
             cierre_por_tp_sl = False
             motivo = ""
-            precio_ejecucion_salida = precio_cierre_vivo
+            precio_ejecucion_salida = p_vivo_pos
 
             if pos["tipo"] == "BUY":
-                if max_vela >= pos["tp"]:
+                if p_vivo_pos >= pos["tp"]:
                     cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "Take Profit (TP)", pos["tp"]
-                elif min_vela <= pos["sl"]:
+                elif p_vivo_pos <= pos["sl"]:
                     cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "Stop Loss (SL)", pos["sl"]
             else: 
-                if min_vela <= pos["tp"]:
+                if p_vivo_pos <= pos["tp"]:
                     cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "Take Profit (TP)", pos["tp"]
-                elif max_vela >= pos["sl"]:
+                elif p_vivo_pos >= pos["sl"]:
                     cierre_por_tp_sl, motivo, precio_ejecucion_salida = True, "Stop Loss (SL)", pos["sl"]
 
             if cierre_por_tp_sl:
-                pips_reales = (precio_ejecucion_salida - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_ejecucion_salida)
-                pnl_real = pips_reales * mp * vp * pos["lotes"]
+                pips_reales = (precio_ejecucion_salida - pos["entrada"]) * mult_pips if pos["tipo"] == "BUY" else (pos["entrada"] - precio_ejecucion_salida) * mult_pips
+                pnl_real = pips_reales * val_pip_base * pos["lotes"]
                 
                 st.session_state.balance_pedagogico += pnl_real
                 registro_historial = {
@@ -761,10 +751,10 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             act_p = pos.get("precio_vela_actual", pos["entrada"])
             is_jpy_m = "JPY" in pos["activo"]
             is_oro_m = "XAU" in pos["activo"]
-            mp = 100.0 if is_jpy_m else (1.0 if is_oro_m else 10000.0)
-            vp = 7.0 if is_jpy_m else 10.0
-            pips_calc = (act_p - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - act_p)
-            pnl_flotante_total += (pips_calc * mp * vp * pos["lotes"])
+            mp_m = 100.0 if is_jpy_m else (10.0 if is_oro_m else 10000.0)
+            vp_m = 7.0 if is_jpy_m else 10.0
+            pips_calc = (act_p - pos["entrada"]) * mp_m if pos["tipo"] == "BUY" else (pos["entrada"] - act_p) * mp_m
+            pnl_flotante_total += (pips_calc * vp_m * pos["lotes"])
         st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
     with col_m3:
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
@@ -859,10 +849,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             es_jpy_pos = "JPY" in pos["activo"]
             is_oro_pos = "XAU" in pos["activo"]
             fmt_pos = "%.3f" if es_jpy_pos else ("%.2f" if is_oro_pos else "%.5f")
-            mp = 100.0 if es_jpy_pos else (1.0 if is_oro_pos else 10000.0)
-            vp = 7.0 if es_jpy_pos else 10.0
-            pips = (precio_vivo - pos["entrada"]) if pos["tipo"] == "BUY" else (pos["entrada"] - precio_vivo)
-            pnl = pips * mp * vp * pos["lotes"]
+            
+            mp_card = 100.0 if es_jpy_pos else (10.0 if is_oro_pos else 10000.0)
+            vp_card = 7.0 if es_jpy_pos else 10.0
+            
+            pips_calc_card = (precio_vivo - pos["entrada"]) * mp_card if pos["tipo"] == "BUY" else (pos["entrada"] - precio_vivo) * mp_card
+            pnl_card = pips_calc_card * vp_card * pos["lotes"]
 
             st.markdown(f"""
                 <div class="mt5-terminal-card">
@@ -870,12 +862,12 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     Entrada: <code>{fmt_pos % pos['entrada']}</code> | Vivo Forex: <code style="color: #26a69a;">{fmt_pos % precio_vivo}</code> | 
                     TP: <span style="color:#26a69a;">{fmt_pos % pos['tp']}</span> | 
                     SL: <span style="color:#ef5350;">{fmt_pos % pos['sl']}</span> | 
-                    PnL: <b style="color: {'#26a69a' if pnl>=0 else '#ef5350'}">${pnl:,.2f} USD</b>
+                    PnL: <b style="color: {'#26a69a' if pnl_card>=0 else '#ef5350'}">${pnl_card:,.2f} USD</b>
                 </div>
             """, unsafe_allow_html=True)
             
             if st.button(f"Cerrar Manual #{pos['id']}", key=f"manual_btn_forex_{pos['id']}_{idx}"):
-                st.session_state.balance_pedagogico += pnl
+                st.session_state.balance_pedagogico += pnl_card
                 st.session_state.historial_cerradas.append({
                     "Marca temporal": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                     "Matricula": st.session_state.get("usuario_actual", "DIRALEX"),
@@ -883,8 +875,8 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
                     "Activo": pos['activo'],
                     "Tipo": pos['tipo'],
                     "Lotes": pos['lotes'],
-                    "Pips": round(pips, 1),
-                    "Resultado USD": round(pnl, 2),
+                    "Pips": round(pips_calc_card, 1),
+                    "Resultado USD": round(pnl_card, 2),
                     "Motivo": "Cierre Manual"
                 })
                 guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
