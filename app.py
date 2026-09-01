@@ -615,7 +615,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS)
+# (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
 # ==========================================
 elif opcion_menu == "📉 Alema Trade live":
     
@@ -653,35 +653,46 @@ elif opcion_menu == "📉 Alema Trade live":
         except Exception:
             pass
 
-    # --- FUNCIÓN DE CONEXIÓN Y LECTURA DE CAPITAL DESDE GOOGLE SHEETS ---
+    # --- FUNCIÓN DE CONEXIÓN Y LECTURA DE CAPITAL Y CHALLENGE DESDE GOOGLE SHEETS ---
     @st.cache_data(ttl=10) # Se actualiza cada 10 segundos desde la base de datos
-    def obtener_capital_desde_sheets(usuario_target):
+    def obtener_datos_usuario_desde_sheets(usuario_target):
+        capital_defecto = 300.00
+        nivel_defecto = "Nivel 1"
         try:
             sheet_url = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0"
             df = pd.read_csv(sheet_url)
             df.columns = [str(c).strip() for c in df.columns]
             
-            # Identificar columnas de Usuario y Capital en la hoja
+            # Identificar columnas de Usuario, Capital y Challenge en la hoja
             col_user = next((c for c in df.columns if any(k in c.lower() for k in ["usuario", "matricula", "user"])), None)
             col_cap = next((c for c in df.columns if any(k in c.lower() for k in ["capital", "monto", "balance"])), None)
+            col_challenge = next((c for c in df.columns if any(k in c.lower() for k in ["challenge", "nivel", "level"])), None)
             
-            if col_user and col_cap:
+            if col_user:
                 filtro = df[df[col_user].astype(str).str.strip().str.lower() == str(usuario_target).strip().lower()]
                 if not filtro.empty:
-                    val_str = str(filtro[col_cap].values[0]).replace("$", "").replace(",", "").strip()
-                    return float(val_str)
+                    # Lectura de Capital
+                    if col_cap:
+                        val_str = str(filtro[col_cap].values[0]).replace("$", "").replace(",", "").strip()
+                        capital_defecto = float(val_str)
+                    # Lectura de Nivel de Challenge
+                    if col_challenge:
+                        val_chal = str(filtro[col_challenge].values[0]).strip()
+                        if val_chal and val_chal.lower() != "nan":
+                            nivel_defecto = val_chal
         except Exception:
             pass
-        return 300.00  # Valor por defecto en caso de falla de conexión
+        return capital_defecto, nivel_defecto
 
     # Cargar operaciones activas e historial
     st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, [])
     st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
 
-    # CÁLCULO DINÁMICO DEL BALANCE: CAPITAL DE SHEETS + PnL ACUMULADO DEL ALUMNO
-    capital_base_sheets = obtener_capital_desde_sheets(usuario)
+    # CÁLCULO DINÁMICO DEL BALANCE Y ASIGNACIÓN DE NIVEL DE CHALLENGE
+    capital_base_sheets, nivel_challenge_sheets = obtener_datos_usuario_desde_sheets(usuario)
     pnl_acumulado_historico = sum(float(trade.get("Beneficio", 0.0)) for trade in st.session_state.historial_cerradas)
     st.session_state.balance_pedagogico = capital_base_sheets + pnl_acumulado_historico
+    st.session_state.nivel_challenge = nivel_challenge_sheets
     st.session_state.current_loaded_user = usuario
 
     if 'cache_precios_forex' not in st.session_state:
@@ -870,13 +881,13 @@ elif opcion_menu == "📉 Alema Trade live":
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
             st.rerun()
 
-# --- DASHBOARD Y GRÁFICOS CON CONTROL DE ROL ---
+    # --- DASHBOARD Y GRÁFICOS CON VISUALIZACIÓN DE CHALLENGE Y ROL ADMIN ---
     es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
 
     if es_admin:
-        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
     else:
-        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
 
     with col_m1: 
         st.metric("Balance Base", f"${st.session_state.balance_pedagogico:,.2f}")
@@ -888,9 +899,11 @@ elif opcion_menu == "📉 Alema Trade live":
         st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
     with col_m3: 
         st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
+    with col_m4:
+        st.metric("Fase Challenge", st.session_state.get("nivel_challenge", "Nivel 1"))
 
     if es_admin:
-        with col_m4: 
+        with col_m5: 
             if st.button("🔄 Sincronizar Sheets"):
                 st.cache_data.clear()
                 st.rerun()
