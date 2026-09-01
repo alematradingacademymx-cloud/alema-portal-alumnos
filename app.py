@@ -609,7 +609,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (VERSIÓN 100% ESTABLE - SCALPING 10/20 PIPS Y BOTÓN FIJO)
+# (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS)
 # ==========================================
 elif opcion_menu == "📉 Alema Trade live":
     
@@ -626,9 +626,8 @@ elif opcion_menu == "📉 Alema Trade live":
     # Recarga automática de la pantalla cada 4 segundos
     st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_live")
 
-    # --- IDENTIFICADOR DE USUARIO Y ARCHIVOS DE PERSISTENCIA AISLADOS ---
+    # --- IDENTIFICADOR DE USUARIO Y RUTAS PERSISTENTES ---
     usuario = st.session_state.get("usuario_actual", "alema")
-    ARCH_PERSISTENCIA_BALANCE = f"balance_{usuario}.json"
     ARCH_PERSISTENCIA_ACTIVAS = f"posiciones_activas_{usuario}.json"
     ARCH_PERSISTENCIA_HISTORIAL = f"historial_cerradas_{usuario}.json"
 
@@ -648,12 +647,36 @@ elif opcion_menu == "📉 Alema Trade live":
         except Exception:
             pass
 
-    # Cargar datos persistentes asegurando aislamiento por alumno y evitando reseteos al recargar
-    if 'balance_pedagogico' not in st.session_state or st.session_state.get('current_loaded_user') != usuario:
-        st.session_state.balance_pedagogico = float(cargar_datos_json(ARCH_PERSISTENCIA_BALANCE, 300.00))
-        st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, [])
-        st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
-        st.session_state.current_loaded_user = usuario
+    # --- FUNCIÓN DE CONEXIÓN Y LECTURA DE CAPITAL DESDE GOOGLE SHEETS ---
+    @st.cache_data(ttl=10) # Se actualiza cada 10 segundos desde la base de datos
+    def obtener_capital_desde_sheets(usuario_target):
+        try:
+            sheet_url = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0"
+            df = pd.read_csv(sheet_url)
+            df.columns = [str(c).strip() for c in df.columns]
+            
+            # Identificar columnas de Usuario y Capital en la hoja
+            col_user = next((c for c in df.columns if any(k in c.lower() for k in ["usuario", "matricula", "user"])), None)
+            col_cap = next((c for c in df.columns if any(k in c.lower() for k in ["capital", "monto", "balance"])), None)
+            
+            if col_user and col_cap:
+                filtro = df[df[col_user].astype(str).str.strip().str.lower() == str(usuario_target).strip().lower()]
+                if not filtro.empty:
+                    val_str = str(filtro[col_cap].values[0]).replace("$", "").replace(",", "").strip()
+                    return float(val_str)
+        except Exception:
+            pass
+        return 300.00  # Valor por defecto en caso de falla de conexión
+
+    # Cargar operaciones activas e historial
+    st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, [])
+    st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
+
+    # CÁLCULO DINÁMICO DEL BALANCE: CAPITAL DE SHEETS + PnL ACUMULADO DEL ALUMNO
+    capital_base_sheets = obtener_capital_desde_sheets(usuario)
+    pnl_acumulado_historico = sum(float(trade.get("Beneficio", 0.0)) for trade in st.session_state.historial_cerradas)
+    st.session_state.balance_pedagogico = capital_base_sheets + pnl_acumulado_historico
+    st.session_state.current_loaded_user = usuario
 
     if 'cache_precios_forex' not in st.session_state:
         st.session_state.cache_precios_forex = {}
@@ -675,7 +698,6 @@ elif opcion_menu == "📉 Alema Trade live":
             return diferencia * 100000.0 * lotes
 
     def obtener_config_activo(simbolo):
-        # Configuración optimizada para Scalping (SL: 10 pips / TP: 20 pips aprox.)
         if "JPY" in simbolo: return 3, "%.3f", 0.001, 0.100, 0.200, 0.015
         elif "XAU" in simbolo: return 2, "%.2f", 0.10, 2.00, 4.00, 0.35
         elif "WTI" in simbolo or "BRENT" in simbolo: return 2, "%.2f", 0.01, 0.30, 0.60, 0.04
@@ -748,7 +770,6 @@ elif opcion_menu == "📉 Alema Trade live":
 
         return precio_bid, precio_ask, precio_vivo
 
-    # DICCIONARIO DE TICKS SINCRONIZADOS
     precios_tick_actual = {}
     
     def get_precio_sincronizado(simbolo):
@@ -821,7 +842,6 @@ elif opcion_menu == "📉 Alema Trade live":
                 pnl_real = calcular_pnl_institucional(sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"])
                 
                 st.session_state.balance_pedagogico += pnl_real
-                guardar_datos_json(ARCH_PERSISTENCIA_BALANCE, st.session_state.balance_pedagogico)
                 
                 registro_historial = {
                     "Tipo": pos['tipo'].lower(),
@@ -846,7 +866,7 @@ elif opcion_menu == "📉 Alema Trade live":
 
     # --- DASHBOARD Y GRÁFICOS ---
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    with col_m1: st.metric("Balance", f"${st.session_state.balance_pedagogico:,.2f}")
+    with col_m1: st.metric("Balance Base (Sheets)", f"${st.session_state.balance_pedagogico:,.2f}")
     with col_m2:
         pnl_flotante_total = sum([
             calcular_pnl_institucional(p["activo"], p["tipo"], p["entrada"], p.get("bid_vela_actual", p["entrada"]) if p["tipo"] == "BUY" else p.get("ask_vela_actual", p["entrada"]), p["lotes"]) 
@@ -854,7 +874,10 @@ elif opcion_menu == "📉 Alema Trade live":
         ])
         st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
     with col_m3: st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
-    with col_m4: st.metric("Estado Datos", "Alema Live")
+    with col_m4: 
+        if st.button("🔄 Sincronizar Sheets"):
+            st.cache_data.clear()
+            st.rerun()
 
     st.divider()
 
@@ -889,7 +912,6 @@ elif opcion_menu == "📉 Alema Trade live":
         
         precio_ref_orden = ask_actual if sim_tipo == "BUY" else bid_actual
 
-        # GESTIÓN DE ESTADOS INDEPENDIENTES PARA SL Y TP
         key_sl = f"sim_precio_sl_{par_activo}_{sim_tipo}"
         key_tp = f"sim_precio_tp_{par_activo}_{sim_tipo}"
 
@@ -901,7 +923,6 @@ elif opcion_menu == "📉 Alema Trade live":
         sim_precio_sl = st.number_input("Stop Loss", format=formato_str, step=step_val, key=key_sl)
         sim_precio_tp = st.number_input("Take Profit", format=formato_str, step=step_val, key=key_tp)
 
-        # BOTÓN FIJO (ETIQUETA ESTÁTICA PARA EVITAR FALLOS DE CLIC POR EL AUTOREFRESH)
         texto_boton = "🟢 EJECUTAR ORDEN DE COMPRA" if sim_tipo == "BUY" else "🔴 EJECUTAR ORDEN DE VENTA"
         
         if st.button(texto_boton, use_container_width=True):
@@ -935,7 +956,6 @@ elif opcion_menu == "📉 Alema Trade live":
             
             if st.button(f"Cerrar Manual #{pos['id']}", key=f"btn_close_{pos['id']}_{idx}"):
                 st.session_state.balance_pedagogico += pnl_card
-                guardar_datos_json(ARCH_PERSISTENCIA_BALANCE, st.session_state.balance_pedagogico)
                 st.session_state.historial_cerradas.append({
                     "Tipo": pos['tipo'].lower(), "Volumen": pos['lotes'], "Símbolo": pos['activo'],
                     "S / L": pos['sl'], "T / P": pos['tp'], "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
@@ -976,7 +996,6 @@ elif opcion_menu == "📉 Alema Trade live":
         st.markdown(f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Vol.</th><th>Símbolo</th><th>S/L</th><th>T/P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{"".join(filas_html)}</tbody></table></div>', unsafe_allow_html=True)
     else:
         st.info("Aún no hay operaciones cerradas.")
-
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
