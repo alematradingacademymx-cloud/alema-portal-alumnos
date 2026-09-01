@@ -879,7 +879,7 @@ elif opcion_menu == "📉 Alema Trade live":
         col_m1, col_m2, col_m3 = st.columns(3)
 
     with col_m1: 
-        st.metric("Balance Base (Sheets)", f"${st.session_state.balance_pedagogico:,.2f}")
+        st.metric("Balance Base", f"${st.session_state.balance_pedagogico:,.2f}")
     with col_m2:
         pnl_flotante_total = sum([
             calcular_pnl_institucional(p["activo"], p["tipo"], p["entrada"], p.get("bid_vela_actual", p["entrada"]) if p["tipo"] == "BUY" else p.get("ask_vela_actual", p["entrada"]), p["lotes"]) 
