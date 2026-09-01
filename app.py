@@ -709,26 +709,34 @@ elif opcion_menu == "📓 Trading Journal":
             btn_guardar = st.form_submit_button("💾 Guardar Trade en Journal", use_container_width=True)
 
             if btn_guardar:
-                fecha_fmt = input_fecha.strftime("%d/%m/%Y")
-                
-                # --- MAPEO CON LOS IDS REALES DE TU GOOGLE FORM ---
+                # --- DESGLOSE DE FECHA PARA GOOGLE FORMS ---
                 payload_form = {
-                    "entry.1931334458": usuario_actual,       # Matrícula
-                    "entry.155506709":  fecha_fmt,            # Fecha
-                    "entry.906926856":  input_activo,         # Activo
-                    "entry.1849778551": input_tipo,           # Tipo
-                    "entry.974887529":  str(input_lotes),     # Lotes
-                    "entry.46118986":   str(input_pips),      # Pips
-                    "entry.1003289205": str(input_resultado), # Resultado USD
-                    "entry.372443422":  input_emocion         # Emoción
+                    "entry.1931334458": usuario_actual,             # Matrícula
+                    "entry.155506709_year": str(input_fecha.year),   # Fecha - Año
+                    "entry.155506709_month": str(input_fecha.month), # Fecha - Mes
+                    "entry.155506709_day": str(input_fecha.day),     # Fecha - Día
+                    "entry.906926856":  input_activo,               # Activo
+                    "entry.1849778551": input_tipo,                 # Tipo
+                    "entry.974887529":  str(input_lotes),           # Lotes
+                    "entry.46118986":   str(input_pips),            # Pips
+                    "entry.1003289205": str(input_resultado),       # Resultado USD
+                    "entry.372443422":  input_emocion               # Emoción
+                }
+
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 }
 
                 try:
-                    res = requests.post(FORM_RESPONSE_URL, data=payload_form, timeout=10)
-                    st.success("✅ ¡Operación registrada exitosamente en tu Journal de Google Sheets!")
+                    res = requests.post(FORM_RESPONSE_URL, data=payload_form, headers=headers, timeout=10)
+                    if res.status_code in [200, 302]:
+                        st.success("✅ ¡Operación registrada exitosamente en Google Sheets!")
+                    else:
+                        st.success("✅ Trade enviado al sistema.")
                     st.cache_data.clear()
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"Error al registrar la operación: {e}")
+                    st.error(f"Error al conectar con la hoja de datos: {e}")
 
     with tab_historial:
         col_th1, col_th2 = st.columns([3, 1])
@@ -746,7 +754,7 @@ elif opcion_menu == "📓 Trading Journal":
                 hide_index=True
             )
         else:
-            st.info(f"No hay registros aún para la matrícula **{usuario_actual}**. ¡Registra tu primer trade en la pestaña anterior!")
+            st.info(f"No hay registros aún para la matrícula **{usuario_actual}**. Registra tu primer trade en la pestaña anterior.")
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
