@@ -328,7 +328,7 @@ st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 st.sidebar.markdown("---")
 
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
-    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "🧪 Simulador de Ejecución", "📚 Biblioteca de Guías"]
+    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📉 Alema Trade live", "📚 Biblioteca de Guías"]
 else:
     opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
 
@@ -611,7 +611,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
 # (VERSIÓN 100% ESTABLE - SCALPING 10/20 PIPS Y BOTÓN FIJO)
 # ==========================================
-elif opcion_menu == "🧪 Simulador de Ejecución":
+elif opcion_menu == "📉 Alema Trade live":
     
     import json
     import os
@@ -854,7 +854,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         ])
         st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
     with col_m3: st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
-    with col_m4: st.metric("Estado Datos", "Sincronizado Scalping")
+    with col_m4: st.metric("Estado Datos", "Alema Live")
 
     st.divider()
 
@@ -883,7 +883,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
         st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True, 'displaylogo': False})
 
     with col_panel:
-        st.markdown("### 🎛️ Nueva Orden")
+        st.markdown("### Nueva Orden")
         sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_forex")
         sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01)
         
@@ -917,7 +917,7 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
             st.rerun()
 
     # --- POSICIONES ACTIVAS ---
-    st.markdown("### 📊 Posiciones Abiertas (Monitoreo ECN en Vivo)")
+    st.markdown("### Posiciones Abiertas (Monitoreo ECN en Vivo)")
     if st.session_state.posiciones_abiertas:
         for idx, pos in enumerate(st.session_state.posiciones_abiertas):
             p_salida = pos.get("bid_vela_actual", pos["entrada"]) if pos["tipo"] == "BUY" else pos.get("ask_vela_actual", pos["entrada"])
@@ -954,14 +954,14 @@ elif opcion_menu == "🧪 Simulador de Ejecución":
     if st.session_state.get("tipo_usuario") == "ADMIN":
         col_tit_bita, col_btn_bita = st.columns([3.0, 1.0])
         with col_tit_bita: 
-            st.markdown("### 📋 Bitácora Histórica")
+            st.markdown("### Bitácora Histórica")
         with col_btn_bita:
             if st.button("🗑️ Limpiar Historial"):
                 st.session_state.historial_cerradas = []
                 guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
                 st.rerun()
     else:
-        st.markdown("### 📋 Bitácora Histórica")
+        st.markdown("### Bitácora Histórica")
 
     if st.session_state.historial_cerradas:
         filas_html = []
