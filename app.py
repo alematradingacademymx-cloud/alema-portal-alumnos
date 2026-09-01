@@ -627,13 +627,10 @@ elif opcion_menu == "📓 Trading Journal":
     usuario_actual = st.session_state.get("usuario_actual", "DIRALEX")
 
     # --- CONFIGURACIÓN DE CONEXIÓN A GOOGLE SHEETS Y GOOGLE FORM ---
-    # URL de exportación CSV apuntando a la pestaña 'Form_Responses' (gid=1731304994)
     SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=1731304994"
-    
-    # URL de recepción de respuestas del Google Form
     FORM_RESPONSE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
 
-    # --- FUNCIÓN PARA CARGAR LA BITÁCORA DESDE LA HOJA DE EXCEL ---
+    # --- FUNCIÓN PARA CARGAR LA BITÁCORA ---
     @st.cache_data(ttl=5)
     def cargar_journal():
         try:
@@ -645,7 +642,7 @@ elif opcion_menu == "📓 Trading Journal":
 
     df_journal = cargar_journal()
 
-    # --- FILTRAR OPERACIONES POR LA MATRÍCULA DEL ALUMNO LOGUEADO ---
+    # --- FILTRAR OPERACIONES POR ALUMNO ---
     df_alumno = pd.DataFrame()
     if not df_journal.empty:
         col_mat = next((c for c in df_journal.columns if any(k in c.lower() for k in ["matricula", "usuario", "user"])), None)
@@ -701,38 +698,35 @@ elif opcion_menu == "📓 Trading Journal":
                 )
                 if input_activo == "Otro":
                     input_activo = st.text_input("Especifica el Activo", value="EUR/USD")
-            
-            with col_f2:
                 input_tipo = st.selectbox("Tipo de Operación", ["BUY", "SELL"])
+
+            with col_f2:
                 input_lotes = st.number_input("Volumen (Lotes)", min_value=0.01, max_value=100.0, value=0.10, step=0.01)
                 input_pips = st.number_input("Pips Obtenidos (+/-)", value=20.0, step=1.0)
-                input_resultado = st.number_input("Resultado Monetario / PnL ($)", value=50.0, step=5.0)
+                input_resultado = st.number_input("Resultado USD / PnL ($)", value=50.0, step=5.0)
+                input_emocion = st.selectbox("Estado Emocional / Psicología", ["Disciplinado", "Ansiedad", "Impulsivo / FOMO", "Revancha"])
 
             btn_guardar = st.form_submit_button("💾 Guardar Trade en Journal", use_container_width=True)
 
             if btn_guardar:
                 fecha_fmt = input_fecha.strftime("%d/%m/%Y")
                 
-                # --- MAPEO DE CAMPOS HACIA GOOGLE FORM ---
-                # NOTA: Asegúrate de ajustar los 'entry.XXXXX' con las IDs de tu Google Form si difieren.
+                # --- MAPEO CON LOS IDS REALES DE TU GOOGLE FORM ---
                 payload_form = {
-                    "entry.1234567890": usuario_actual,        # Matrícula
-                    "entry.1234567891": fecha_fmt,             # Fecha
-                    "entry.1234567892": input_activo,          # Activo
-                    "entry.1234567893": input_tipo,            # Tipo
-                    "entry.1234567894": str(input_lotes),      # Lotes
-                    "entry.1234567895": str(input_pips),       # Pips
-                    "entry.1234567896": str(input_resultado)   # Resultado
+                    "entry.1931334458": usuario_actual,       # Matrícula
+                    "entry.155506709":  fecha_fmt,            # Fecha
+                    "entry.906926856":  input_activo,         # Activo
+                    "entry.1849778551": input_tipo,           # Tipo
+                    "entry.974887529":  str(input_lotes),     # Lotes
+                    "entry.46118986":   str(input_pips),      # Pips
+                    "entry.1003289205": str(input_resultado), # Resultado USD
+                    "entry.372443422":  input_emocion         # Emoción
                 }
 
                 try:
                     res = requests.post(FORM_RESPONSE_URL, data=payload_form, timeout=10)
-                    if res.status_code in [200, 302]:
-                        st.success("✅ ¡Operación registrada exitosamente en tu Journal!")
-                        st.cache_data.clear()
-                    else:
-                        st.success("✅ Trade enviado. Actualizando registros...")
-                        st.cache_data.clear()
+                    st.success("✅ ¡Operación registrada exitosamente en tu Journal de Google Sheets!")
+                    st.cache_data.clear()
                 except Exception as e:
                     st.error(f"Error al registrar la operación: {e}")
 
