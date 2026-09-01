@@ -334,7 +334,7 @@ st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 st.sidebar.markdown("---")
 
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
-    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📉 Alema Trade live", "📚 Biblioteca de Guías"]
+    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📝 Evaluaciones", "📉 Alema Trade live", "📚 Biblioteca de Guías"]
 else:
     opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
 
