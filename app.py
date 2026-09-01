@@ -864,20 +864,30 @@ elif opcion_menu == "📉 Alema Trade live":
             guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
             st.rerun()
 
-    # --- DASHBOARD Y GRÁFICOS ---
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    with col_m1: st.metric("Balance Base (Sheets)", f"${st.session_state.balance_pedagogico:,.2f}")
+# --- DASHBOARD Y GRÁFICOS CON CONTROL DE ROL ---
+    es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
+
+    if es_admin:
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    else:
+        col_m1, col_m2, col_m3 = st.columns(3)
+
+    with col_m1: 
+        st.metric("Balance Base (Sheets)", f"${st.session_state.balance_pedagogico:,.2f}")
     with col_m2:
         pnl_flotante_total = sum([
             calcular_pnl_institucional(p["activo"], p["tipo"], p["entrada"], p.get("bid_vela_actual", p["entrada"]) if p["tipo"] == "BUY" else p.get("ask_vela_actual", p["entrada"]), p["lotes"]) 
             for p in st.session_state.posiciones_abiertas
         ])
         st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
-    with col_m3: st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
-    with col_m4: 
-        if st.button("🔄 Sincronizar Sheets"):
-            st.cache_data.clear()
-            st.rerun()
+    with col_m3: 
+        st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
+
+    if es_admin:
+        with col_m4: 
+            if st.button("🔄 Sincronizar Sheets"):
+                st.cache_data.clear()
+                st.rerun()
 
     st.divider()
 
