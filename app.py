@@ -613,147 +613,115 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         </div>
         """, unsafe_allow_html=True)
 # ==========================================
-# 📓 TRADING JOURNAL INSTITUCIONAL (GOOGLE FORMS NATIVO)
+# SECCIÓN: TRADING JOURNAL
 # ==========================================
 elif opcion_menu == "📓 Trading Journal":
-    import streamlit as st
-    import pandas as pd
-    import requests
-    from datetime import datetime
+    st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title" style="text-align: left;">Journal Institucional de Operaciones y Bitácora Psicológica</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Trading Journal</div>', unsafe_allow_html=True)
-    st.markdown("<p style='color: #94A3B8; font-size: 14px;'>Bitácora institucional de operaciones. Registra tus trades directamente desde la terminal sin salir del sistema.</p>", unsafe_allow_html=True)
-
-    usuario_actual = st.session_state.get("usuario_actual", "DIRALEX")
-
-    # --- CONFIGURACIÓN DE CONEXIÓN A GOOGLE SHEETS Y GOOGLE FORM ---
-    SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=1731304994"
-    FORM_RESPONSE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
-
-    # --- FUNCIÓN PARA CARGAR LA BITÁCORA ---
     @st.cache_data(ttl=3)
-    def cargar_journal():
+    def cargar_journal_persiste(matricula_usuario):
         try:
-            df = pd.read_csv(SHEET_CSV_URL)
-            df.columns = [str(c).strip() for c in df.columns]
-            return df
+            df = pd.read_csv(URL_JOURNAL_CSV, dtype=str)
+            df.columns = df.columns.str.strip()
+            
+            col_mat = [c for c in df.columns if 'Matricula' in c or 'Matrícula' in c]
+            if col_mat:
+                nombre_col_mat = col_mat[0]
+                df_user = df[df[nombre_col_mat].str.strip().str.upper() == matricula_usuario].copy()
+            else:
+                df_user = pd.DataFrame()
+
+            col_res = [c for c in df.columns if 'Resultado' in c or 'USD' in c or 'pnl' in c.lower()]
+            if col_res:
+                df_user['Resultado_Num'] = pd.to_numeric(df_user[col_res[0]], errors='coerce').fillna(0.0)
+            else:
+                df_user['Resultado_Num'] = 0.0
+
+            return df_user
         except Exception:
             return pd.DataFrame()
 
-    df_journal = cargar_journal()
+    df_user_journal = cargar_journal_persiste(st.session_state.usuario_actual)
+    total_trades = len(df_user_journal)
 
-    # --- FILTRAR OPERACIONES POR ALUMNO ---
-    df_alumno = pd.DataFrame()
-    if not df_journal.empty:
-        col_mat = next((c for c in df_journal.columns if any(k in c.lower() for k in ["matricula", "usuario", "user"])), None)
-        if col_mat:
-            df_alumno = df_journal[df_journal[col_mat].astype(str).str.strip().str.lower() == str(usuario_actual).strip().lower()].copy()
+    if total_trades > 0:
+        pnl_total = df_user_journal['Resultado_Num'].sum()
+        wins = len(df_user_journal[df_user_journal['Resultado_Num'] > 0])
+        win_rate = (wins / total_trades) * 100
+    else:
+        pnl_total = 0.0
+        win_rate = 0.0
 
-    # --- CÁLCULO DE MÉTRICAS INSTITUCIONALES ---
-    total_trades = len(df_alumno)
-    pips_totales = 0.0
-    win_rate = 0.0
-
-    if not df_alumno.empty:
-        col_pips = next((c for c in df_alumno.columns if "pip" in c.lower()), None)
-        col_res = next((c for c in df_alumno.columns if any(k in c.lower() for k in ["resultado", "pnl", "ganancia", "beneficio"])), None)
-        
-        if col_pips:
-            pips_totales = pd.to_numeric(df_alumno[col_pips], errors='coerce').fillna(0).sum()
-        
-        if col_res:
-            res_numeric = pd.to_numeric(df_alumno[col_res], errors='coerce').fillna(0)
-            wins = (res_numeric > 0).sum()
-            win_rate = (wins / total_trades * 100) if total_trades > 0 else 0.0
-
-    # Tarjetas Métricas
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    with col_m1:
-        st.metric("Matrícula Activa", usuario_actual)
-    with col_m2:
-        st.metric("Total Trades", f"{total_trades}")
-    with col_m3:
-        st.metric("Pips Acumulados", f"{pips_totales:+,.1f}")
-    with col_m4:
-        st.metric("Win Rate Estimado", f"{win_rate:.1f}%")
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric("Total de Trades", f"{total_trades}")
+    with m2:
+        st.metric("Win Rate (%)", f"{win_rate:.1f}%")
+    with m3:
+        st.metric("P&L Total ($ USD)", f"${pnl_total:.2f}")
 
     st.divider()
 
-    # --- PESTAÑAS: REGISTRO NATIVO Y TABLA DE HISTORIAL ---
-    tab_registro, tab_historial = st.tabs(["📝 Registrar Nuevo Trade", "📊 Mis Trades Registrados"])
-
-    with tab_registro:
-        st.markdown("### Registro de Operativa")
-        st.caption("Ingresa los detalles de tu trade. Los datos se guardarán automáticamente en tu bitácora institucional.")
-
-        with st.form("form_registro_journal", clear_on_submit=True):
-            col_f1, col_f2 = st.columns(2)
+    st.subheader("✍️ Registrar Nueva Operación Manual")
+    
+    with st.form("form_journal_directo", clear_on_submit=True):
+        col_j1, col_j2 = st.columns(2)
+        
+        with col_j1:
+            j_fecha = st.date_input("Fecha", value=datetime.now())
+            j_activo = st.text_input("Activo / Par", value="EUR/USD").strip().upper()
+            j_tipo = st.selectbox("Tipo", ["BUY", "SELL"])
+            j_lotes = st.number_input("Lotes Operados", value=0.10, step=0.01)
             
-            with col_f1:
-                st.text_input("Matrícula del Alumno", value=usuario_actual, disabled=True)
-                input_fecha = st.date_input("Fecha de Operación", value=datetime.now())
-                input_activo = st.selectbox(
-                    "Activo / Par", 
-                    ["EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "USD/CAD", "USD/CHF", "NZD/USD", "XAU/USD", "BTC/USD", "Otro"]
-                )
-                if input_activo == "Otro":
-                    input_activo = st.text_input("Especifica el Activo", value="EUR/USD")
-                input_tipo = st.selectbox("Tipo de Operación", ["BUY", "SELL"])
+        with col_j2:
+            j_pips = st.number_input("Pips (+/-)", value=20.0, step=1.0)
+            j_pnl = st.number_input("Resultado ($ USD)", value=20.0, step=1.0)
+            j_emocion = st.selectbox("Estado Emocional / Psicotrading", [
+                "🟢 Disciplinado",
+                "🟡 Ansiedad",
+                "🔴 Impulsivo / FOMO",
+                "🔴 Revancha"
+            ])
+            j_link = st.text_input("Enlace / Captura de TradingView", value="")
 
-            with col_f2:
-                input_lotes = st.number_input("Volumen (Lotes)", min_value=0.01, max_value=100.0, value=0.10, step=0.01)
-                input_pips = st.number_input("Pips Obtenidos (+/-)", value=20.0, step=1.0)
-                input_resultado = st.number_input("Resultado USD / PnL ($)", value=50.0, step=5.0)
-                # Opciones exactas coincidiendo con las del Google Form (incluyendo emojis)
-                input_emocion = st.selectbox("Estado Emocional / Psicología", [
-                    "🟢 Disciplinado", 
-                    "🟡 Ansiedad", 
-                    "🔴 Impulsivo / FOMO", 
-                    "🔴 Revancha"
-                ])
-
-            btn_guardar = st.form_submit_button("💾 Guardar Trade en Journal", use_container_width=True)
-
-            if btn_guardar:
-                fecha_fmt = input_fecha.strftime("%d/%m/%Y")
-                
-                # --- DICCIONARIO CON IDS EXACTOS DEL GOOGLE FORM ---
-                payload_form = {
-                    "entry.1931334458": usuario_actual,       # Matrícula
-                    "entry.155506709":  fecha_fmt,            # Fecha
-                    "entry.906926856":  input_activo,         # Activo
-                    "entry.1849778551": input_tipo,           # Tipo
-                    "entry.974887529":  str(input_lotes),     # Lotes
-                    "entry.46118986":   str(input_pips),      # Pips
-                    "entry.1003289205": str(input_resultado), # Resultado USD
-                    "entry.372443422":  input_emocion         # Emoción
-                }
-
-                try:
-                    res = requests.post(FORM_RESPONSE_URL, data=payload_form, timeout=10)
-                    st.success("✅ ¡Operación registrada exitosamente en Google Sheets!")
+        j_notas = st.text_area("Observaciones / Conclusión Técnica", placeholder="¿Por qué entraste? ¿Qué confirmó tu setup?")
+        
+        submitted = st.form_submit_button("💾 Guardar en Journal", use_container_width=True)
+        
+        if submitted:
+            form_data = {
+                "entry.990498500": st.session_state.usuario_actual,
+                "entry.155506709": str(j_fecha),
+                "entry.906926856": j_activo,
+                "entry.1849778551": j_tipo,
+                "entry.974887529": str(j_lotes),
+                "entry.46118986": str(j_pips),
+                "entry.1003289205": str(j_pnl),
+                "entry.372443422": j_emocion,
+                "entry.332810614": j_notas,
+                "entry.635428194": j_link
+            }
+            
+            try:
+                res = requests.post(URL_FORM_RESPONSE, data=form_data)
+                if res.status_code == 200 or res.status_code == 0:
+                    st.success("✅ Operación registrada exitosamente en tu bitácora permanente.")
                     st.cache_data.clear()
                     st.rerun()
-                except Exception as e:
-                    st.error(f"Error al registrar la operación: {e}")
+                else:
+                    st.error("⚠️ Error al registrar la operación en Google Sheets.")
+            except Exception as e:
+                st.error(f"Error de conexión: {e}")
 
-    with tab_historial:
-        col_th1, col_th2 = st.columns([3, 1])
-        with col_th1:
-            st.markdown("### Historial Centralizado en Google Sheets")
-        with col_th2:
-            if st.button("🔄 Actualizar Tabla", use_container_width=True):
-                st.cache_data.clear()
-                st.rerun()
+    st.divider()
 
-        if not df_alumno.empty:
-            st.dataframe(
-                df_alumno,
-                use_container_width=True,
-                hide_index=True
-            )
-        else:
-            st.info(f"No hay registros aún para la matrícula **{usuario_actual}**. Registra tu primer trade en la pestaña anterior.")
+    st.subheader("📋 Bitácora Histórica Permanente")
+    if not df_user_journal.empty:
+        df_mostrar = df_user_journal.drop(columns=['Resultado_Num'], errors='ignore')
+        st.dataframe(df_mostrar, use_container_width=True)
+    else:
+        st.info("💡 Aún no tienes trades guardados en tu historial permanente.")
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
