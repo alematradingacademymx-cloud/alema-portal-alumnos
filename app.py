@@ -302,18 +302,24 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
     lista_matriculas = list(USUARIOS_AUTORIZADOS.keys())
     alumno_seleccionado = st.sidebar.selectbox("Gestionar Alumno", lista_matriculas, key="select_admin_alumno")
     
-    if st.sidebar.button("🔄 Sincronizar / Reiniciar Capital", use_container_width=True):
-        cargar_usuarios_desde_sheets.clear()
-        datos_frescos = cargar_usuarios_desde_sheets()
-        capital_nuevo = datos_frescos.get(alumno_seleccionado, {}).get('capital_base', 300.0)
+    # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL DESDE GOOGLE SHEETS ---
+    if st.sidebar.button("🔄 Sincronizar Capital (Sheets)", use_container_width=True):
+        st.cache_data.clear()
+        st.sidebar.success(f"Capital de '{alumno_seleccionado}' actualizado desde Google Sheets.")
+        st.rerun()
         
-        if alumno_seleccionado == st.session_state.usuario_actual:
-            st.session_state.balance_pedagogico = capital_nuevo
-            st.session_state.posiciones_abiertas = []
-            guardar_datos_json(st.session_state.archivo_pos, [])
-            st.success(f"¡Tu cuenta ha sido reiniciada a ${capital_nuevo:,.2f}!")
-        else:
-            st.sidebar.success(f"Capital de {alumno_seleccionado} actualizado en base.")
+    # --- 2. BOTÓN PARA REINICIAR BITÁCORA HISTÓRICA DEL ALUMNO ---
+    if st.sidebar.button("🗑️ Reiniciar Bitácora de Alumno", use_container_width=True):
+        # Localiza el archivo JSON del alumno seleccionado y lo vacía
+        arch_bita_alumno = f"historial_cerradas_{alumno_seleccionado}.json"
+        guardar_datos_json(arch_bita_alumno, [])
+        
+        # Si estás en tu propio perfil dentro del simulador, actualiza la sesión viva
+        if alumno_seleccionado == st.session_state.get("usuario_actual"):
+            st.session_state.historial_cerradas = []
+            
+        st.cache_data.clear()
+        st.sidebar.success(f"Bitácora de '{alumno_seleccionado}' limpiada a 0.")
         st.rerun()
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
