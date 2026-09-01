@@ -7,11 +7,37 @@ import json
 import pandas as pd
 from datetime import datetime
 import yfinance as yf
+from PIL import Image
 
-# Configuración de página
-st.set_page_config(page_title="ALEMA Trading Academy - Portal de Alumnos", page_icon="📈", layout="centered")
+# ==========================================
+# ⚙️ CONFIGURACIÓN DE PÁGINA Y LOGO OFICIAL
+# ==========================================
+# Búsqueda del archivo de logo institucional
+archivo_logo = "alema trading academy.png"
 
-# Funciones de persistencia JSON auxiliares
+if not os.path.exists(archivo_logo):
+    # Detección de respaldo en caso de variación en la extensión (.png, .jpg, .jpeg)
+    coincidencias = [f for f in os.listdir(".") if f.lower().startswith("alema trading academ")]
+    if coincidencias:
+        archivo_logo = coincidencias[0]
+
+if os.path.exists(archivo_logo):
+    try:
+        icono_pagina = Image.open(archivo_logo)
+    except Exception:
+        icono_pagina = "📈"
+else:
+    icono_pagina = "📈"
+
+st.set_page_config(
+    page_title="ALEMA Trading Academy - Portal de Alumnos", 
+    page_icon=icono_pagina, 
+    layout="centered"
+)
+
+# ==========================================
+# 🛠️ FUNCIONES DE PERSISTENCIA JSON AUXILIARES
+# ==========================================
 def cargar_datos_json(filepath, default_value):
     if os.path.exists(filepath):
         try:
