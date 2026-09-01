@@ -613,7 +613,7 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         </div>
         """, unsafe_allow_html=True)
 # ==========================================
-# 📓 TRADING JOURNAL INSTITUCIONAL (FORMULARIO NATIVO)
+# 📓 TRADING JOURNAL INSTITUCIONAL (GOOGLE FORMS NATIVO)
 # ==========================================
 elif opcion_menu == "📓 Trading Journal":
     import streamlit as st
@@ -631,7 +631,7 @@ elif opcion_menu == "📓 Trading Journal":
     FORM_RESPONSE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
 
     # --- FUNCIÓN PARA CARGAR LA BITÁCORA ---
-    @st.cache_data(ttl=5)
+    @st.cache_data(ttl=3)
     def cargar_journal():
         try:
             df = pd.read_csv(SHEET_CSV_URL)
@@ -704,39 +704,38 @@ elif opcion_menu == "📓 Trading Journal":
                 input_lotes = st.number_input("Volumen (Lotes)", min_value=0.01, max_value=100.0, value=0.10, step=0.01)
                 input_pips = st.number_input("Pips Obtenidos (+/-)", value=20.0, step=1.0)
                 input_resultado = st.number_input("Resultado USD / PnL ($)", value=50.0, step=5.0)
-                input_emocion = st.selectbox("Estado Emocional / Psicología", ["Disciplinado", "Ansiedad", "Impulsivo / FOMO", "Revancha"])
+                # Opciones exactas coincidiendo con las del Google Form (incluyendo emojis)
+                input_emocion = st.selectbox("Estado Emocional / Psicología", [
+                    "🟢 Disciplinado", 
+                    "🟡 Ansiedad", 
+                    "🔴 Impulsivo / FOMO", 
+                    "🔴 Revancha"
+                ])
 
             btn_guardar = st.form_submit_button("💾 Guardar Trade en Journal", use_container_width=True)
 
             if btn_guardar:
-                # --- DESGLOSE DE FECHA PARA GOOGLE FORMS ---
+                fecha_fmt = input_fecha.strftime("%d/%m/%Y")
+                
+                # --- DICCIONARIO CON IDS EXACTOS DEL GOOGLE FORM ---
                 payload_form = {
-                    "entry.1931334458": usuario_actual,             # Matrícula
-                    "entry.155506709_year": str(input_fecha.year),   # Fecha - Año
-                    "entry.155506709_month": str(input_fecha.month), # Fecha - Mes
-                    "entry.155506709_day": str(input_fecha.day),     # Fecha - Día
-                    "entry.906926856":  input_activo,               # Activo
-                    "entry.1849778551": input_tipo,                 # Tipo
-                    "entry.974887529":  str(input_lotes),           # Lotes
-                    "entry.46118986":   str(input_pips),            # Pips
-                    "entry.1003289205": str(input_resultado),       # Resultado USD
-                    "entry.372443422":  input_emocion               # Emoción
-                }
-
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    "entry.1931334458": usuario_actual,       # Matrícula
+                    "entry.155506709":  fecha_fmt,            # Fecha
+                    "entry.906926856":  input_activo,         # Activo
+                    "entry.1849778551": input_tipo,           # Tipo
+                    "entry.974887529":  str(input_lotes),     # Lotes
+                    "entry.46118986":   str(input_pips),      # Pips
+                    "entry.1003289205": str(input_resultado), # Resultado USD
+                    "entry.372443422":  input_emocion         # Emoción
                 }
 
                 try:
-                    res = requests.post(FORM_RESPONSE_URL, data=payload_form, headers=headers, timeout=10)
-                    if res.status_code in [200, 302]:
-                        st.success("✅ ¡Operación registrada exitosamente en Google Sheets!")
-                    else:
-                        st.success("✅ Trade enviado al sistema.")
+                    res = requests.post(FORM_RESPONSE_URL, data=payload_form, timeout=10)
+                    st.success("✅ ¡Operación registrada exitosamente en Google Sheets!")
                     st.cache_data.clear()
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error al conectar con la hoja de datos: {e}")
+                    st.error(f"Error al registrar la operación: {e}")
 
     with tab_historial:
         col_th1, col_th2 = st.columns([3, 1])
