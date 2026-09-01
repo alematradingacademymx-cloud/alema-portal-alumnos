@@ -612,6 +612,107 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         💡 <b>LOTAGE SUGERIDO:</b> <span style="color:#FF6B00; font-size: 22px;"><b>{lotaje_rapido:.2f}</b></span>
         </div>
         """, unsafe_allow_html=True)
+# ==========================================
+# 📓 TRADING JOURNAL INSTITUCIONAL
+# ==========================================
+elif opcion_menu == "📓 Trading Journal":
+    
+    import pandas as pd
+    import streamlit.components.v1 as components
+
+    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Trading Journal</div>', unsafe_allow_html=True)
+    st.markdown("<p style='color: #94A3B8; font-size: 14px;'>Bitácora centralizada de operaciones. Registra tus trades a través del formulario y monitorea tu rendimiento institucional.</p>", unsafe_allow_html=True)
+
+    usuario_actual = st.session_state.get("usuario_actual", "DIRALEX")
+
+    # --- FUNCIÓN DE LECTURA DESDE GOOGLE SHEETS (RESPUESTAS DEL FORM) ---
+    @st.cache_data(ttl=10)
+    def cargar_journal_sheets():
+        try:
+            # URL de exportación CSV de la hoja principal
+            sheet_url = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0"
+            df = pd.read_csv(sheet_url)
+            df.columns = [str(c).strip() for c in df.columns]
+            return df
+        except Exception:
+            return pd.DataFrame()
+
+    df_journal = cargar_journal_sheets()
+
+    # --- FILTRADO POR MATRÍCULA DEL ALUMNO ---
+    df_alumno = pd.DataFrame()
+    if not df_journal.empty:
+        col_mat = next((c for c in df_journal.columns if any(k in c.lower() for k in ["matricula", "usuario", "user"])), None)
+        if col_mat:
+            df_alumno = df_journal[df_journal[col_mat].astype(str).str.strip().str.lower() == str(usuario_actual).strip().lower()].copy()
+
+    # --- MÉTRICAS DEL JOURNAL ---
+    total_trades = len(df_alumno)
+    pips_totales = 0.0
+    win_rate = 0.0
+
+    if not df_alumno.empty:
+        col_pips = next((c for c in df_alumno.columns if "pip" in c.lower()), None)
+        col_res = next((c for c in df_alumno.columns if any(k in c.lower() for k in ["resultado", "pnl", "ganancia", "beneficio"])), None)
+        
+        if col_pips:
+            pips_totales = pd.to_numeric(df_alumno[col_pips], errors='coerce').fillna(0).sum()
+        
+        if col_res:
+            res_numeric = pd.to_numeric(df_alumno[col_res], errors='coerce').fillna(0)
+            wins = (res_numeric > 0).sum()
+            win_rate = (wins / total_trades * 100) if total_trades > 0 else 0.0
+
+    col_j1, col_j2, col_j3, col_j4 = st.columns(4)
+    with col_j1:
+        st.metric("Matrícula Activa", usuario_actual)
+    with col_j2:
+        st.metric("Total Trades Registrados", f"{total_trades}")
+    with col_j3:
+        st.metric("Pips Acumulados", f"{pips_totales:+,.1f}")
+    with col_j4:
+        st.metric("Win Rate Estimado", f"{win_rate:.1f}%")
+
+    st.divider()
+
+    # --- PESTAÑAS: VER HISTORIAL Y REGISTRAR TRADE ---
+    tab_historial, tab_registro = st.tabs(["📊 Historial de Trades", "📝 Registrar Nuevo Trade (Google Form)"])
+
+    with tab_historial:
+        col_th_title, col_th_btn = st.columns([3, 1])
+        with col_th_title:
+            st.markdown("### Mis Registros en Google Sheets")
+        with col_th_btn:
+            if st.button("🔄 Sincronizar Journal", use_container_width=True):
+                st.cache_data.clear()
+                st.rerun()
+
+        if not df_alumno.empty:
+            st.dataframe(
+                df_alumno,
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info(f"No se encontraron registros en la hoja de Excel para la matrícula **{usuario_actual}**. Asegúrate de registrar tus operaciones en el formulario.")
+
+    with tab_registro:
+        st.markdown("### Formulario de Registro de Operativa")
+        st.caption(f"Ingresa tus datos. Recuerda colocar tu matrícula exactamente como **{usuario_actual}** para vincular las métricas a tu perfil.")
+        
+        # Enlace o Iframe del Google Form de registro de Trades
+        # Sustituye esta URL por el enlace de tu Google Form público si deseas embeberlo directamente:
+        google_form_url = "https://docs.google.com/forms/d/e/1FAIpQLSc_EXAMPLE_FORM_ID/viewform?embedded=true"
+        
+        col_form_link, _ = st.columns([2, 2])
+        with col_form_link:
+            st.markdown(f"👉 **[Haz clic aquí para abrir el Google Form en una nueva pestaña]({google_form_url.replace('?embedded=true', '')})**")
+        
+        # Embebido visual del formulario dentro de la app
+        try:
+            components.iframe(google_form_url, height=750, scrolling=True)
+        except Exception:
+            st.warning("Si el formulario no carga en pantalla, utiliza el enlace directo superior.")
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
