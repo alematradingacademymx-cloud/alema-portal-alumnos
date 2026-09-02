@@ -34,11 +34,6 @@ st.set_page_config(
     page_icon=icono_pagina, 
     layout="centered"
 )
-st.set_page_config(
-    page_title="ALEMA Trading Academy",
-    layout="wide",
-    initial_sidebar_state="collapsed"  # 👈 Inicia cerrada de primera instancia
-)
 # ==========================================
 # 🛠️ FUNCIONES DE PERSISTENCIA JSON AUXILIARES
 # ==========================================
@@ -473,6 +468,7 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         st.sidebar.success(f"Bitácora de '{alumno_seleccionado}' limpiada a 0.")
         st.rerun()
 # ==========================================
+# ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
 import streamlit.components.v1 as components
@@ -501,30 +497,37 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state.tipo_usuario = "ALUMNO"
     st.rerun()
 
-# --- AUTOCIERRE AUTOMÁTICO EN MÓVILES AL SELECCIONAR OPCIÓN ---
+# --- SCRIPT DE CIERRE TÁCTIL PARA SAFARI / ANDROID ---
 collapse_script = """
 <script>
     (function() {
         const doc = window.parent.document;
-        
-        // Verifica si la pantalla es móvil (< 768px)
-        if (window.parent.innerWidth < 768) {
-            setTimeout(function() {
-                // Selecciona el botón de cierre (<<) dentro de la barra lateral
-                const closeBtn = doc.querySelector('button[data-testid="stSidebarCollapseButton"]') || 
-                                 doc.querySelector('section[data-testid="stSidebar"] button');
-                const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-                
-                // Si la barra está abierta, ejecuta el clic para ocultarla
-                if (sidebar && sidebar.getAttribute('aria-expanded') === 'true' && closeBtn) {
-                    closeBtn.click();
+        function closeMobileSidebar() {
+            if (window.parent.innerWidth < 768) {
+                const collapseBtn = doc.querySelector('button[data-testid="collapsedControl"]');
+                const sidebarExpanded = doc.querySelector('section[data-testid="stSidebar"][aria-expanded="true"]');
+                if (collapseBtn && sidebarExpanded) {
+                    collapseBtn.click();
                 }
-            }, 150);
+            }
         }
+        
+        // Escuchador global de toque/clic en la barra lateral para móviles
+        setTimeout(() => {
+            const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
+            if (sidebar) {
+                sidebar.addEventListener('touchend', function(e) {
+                    if (e.target.closest('label') || e.target.closest('div[role="radiogroup"]')) {
+                        setTimeout(closeMobileSidebar, 300);
+                    }
+                }, {passive: true});
+            }
+        }, 600);
     })();
 </script>
 """
 components.html(collapse_script, height=0, width=0)
+
 
 # --- TICKER DE TRADINGVIEW SUPERIOR ---
 ticker_html = """
