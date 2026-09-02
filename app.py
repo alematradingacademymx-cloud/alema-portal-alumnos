@@ -347,7 +347,7 @@ if not st.session_state.autenticado:
             </div>
         </a>
         ''',
-        unsafe_allow_html=True
+        unsafe_allow_html=True)
 
     st.markdown("<h2 style='text-align: center;'> ¿Deseas Formarte como Trader en ALEMA?</h2>", unsafe_allow_html=True)
     st.markdown(
