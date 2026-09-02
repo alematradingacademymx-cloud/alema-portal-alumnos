@@ -334,20 +334,26 @@ if not st.session_state.autenticado:
     
     col_btn, _ = st.columns([1, 1])
     with col_btn:
-        if st.button("🔑 Iniciar Sesión", use_container_width=True):
-            if matricula_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[matricula_input]['password'] == password_input:
-                user_info = USUARIOS_AUTORIZADOS[matricula_input]
-                
-                fecha_venc = parsear_fecha(user_info['vencimiento'])
-                hoy = datetime.now().date()
-                
-                if hoy > fecha_venc:
-                    st.error(f"⛔ **Suscripción Vencida:** Tu acceso venció el {fecha_venc.strftime('%d/%m/%Y')}. Por favor, renueva tu suscripción para volver a ingresar.")
-                else:
-                    st.session_state.autenticado = True
-                    st.session_state.usuario_actual = matricula_input
-                    st.session_state.tipo_usuario = user_info['tipo']
-                    st.session_state.balance_pedagogico = float(user_info['capital_base'])
+       if st.button("🔑 Iniciar Sesión", use_container_width=True):
+    if matricula_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[matricula_input]['password'] == password_input:
+        user_info = USUARIOS_AUTORIZADOS[matricula_input]
+        
+        fecha_venc = parsear_fecha(user_info['vencimiento'])
+        hoy = datetime.now().date()
+        
+        if hoy > fecha_venc:
+            st.error(f"⛔ **Suscripción Vencida:** Tu acceso venció el {fecha_venc.strftime('%d/%m/%Y')}. Por favor, renueva tu suscripción para volver a ingresar.")
+        else:
+            st.session_state.autenticado = True
+            st.session_state.usuario_actual = matricula_input
+            st.session_state.tipo_usuario = user_info['tipo']
+            st.session_state.balance_pedagogico = float(user_info['capital_base'])
+            
+            # 🔑 ¡ESTA LÍNEA ES LA QUE TE FALTABA PARA ACTIVAR EL PERMISO!
+            st.session_state.simulador_habilitado = user_info.get('simulador_habilitado', False)
+            
+            st.success(f"¡Bienvenido, {matricula_input}!")
+            st.rerun()
                     
                     # 👈 NUEVO: CARGAR PERMISO DEL SIMULADOR SEGÚN LA BASE DE DATOS O SI ES ADMIN
                     permiso_sim = user_info.get('simulador_habilitado', False)
