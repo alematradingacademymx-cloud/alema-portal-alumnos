@@ -315,12 +315,6 @@ if not st.session_state.autenticado:
     url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
     st.link_button("📲 Solicitar Membresía por WhatsApp", url_wa, use_container_width=True)
 
-    st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
-    st.stop()
-
-# ==========================================
-    # SECCIÓN INFORMATIVA PARA FUTUROS ALUMNOS
-    # ==========================================
     st.markdown("<h2 style='text-align: center;'>🚀 ¿Deseas Formarte como Trader en ALEMA?</h2>", unsafe_allow_html=True)
     st.markdown(
         "<p style='text-align: center; color: #a0aec0; font-size: 1.1rem;'>"
