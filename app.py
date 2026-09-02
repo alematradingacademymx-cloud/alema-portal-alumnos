@@ -56,15 +56,24 @@ def guardar_datos_json(filepath, data):
 # Estilos CSS personalizados con Fondo Azul Oscuro Elegante y Botón Verde
 st.markdown("""
     <style>
-    /* 🙈 OCULTAR HEADER, MENÚ SUPERIOR Y BOTÓN DE GITHUB */
-    header[data-testid="stHeader"] {
+    /* 🙈 OCULTAR BARRA SUPERIOR, GITHUB, FORK Y MENÚS */
+    [data-testid="stHeader"], 
+    [data-testid="stToolbar"], 
+    [data-testid="stHeaderActionElements"],
+    header, 
+    .stAppHeader {
         display: none !important;
+        visibility: hidden !important;
+        height: 0px !important;
     }
-    #MainMenu {
-        visibility: hidden;
-    }
-    footer {
-        visibility: hidden;
+    
+    /* 🙈 OCULTAR PIE DE PÁGINA Y ELEMENTOS FLOTANTES DE STREAMLIT */
+    #MainMenu, 
+    footer, 
+    .stDeployButton, 
+    [data-testid="stDecoration"] {
+        display: none !important;
+        visibility: hidden !important;
     }
 
     /* Fondo General Azul Oscuro */
