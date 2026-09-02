@@ -350,7 +350,7 @@ if not st.session_state.autenticado:
     
     col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
     with col_p2:
-        st.markdown("📌 **Membresía Elite ALEMA / Acceso al Portal:** **$1980 MXN / mes**\n\nIncluye)
+        st.info ("📌 **Membresía Elite ALEMA / Acceso al Portal:** **$1980 MXN / mes**\n\nIncluye)
         st.markdown("""
          * **Acceso completo al portal de alumnos.
          * **Clases en vivo vía Zoom, Análisis en vivo.
