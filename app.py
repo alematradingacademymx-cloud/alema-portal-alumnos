@@ -300,7 +300,7 @@ if not st.session_state.autenticado:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
     
     st.markdown("---")
-    st.markdown("### 🚀 ¿Aún no tienes tu acceso al Portal?")
+    st.markdown("###  ¿Aún no tienes tu acceso al Portal?")
     st.write(
         "Obtén acceso a las **Calculadoras Operativas**, **Biblioteca de Guías en PDF** "
         "y **Cápsulas de Psicotrading** por solo **$150 MXN / mes**."
@@ -315,7 +315,7 @@ if not st.session_state.autenticado:
     url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
     st.link_button("📲 Solicitar Membresía por WhatsApp", url_wa, use_container_width=True)
 
-    st.markdown("<h2 style='text-align: center;'>🚀 ¿Deseas Formarte como Trader en ALEMA?</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'> ¿Deseas Formarte como Trader en ALEMA?</h2>", unsafe_allow_html=True)
     st.markdown(
         "<p style='text-align: center; color: #a0aec0; font-size: 1.1rem;'>"
         "Conoce nuestro programa educativo integral, herramientas operativas y acompañamiento personalizado."
