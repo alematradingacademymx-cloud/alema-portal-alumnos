@@ -950,10 +950,10 @@ elif opcion_menu == "📉 Alema Trade live":
     if es_admin or simulador_activo:
         # 🟢 ACCESO PERMITIDO
         st.title("📉 Alema Trade Live")
-    # ==========================================
- # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
- # (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
- # ==========================================
+     # ==========================================
+     # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
+     # (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
+     # ==========================================
 
     
         import json
