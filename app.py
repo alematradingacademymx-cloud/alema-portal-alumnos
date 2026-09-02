@@ -938,11 +938,17 @@ elif opcion_menu == "📓 Trading Journal":
 # ==========================================
 elif opcion_menu == "📉 Alema Trade live":
     
+    # 1. Identificar usuario y rol
+    usuario_actual = st.session_state.get("usuario_actual", "")
     es_admin = st.session_state.tipo_usuario == "ADMIN"
-    simulador_activo = st.session_state.get("simulador_habilitado", False)
     
+    # 2. LECTURA EN TIEMPO REAL: Consultar permiso directamente en la base cargada
+    datos_usuario = USUARIOS_AUTORIZADOS.get(usuario_actual, {})
+    simulador_activo = datos_usuario.get("simulador_habilitado", False)
+    
+    # 3. PUERTA DE ACCESO (VALIDACIÓN)
     if es_admin or simulador_activo:
-        # 🟢 ACCESO PERMITIDO: Todo el código actual de tu simulador va aquí adentro (sangrado/indentado)
+        # 🟢 ACCESO PERMITIDO
         st.title("📉 Alema Trade Live")
     # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
@@ -1357,10 +1363,9 @@ elif opcion_menu == "📉 Alema Trade live":
     else:
         st.info("Aún no hay operaciones cerradas.")
 else:
-        # 🔴 ACCESO RESTRINGIDO: Mensaje institucional para el alumno
+        # 🔴 ACCESO RESTRINGIDO
         st.markdown("<h1 style='text-align: center; color: #F1F5F9;'>🔒 Plataforma Educativa Live</h1>", unsafe_allow_html=True)
         st.write("")
-        
         st.markdown("""
             <div class="card-box" style="text-align: center; padding: 35px 25px; border-left: 4px solid #FF6B00;">
                 <div style="font-size: 45px; margin-bottom: 10px;">⚠️</div>
