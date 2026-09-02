@@ -350,7 +350,7 @@ if not st.session_state.autenticado:
     
     col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
     with col_p2:
-        st.info("📌 **Membresía Elite ALEMA / Acceso al Portal:** **$1980 MXN / mes**\n\nIncluye acceso completo al portal de alumnos, clases en vivo via zoom, Análisis en vivo, calculadoras de gestión, biblioteca digital y evaluaciones.")
+        st.info("📌 **Membresía Elite ALEMA / Acceso al Portal:** **$1980 MXN / mes**\n\nIncluye acceso completo al portal de alumnos, Clases en vivo vía Zoom, Análisis en vivo, Calculadoras de gestión, Biblioteca digital y Evaluaciones.")
 
         num_whatsapp = "528136462129"
         mensaje_preset = (
