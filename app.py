@@ -468,7 +468,6 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         st.sidebar.success(f"Bitácora de '{alumno_seleccionado}' limpiada a 0.")
         st.rerun()
 # ==========================================
-# ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
 import streamlit.components.v1 as components
