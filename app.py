@@ -34,7 +34,11 @@ st.set_page_config(
     page_icon=icono_pagina, 
     layout="centered"
 )
-
+st.set_page_config(
+    page_title="ALEMA Trading Academy",
+    layout="wide",
+    initial_sidebar_state="collapsed"  # 👈 Inicia cerrada de primera instancia
+)
 # ==========================================
 # 🛠️ FUNCIONES DE PERSISTENCIA JSON AUXILIARES
 # ==========================================
