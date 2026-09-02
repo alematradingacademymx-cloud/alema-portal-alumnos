@@ -244,7 +244,7 @@ import base64
 
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
-    # 🖼️ ISOTIPO BLANCO CENTRADO Y RESPONSIVO (DESKTOP Y MÓVIL)
+  # 🖼️ ISOTIPO BLANCO CENTRADO (TAMAÑO INTERMEDIO)
     archivo_iso = "alema_iso.png"
     
     if not os.path.exists(archivo_iso):
@@ -253,16 +253,9 @@ if not st.session_state.autenticado:
             archivo_iso = coincidencias[0]
 
     if os.path.exists(archivo_iso):
-        with open(archivo_iso, "rb") as img_file:
-            img_b64 = base64.b64encode(img_file.read()).decode()
-        st.markdown(
-            f'''
-            <div style="text-align: center; margin-bottom: 15px;">
-                <img src="data:image/png;base64,{img_b64}" style="width: 95px; height: auto;">
-            </div>
-            ''',
-            unsafe_allow_html=True
-        )
+        col_logo1, col_logo2, col_logo3 = st.columns([2, 1, 2])
+        with col_logo2:
+            st.image(archivo_iso, use_container_width=True)
             
     st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados y Suscriptores</div>', unsafe_allow_html=True)
