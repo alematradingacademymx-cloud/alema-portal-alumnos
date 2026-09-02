@@ -315,6 +315,9 @@ if not st.session_state.autenticado:
     url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
     st.link_button("📲 Solicitar Membresía por WhatsApp", url_wa, use_container_width=True)
 
+    # ==========================================
+    # SECCIÓN INFORMATIVA PARA FUTUROS ALUMNOS
+    # ==========================================
     st.markdown("<h2 style='text-align: center;'>🚀 ¿Deseas Formarte como Trader en ALEMA?</h2>", unsafe_allow_html=True)
     st.markdown(
         "<p style='text-align: center; color: #a0aec0; font-size: 1.1rem;'>"
@@ -339,7 +342,7 @@ if not st.session_state.autenticado:
         st.markdown("""
         * **Calculadoras Operativas:** Gestión exacta de lotaje y riesgo por operación.
         * **Evaluaciones Progresivas:** Exámenes técnicos revisados directamente por Dirección General.
-        * **Constancia Educativa Institucional:** Reconocimiento con validez interna al aprobar cada nivel.
+        * **Certificación Institucional:** Reconocimiento con validez interna al aprobar cada nivel.
         * **Biblioteca y Reportes:** Descarga de manuales en PDF y retroalimentación personalizada.
         """)
 
@@ -350,17 +353,11 @@ if not st.session_state.autenticado:
     
     col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
     with col_p2:
-        st.info ("📌 **Membresía Elite ALEMA / Acceso al Portal:** **$1980 MXN / mes**\n\nIncluye")
-        st.markdown("""
-         * **Acceso completo al portal de alumnos.
-         * **Clases en vivo vía Zoom, Análisis en vivo.
-         * **Calculadoras de gestión.
-         * **Biblioteca digital.
-         * **Evaluaciones.")
+        st.info("📌 **Membresía Mensual / Acceso al Portal:** **$150 MXN / mes**\n\nIncluye acceso completo al portal de alumnos, calculadoras de gestión, biblioteca digital y evaluaciones.")
 
         num_whatsapp = "528136462129"
         mensaje_preset = (
-            "¡Hola Daniela! 👋 Vengo del portal web y me gustaría inscribirme "
+            "¡Hola Daniela! 👋 Vengo del portal web y me gustaría solicitar información e inscribirme "
             "a ALEMA Trading Academy. ¿Me podrías compartir los datos de pago y requisitos?"
         )
 
