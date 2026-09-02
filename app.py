@@ -261,7 +261,7 @@ if not st.session_state.autenticado:
                 <img src="data:image/png;base64,{img_b64}" style="width: 95px; height: auto;">
             </div>
             ''',
-            unsafe_allow_html=True
+            unsafe_allow_html=True)
     st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados y Suscriptores</div>', unsafe_allow_html=True)
     
