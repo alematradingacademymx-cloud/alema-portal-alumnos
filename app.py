@@ -914,7 +914,17 @@ elif opcion_menu == "📓 Trading Journal":
         st.dataframe(df_mostrar, use_container_width=True)
     else:
         st.info("💡 Aún no tienes trades guardados en tu historial permanente.")
-
+# ==========================================
+# 📉 SECCIÓN: ALEMA TRADE LIVE
+# ==========================================
+elif opcion_menu == "📉 Alema Trade live":
+    
+    es_admin = st.session_state.tipo_usuario == "ADMIN"
+    simulador_activo = st.session_state.get("simulador_habilitado", False)
+    
+    if es_admin or simulador_activo:
+        # 🟢 ACCESO PERMITIDO: Todo el código actual de tu simulador va aquí adentro (sangrado/indentado)
+        st.title("📉 Alema Trade Live")
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
 # (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
@@ -1327,6 +1337,28 @@ elif opcion_menu == "📉 Alema Trade live":
         st.markdown(f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Vol.</th><th>Símbolo</th><th>S/L</th><th>T/P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{"".join(filas_html)}</tbody></table></div>', unsafe_allow_html=True)
     else:
         st.info("Aún no hay operaciones cerradas.")
+else:
+        # 🔴 ACCESO RESTRINGIDO: Mensaje institucional para el alumno
+        st.markdown("<h1 style='text-align: center; color: #F1F5F9;'>🔒 Plataforma Educativa Live</h1>", unsafe_allow_html=True)
+        st.write("")
+        
+        st.markdown("""
+            <div class="card-box" style="text-align: center; padding: 35px 25px; border-left: 4px solid #FF6B00;">
+                <div style="font-size: 45px; margin-bottom: 10px;">⚠️</div>
+                <h2 style="color: #FF6B00; margin-top: 0px; font-size: 22px;">
+                    Aún no tienes habilitada la opción a la Plataforma Educativa Live
+                </h2>
+                <p style="color: #94A3B8; font-size: 15px; max-width: 600px; margin: 15px auto 0px auto; line-height: 1.6;">
+                    Esta herramienta práctica de ejecución en vivo se activa de forma personalizada 
+                    al avanzar al <b>Nivel Avanzado Práctico</b> de tu programa académico.
+                </p>
+                <div style="background-color: #0E1726; border-radius: 8px; padding: 15px; margin-top: 25px; border: 1px solid #334155;">
+                    <p style="color: #CBD5E1; font-size: 13px; margin: 0;">
+                        📌 <b>¿Qué debes hacer?</b> Completa tus evaluaciones teóricas del bloque actual y solicita la validación a través de la coordinación académica o con tu mentor asignado.
+                    </p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
