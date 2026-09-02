@@ -244,7 +244,7 @@ if "archivo_hist" not in st.session_state:
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
     # 🖼️ ISOTIPO BLANCO CENTRADO
-    archivo_iso = "alema_iso.png"
+    archivo_iso = "alema_iso.png.png"
     
     if os.path.exists(archivo_iso):
         col_logo1, col_logo2, col_logo3 = st.columns([1, 1, 1])
