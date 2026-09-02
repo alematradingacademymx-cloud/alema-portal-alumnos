@@ -501,32 +501,26 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state.tipo_usuario = "ALUMNO"
     st.rerun()
 
-# --- SCRIPT DE CIERRE TÁCTIL PARA SAFARI / ANDROID ---
+# --- AUTOCIERRE AUTOMÁTICO EN MÓVILES AL SELECCIONAR OPCIÓN ---
 collapse_script = """
 <script>
     (function() {
         const doc = window.parent.document;
-        function closeMobileSidebar() {
-            if (window.parent.innerWidth < 768) {
-                const collapseBtn = doc.querySelector('button[data-testid="collapsedControl"]');
-                const sidebarExpanded = doc.querySelector('section[data-testid="stSidebar"][aria-expanded="true"]');
-                if (collapseBtn && sidebarExpanded) {
-                    collapseBtn.click();
-                }
-            }
-        }
         
-        // Escuchador global de toque/clic en la barra lateral para móviles
-        setTimeout(() => {
-            const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-            if (sidebar) {
-                sidebar.addEventListener('touchend', function(e) {
-                    if (e.target.closest('label') || e.target.closest('div[role="radiogroup"]')) {
-                        setTimeout(closeMobileSidebar, 300);
-                    }
-                }, {passive: true});
-            }
-        }, 600);
+        // Verifica si la pantalla es móvil (< 768px)
+        if (window.parent.innerWidth < 768) {
+            setTimeout(function() {
+                // Selecciona el botón de cierre (<<) dentro de la barra lateral
+                const closeBtn = doc.querySelector('button[data-testid="stSidebarCollapseButton"]') || 
+                                 doc.querySelector('section[data-testid="stSidebar"] button');
+                const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
+                
+                // Si la barra está abierta, ejecuta el clic para ocultarla
+                if (sidebar && sidebar.getAttribute('aria-expanded') === 'true' && closeBtn) {
+                    closeBtn.click();
+                }
+            }, 150);
+        }
     })();
 </script>
 """
