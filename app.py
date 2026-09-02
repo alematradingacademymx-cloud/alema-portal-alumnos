@@ -203,13 +203,19 @@ def cargar_usuarios_desde_sheets():
         df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
         df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
         
+        # 🆕 LEER COLUMNA SIMULADOR_HABILITADO (SI NO EXISTE, POR DEFECTO 'NO')
+        if 'Simulador_Habilitado' not in df.columns:
+            df['Simulador_Habilitado'] = 'NO'
+        
         dict_usuarios = {}
         for _, row in df.iterrows():
+            sim_hab = str(row.get('Simulador_Habilitado', 'NO')).strip().upper() == 'SI'
             dict_usuarios[row['Matricula']] = {
                 'password': row['Password'],
                 'tipo': row['Tipo_Usuario'],
                 'vencimiento': row['Fecha_Vencimiento'],
-                'capital_base': float(row['Capital'])
+                'capital_base': float(row['Capital']),
+                'simulador_habilitado': sim_hab # 👈 GUARDAMOS EL PERMISO
             }
         return dict_usuarios
     except Exception:
@@ -223,13 +229,18 @@ def cargar_usuarios_desde_sheets():
             df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
             df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
             
+            if 'Simulador_Habilitado' not in df.columns:
+                df['Simulador_Habilitado'] = 'NO'
+                
             dict_usuarios = {}
             for _, row in df.iterrows():
+                sim_hab = str(row.get('Simulador_Habilitado', 'NO')).strip().upper() == 'SI'
                 dict_usuarios[row['Matricula']] = {
                     'password': row['Password'],
                     'tipo': row['Tipo_Usuario'],
                     'vencimiento': row['Fecha_Vencimiento'],
-                    'capital_base': float(row['Capital'])
+                    'capital_base': float(row['Capital']),
+                    'simulador_habilitado': sim_hab
                 }
             return dict_usuarios
         except Exception:
@@ -260,6 +271,10 @@ if "usuario_actual" not in st.session_state:
 
 if "tipo_usuario" not in st.session_state:
     st.session_state.tipo_usuario = "ALUMNO"
+
+# 🆕 INICIALIZAR LA VARIABLE DEL SIMULADOR EN SESIÓN
+if "simulador_habilitado" not in st.session_state:
+    st.session_state.simulador_habilitado = False
 
 if "journal_trades" not in st.session_state:
     st.session_state.journal_trades = []
@@ -327,6 +342,10 @@ if not st.session_state.autenticado:
                     st.session_state.usuario_actual = matricula_input
                     st.session_state.tipo_usuario = user_info['tipo']
                     st.session_state.balance_pedagogico = float(user_info['capital_base'])
+                    
+                    # 👈 NUEVO: CARGAR PERMISO DEL SIMULADOR SEGÚN LA BASE DE DATOS O SI ES ADMIN
+                    permiso_sim = user_info.get('simulador_habilitado', False)
+                    st.session_state.simulador_habilitado = permiso_sim or (user_info['tipo'] == 'ADMIN')
                     
                     # BLINDAJE DE SESIÓN: Fijar rutas únicas directamente en st.session_state
                     st.session_state.archivo_pos = f"posiciones_{matricula_input}.json"
@@ -415,7 +434,7 @@ if not st.session_state.autenticado:
 
     st.divider()
 
-  # --- SECCIÓN DE INSCRIPCIÓN Y WHATSAPP COORDINACIÓN ---
+    # --- SECCIÓN DE INSCRIPCIÓN Y WHATSAPP COORDINACIÓN ---
     st.markdown("<h3 style='text-align: center;'>💳 Cuota e Inscripciones</h3>", unsafe_allow_html=True)
     
     col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
@@ -465,7 +484,6 @@ if not st.session_state.autenticado:
 
     st.markdown("<br><p style='text-align: center; color: #718096;'>© ALEMA Trading Academy. Reservados todos los derechos.</p>", unsafe_allow_html=True)
     st.stop()
-
 # ==========================================
 # ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
 # ==========================================
