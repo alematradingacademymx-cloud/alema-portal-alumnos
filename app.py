@@ -315,9 +315,6 @@ if not st.session_state.autenticado:
     url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
     st.link_button("📲 Solicitar Membresía por WhatsApp", url_wa, use_container_width=True)
 
-    # ==========================================
-    # SECCIÓN INFORMATIVA PARA FUTUROS ALUMNOS
-    # ==========================================
     st.markdown("<h2 style='text-align: center;'>🚀 ¿Deseas Formarte como Trader en ALEMA?</h2>", unsafe_allow_html=True)
     st.markdown(
         "<p style='text-align: center; color: #a0aec0; font-size: 1.1rem;'>"
@@ -342,19 +339,28 @@ if not st.session_state.autenticado:
         st.markdown("""
         * **Calculadoras Operativas:** Gestión exacta de lotaje y riesgo por operación.
         * **Evaluaciones Progresivas:** Exámenes técnicos revisados directamente por Dirección General.
-        * **Certificación Institucional:** Reconocimiento con validez interna al aprobar cada nivel.
+        * **Constancia Institucional:** Reconocimiento con validez interna al aprobar cada nivel.
         * **Biblioteca y Reportes:** Descarga de manuales en PDF y retroalimentación personalizada.
         """)
 
     st.divider()
 
-    # --- SECCIÓN DE INSCRIPCIÓN Y WHATSAPP COORDINACIÓN ---
+  # --- SECCIÓN DE INSCRIPCIÓN Y WHATSAPP COORDINACIÓN ---
     st.markdown("<h3 style='text-align: center;'>💳 Cuota e Inscripciones</h3>", unsafe_allow_html=True)
     
     col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
     with col_p2:
-        st.info("📌 **Membresía Mensual / Acceso al Portal:** **$150 MXN / mes**\n\nIncluye acceso completo al portal de alumnos, calculadoras de gestión, biblioteca digital y evaluaciones.")
-
+        st.info(
+            "📌 **Membresía Elite ALEMA / Acceso al Portal:** **$1890 MXN / mes**\n\n"
+            "**Incluye:**\n"
+            "* Acceso completo al portal de alumnos\n"
+            "* Calculadoras de gestión\n"
+            "* Biblioteca digital\n"
+            "* Clases personalizadas en vivo vía Zoom\n"
+            "* Plataforma Educativa\n"
+            "* Journal Alema\n"
+            "* Evaluaciones"
+            
         num_whatsapp = "528136462129"
         mensaje_preset = (
             "¡Hola Daniela! 👋 Vengo del portal web y me gustaría solicitar información e inscribirme "
