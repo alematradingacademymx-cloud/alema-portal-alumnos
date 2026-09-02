@@ -359,7 +359,7 @@ if not st.session_state.autenticado:
             "* Clases personalizadas en vivo vía Zoom\n"
             "* Plataforma Educativa\n"
             "* Journal Alema\n"
-            "* Evaluaciones"
+            "* Evaluaciones")
             
         num_whatsapp = "528136462129"
         mensaje_preset = (
