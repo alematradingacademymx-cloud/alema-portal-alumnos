@@ -524,39 +524,11 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state.tipo_usuario = "ALUMNO"
     st.rerun()
 
-# --- SCRIPT JS: LIMPIEZA DE ÍCONOS FLOTANTES Y CIERRE TÁCTIL EN MÓVILES ---
-combined_script = """
+# --- SCRIPT DE CIERRE TÁCTIL PARA SAFARI / ANDROID ---
+collapse_script = """
 <script>
     (function() {
         const doc = window.parent.document;
-        
-        // 🙈 1. OCULTAR ÍCONOS FLOTANTES, MARCA DE AGUA Y BADGES DE STREAMLIT CLOUD
-        function ocultarIconosStreamlit() {
-            try {
-                const elementos = doc.querySelectorAll(`
-                    footer, 
-                    header, 
-                    [data-testid="stHeader"], 
-                    [data-testid="stStatusWidget"], 
-                    [class*="viewerBadge"], 
-                    [class*="stAppDeployButton"], 
-                    div[class*="HostContainer"], 
-                    div[class*="FloatingContainer"],
-                    a[href*="streamlit.app"]
-                `);
-                
-                elementos.forEach(el => {
-                    el.style.display = 'none';
-                    el.style.visibility = 'hidden';
-                });
-            } catch (e) {}
-        }
-
-        // Ejecutar inmediatamente y revisar periódicamente
-        ocultarIconosStreamlit();
-        setInterval(ocultarIconosStreamlit, 400);
-
-        // 📱 2. SCRIPT DE CIERRE TÁCTIL PARA SAFARI / ANDROID
         function closeMobileSidebar() {
             if (window.parent.innerWidth < 768) {
                 const collapseBtn = doc.querySelector('button[data-testid="collapsedControl"]');
@@ -567,6 +539,7 @@ combined_script = """
             }
         }
         
+        // Escuchador global de toque/clic en la barra lateral para móviles
         setTimeout(() => {
             const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
             if (sidebar) {
@@ -580,7 +553,7 @@ combined_script = """
     })();
 </script>
 """
-components.html(combined_script, height=0, width=0)
+components.html(collapse_script, height=0, width=0)
 
 # --- TICKER DE TRADINGVIEW SUPERIOR ---
 ticker_html = """
