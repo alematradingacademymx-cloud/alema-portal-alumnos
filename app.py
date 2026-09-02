@@ -203,19 +203,22 @@ def cargar_usuarios_desde_sheets():
         df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
         df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
         
-        # 🆕 LEER COLUMNA SIMULADOR_HABILITADO (SI NO EXISTE, POR DEFECTO 'NO')
+        # 🆕 VALIDACIÓN DE COLUMNA SIMULADOR_HABILITADO
         if 'Simulador_Habilitado' not in df.columns:
             df['Simulador_Habilitado'] = 'NO'
         
         dict_usuarios = {}
         for _, row in df.iterrows():
-            sim_hab = str(row.get('Simulador_Habilitado', 'NO')).strip().upper() == 'SI'
+            # Evalúa 'SI', 'Si', 'si', 'TRUE', etc.
+            val_sim = str(row.get('Simulador_Habilitado', 'NO')).strip().upper()
+            sim_hab = val_sim in ['SI', 'TRUE', '1']
+            
             dict_usuarios[row['Matricula']] = {
                 'password': row['Password'],
                 'tipo': row['Tipo_Usuario'],
                 'vencimiento': row['Fecha_Vencimiento'],
                 'capital_base': float(row['Capital']),
-                'simulador_habilitado': sim_hab # 👈 GUARDAMOS EL PERMISO
+                'simulador_habilitado': sim_hab
             }
         return dict_usuarios
     except Exception:
@@ -234,7 +237,9 @@ def cargar_usuarios_desde_sheets():
                 
             dict_usuarios = {}
             for _, row in df.iterrows():
-                sim_hab = str(row.get('Simulador_Habilitado', 'NO')).strip().upper() == 'SI'
+                val_sim = str(row.get('Simulador_Habilitado', 'NO')).strip().upper()
+                sim_hab = val_sim in ['SI', 'TRUE', '1']
+                
                 dict_usuarios[row['Matricula']] = {
                     'password': row['Password'],
                     'tipo': row['Tipo_Usuario'],
@@ -260,6 +265,7 @@ def obtener_avance_alumno(matricula_usuario):
     except Exception:
         return None
 
+# Carga inicial de usuarios
 USUARIOS_AUTORIZADOS = cargar_usuarios_desde_sheets()
 
 # --- CONTROL Y PERSISTENCIA DE SESIÓN ---
@@ -272,14 +278,14 @@ if "usuario_actual" not in st.session_state:
 if "tipo_usuario" not in st.session_state:
     st.session_state.tipo_usuario = "ALUMNO"
 
-# 🆕 INICIALIZAR LA VARIABLE DEL SIMULADOR EN SESIÓN
+# 🆕 VARIABLE DE CONTROL PARA EL SIMULADOR
 if "simulador_habilitado" not in st.session_state:
     st.session_state.simulador_habilitado = False
 
 if "journal_trades" not in st.session_state:
     st.session_state.journal_trades = []
 
-# Inicializar rutas por defecto seguras en session_state
+# Rutas de persistencia individual por alumno
 if "archivo_pos" not in st.session_state:
     st.session_state.archivo_pos = "posiciones_invitado.json"
 if "archivo_hist" not in st.session_state:
