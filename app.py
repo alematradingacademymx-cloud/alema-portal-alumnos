@@ -243,11 +243,16 @@ if "archivo_hist" not in st.session_state:
 
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
-    # 🖼️ ISOTIPO BLANCO CENTRADO
+   # 🖼️ ISOTIPO BLANCO CENTRADO Y COMPACTO
     archivo_iso = "alema_iso.png.png"
     
+    if not os.path.exists(archivo_iso):
+        coincidencias = [f for f in os.listdir(".") if f.lower().startswith("alema_iso") or f.lower().startswith("alema_a")]
+        if coincidencias:
+            archivo_iso = coincidencias[0]
+
     if os.path.exists(archivo_iso):
-        col_logo1, col_logo2, col_logo3 = st.columns([1, 1, 1])
+        col_logo1, col_logo2, col_logo3 = st.columns([3, 1, 3])
         with col_logo2:
             st.image(archivo_iso, use_container_width=True)
             
