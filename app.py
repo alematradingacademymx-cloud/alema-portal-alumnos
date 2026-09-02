@@ -494,16 +494,16 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
     lista_matriculas = list(USUARIOS_AUTORIZADOS.keys())
     alumno_seleccionado = st.sidebar.selectbox("Gestionar Alumno", lista_matriculas, key="select_admin_alumno")
     
-    # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL DESDE GOOGLE SHEETS ---
-    if st.sidebar.button("🔄 Sincronizar Capital (Sheets)", use_container_width=True):
+    # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL Y PERMISOS DESDE GOOGLE SHEETS ---
+    if st.sidebar.button("🔄 Sincronizar Datos (Sheets)", use_container_width=True):
         st.cache_data.clear()
-        st.sidebar.success(f"Capital de '{alumno_seleccionado}' actualizado desde Google Sheets.")
+        st.sidebar.success(f"Datos de '{alumno_seleccionado}' actualizados desde Google Sheets.")
         st.rerun()
         
     # --- 2. BOTÓN PARA REINICIAR BITÁCORA HISTÓRICA DEL ALUMNO ---
     if st.sidebar.button("🗑️ Reiniciar Bitácora de Alumno", use_container_width=True):
         # Localiza el archivo JSON del alumno seleccionado y lo vacía
-        arch_bita_alumno = f"historial_cerradas_{alumno_seleccionado}.json"
+        arch_bita_alumno = f"historial_{alumno_seleccionado}.json"
         guardar_datos_json(arch_bita_alumno, [])
         
         # Si estás en tu propio perfil dentro del simulador, actualiza la sesión viva
@@ -513,6 +513,13 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         st.cache_data.clear()
         st.sidebar.success(f"Bitácora de '{alumno_seleccionado}' limpiada a 0.")
         st.rerun()
+
+    # --- 3. INDICADOR DE ESTADO DEL SIMULADOR ---
+    datos_sel = USUARIOS_AUTORIZADOS.get(alumno_seleccionado, {})
+    estado_sim = datos_sel.get("simulador_habilitado", False)
+    badge_sim = "🟢 HABILITADO" if estado_sim else "🔴 RESTRINGIDO"
+    
+    st.sidebar.markdown(f"**Estatus Simulador:** {badge_sim}")
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
@@ -925,7 +932,7 @@ elif opcion_menu == "📉 Alema Trade live":
     if es_admin or simulador_activo:
         # 🟢 ACCESO PERMITIDO: Todo el código actual de tu simulador va aquí adentro (sangrado/indentado)
         st.title("📉 Alema Trade Live")
-# ==========================================
+    # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
 # (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
 # ==========================================
