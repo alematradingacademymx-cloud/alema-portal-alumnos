@@ -243,17 +243,14 @@ if "archivo_hist" not in st.session_state:
 
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
-    # 🖼️ LOGO INSTITUCIONAL CENTRADO ARRIBA DEL TÍTULO
-    archivo_logo = "alema trading academy.png"
-    if not os.path.exists(archivo_logo):
-        coincidencias = [f for f in os.listdir(".") if f.lower().startswith("alema trading academ")]
-        if coincidencias:
-            archivo_logo = coincidencias[0]
-            
-    if os.path.exists(archivo_logo):
+    # 🖼️ ISOTIPO BLANCO CENTRADO
+    archivo_iso = "alema_iso.png"
+    
+    if os.path.exists(archivo_iso):
         col_logo1, col_logo2, col_logo3 = st.columns([1, 1, 1])
         with col_logo2:
-            st.image(archivo_logo, use_container_width=True)
+            st.image(archivo_iso, use_container_width=True)
+            
     st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados y Suscriptores</div>', unsafe_allow_html=True)
     
