@@ -309,13 +309,88 @@ if not st.session_state.autenticado:
     num_whatsapp = "528136462129"
     mensaje_preset = (
         "¡Hola Daniela! 👋 Vengo del portal web y me gustaría adquirir mi suscripción "
-        "a la Membresía ALEMA Suite ($150 MXN/mes) para obtener mis credenciales de acceso."
+        "a la Membresía Mensual Alema ($150 MXN/mes) para obtener mis credenciales de acceso."
     )
 
     url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
     st.link_button("📲 Solicitar Membresía por WhatsApp", url_wa, use_container_width=True)
 
     st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
+    st.stop()
+
+# ==========================================
+    # SECCIÓN INFORMATIVA PARA FUTUROS ALUMNOS
+    # ==========================================
+    st.markdown("<h2 style='text-align: center;'>🚀 ¿Deseas Formarte como Trader en ALEMA?</h2>", unsafe_allow_html=True)
+    st.markdown(
+        "<p style='text-align: center; color: #a0aec0; font-size: 1.1rem;'>"
+        "Conoce nuestro programa educativo integral, herramientas operativas y acompañamiento personalizado."
+        "</p>", 
+        unsafe_allow_html=True
+    )
+
+    col_info1, col_info2 = st.columns(2)
+
+    with col_info1:
+        st.markdown("### 📚 Ruta Académica Oficial")
+        st.markdown("""
+        * **Módulo Básico:** Fundamentos de mercados financieros, estructura de precios y lectura de velas.
+        * **Módulo Intermedio:** Metodología institucional, zonas de oferta/demanda y Fibonacci.
+        * **Módulo Avanzado:** Wyckoff, liquidez de mercado y modelos de entrada de alta probabilidad.
+        * **Módulo Práctico & Psicotrading:** Gestión de riesgo matemática, bitácora y control emocional.
+        """)
+
+    with col_info2:
+        st.markdown("### 💡 Beneficios del Portal Privado")
+        st.markdown("""
+        * **Calculadoras Operativas:** Gestión exacta de lotaje y riesgo por operación.
+        * **Evaluaciones Progresivas:** Exámenes técnicos revisados directamente por Dirección General.
+        * **Constancia Educativa Institucional:** Reconocimiento con validez interna al aprobar cada nivel.
+        * **Biblioteca y Reportes:** Descarga de manuales en PDF y retroalimentación personalizada.
+        """)
+
+    st.divider()
+
+    # --- SECCIÓN DE INSCRIPCIÓN Y WHATSAPP COORDINACIÓN ---
+    st.markdown("<h3 style='text-align: center;'>💳 Cuota e Inscripciones</h3>", unsafe_allow_html=True)
+    
+    col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
+    with col_p2:
+        st.info("📌 **Membresía Elite ALEMA / Acceso al Portal:** **$1980 MXN / mes**\n\nIncluye acceso completo al portal de alumnos, clases en vivo via zoom, Análisis en vivo, calculadoras de gestión, biblioteca digital y evaluaciones.")
+
+        num_whatsapp = "528136462129"
+        mensaje_preset = (
+            "¡Hola Daniela! 👋 Vengo del portal web y me gustaría inscribirme "
+            "a ALEMA Trading Academy. ¿Me podrías compartir los datos de pago y requisitos?"
+        )
+
+        url_wa = f"https://wa.me/{num_whatsapp}?text={requests.utils.quote(mensaje_preset)}"
+
+        st.markdown(
+            f'''
+            <a href="{url_wa}" target="_blank" style="text-decoration: none;">
+                <button style="
+                    width: 100%;
+                    background-color: #25D366;
+                    color: white;
+                    padding: 14px 20px;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    font-weight: bold;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;">
+                    📲 ¡Quiero Inscribirme! (Contactar a Daniela por WhatsApp)
+                </button>
+            </a>
+            ''',
+            unsafe_allow_html=True
+        )
+
+    st.markdown("<br><p style='text-align: center; color: #718096;'>© ALEMA Trading Academy. Reservados todos los derechos.</p>", unsafe_allow_html=True)
     st.stop()
 
 # ==========================================
