@@ -326,7 +326,28 @@ if not st.session_state.autenticado:
     )
 
     url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
-    st.link_button("📲 Solicitar Membresía por WhatsApp", url_wa, use_container_width=True)
+    
+    # Botón estilo WhatsApp (Fondo verde #25D366, texto blanco centrado)
+    st.markdown(
+        f'''
+        <a href="{url_wa}" target="_blank" style="text-decoration: none;">
+            <div style="
+                background-color: #25D366;
+                color: #FFFFFF;
+                padding: 12px 20px;
+                border-radius: 8px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 1rem;
+                cursor: pointer;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+                margin: 10px 0;
+                transition: background-color 0.2s ease;">
+                📲 Solicitar Membresía por WhatsApp
+            </div>
+        </a>
+        ''',
+        unsafe_allow_html=True
 
     st.markdown("<h2 style='text-align: center;'> ¿Deseas Formarte como Trader en ALEMA?</h2>", unsafe_allow_html=True)
     st.markdown(
