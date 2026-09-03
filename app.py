@@ -181,7 +181,6 @@ def parsear_fecha(fecha_str):
         except ValueError:
             pass
     return datetime(2030, 12, 31).date()
-
 # ==========================================
 # 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
@@ -196,44 +195,52 @@ URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tq
 def cargar_usuarios_desde_sheets():
     try:
         df = pd.read_csv(URL_USUARIOS, dtype=str)
-        df.columns = df.columns.str.strip()
-        df['Matricula'] = df['Matricula'].fillna('').str.strip().str.upper()
-        df['Password'] = df['Password'].fillna('').str.strip()
-        df['Tipo_Usuario'] = df['Tipo_Usuario'].fillna('ALUMNO').str.strip().str.upper()
-        df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
-        df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
-        
-        dict_usuarios = {}
-        for _, row in df.iterrows():
-            dict_usuarios[row['Matricula']] = {
-                'password': row['Password'],
-                'tipo': row['Tipo_Usuario'],
-                'vencimiento': row['Fecha_Vencimiento'],
-                'capital_base': float(row['Capital'])
-            }
-        return dict_usuarios
     except Exception:
         try:
-            url_fallback = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
+            url_fallback = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
             df = pd.read_csv(url_fallback, dtype=str)
-            df.columns = df.columns.str.strip()
-            df['Matricula'] = df['Matricula'].fillna('').str.strip().str.upper()
-            df['Password'] = df['Password'].fillna('').str.strip()
-            df['Tipo_Usuario'] = df['Tipo_Usuario'].fillna('ALUMNO').str.strip().str.upper()
-            df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
-            df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
-            
-            dict_usuarios = {}
-            for _, row in df.iterrows():
-                dict_usuarios[row['Matricula']] = {
-                    'password': row['Password'],
-                    'tipo': row['Tipo_Usuario'],
-                    'vencimiento': row['Fecha_Vencimiento'],
-                    'capital_base': float(row['Capital'])
-                }
-            return dict_usuarios
         except Exception:
             return {}
+
+    # Normalización exhaustiva de encabezados de columnas
+    df.columns = df.columns.str.strip().str.upper().str.replace(' ', '_')
+    
+    # Identificar la columna que contiene los permisos del simulador
+    col_simulador = None
+    for col in df.columns:
+        if 'SIMULADOR' in col:
+            col_simulador = col
+            break
+
+    dict_usuarios = {}
+    for _, row in df.iterrows():
+        # Matrícula limpia como clave
+        matricula = str(row.get('MATRICULA', '')).strip().upper()
+        if not matricula:
+            continue
+            
+        # 1. Evaluación estricta del valor recibido de Google Sheets
+val_sim = str(row.get(col_simulador, 'NO')).strip().upper() if col_simulador else 'NO'
+sim_hab = val_sim in ['SI', 'TRUE', '1']  # Devuelve True solo si es "SI", si es "NO" devuelve False
+
+tipo_user = str(row.get('Tipo_Usuario', 'ALUMNO')).strip().upper()
+
+# 2. Guardar en el estado de la sesión (session_state)
+st.session_state.simulador_habilitado = sim_hab  # Guarda True/False
+st.session_state.tipo_usuario = tipo_user
+        # Capital limpio
+        col_cap = 'CAPITAL' if 'CAPITAL' in df.columns else 'CAPITAL_BASE'
+        capital_val = row.get(col_cap, '300')
+        capital_limpio = float(pd.to_numeric(capital_val, errors='coerce') if pd.notnull(capital_val) else 300.0)
+
+        dict_usuarios[matricula] = {
+            'password': str(row.get('PASSWORD', '')).strip(),
+            'tipo': tipo_user,
+            'vencimiento': str(row.get('FECHA_VENCIMIENTO', '2030-12-31')).strip(),
+            'capital_base': capital_limpio if capital_limpio > 0 else 300.0,
+            'simulador_habilitado': sim_hab
+        }
+    return dict_usuarios
 
 @st.cache_data(ttl=10)
 def obtener_avance_alumno(matricula_usuario):
@@ -249,6 +256,7 @@ def obtener_avance_alumno(matricula_usuario):
     except Exception:
         return None
 
+# Carga inicial de usuarios
 USUARIOS_AUTORIZADOS = cargar_usuarios_desde_sheets()
 
 # --- CONTROL Y PERSISTENCIA DE SESIÓN ---
@@ -261,10 +269,12 @@ if "usuario_actual" not in st.session_state:
 if "tipo_usuario" not in st.session_state:
     st.session_state.tipo_usuario = "ALUMNO"
 
+if "simulador_habilitado" not in st.session_state:
+    st.session_state.simulador_habilitado = False
+
 if "journal_trades" not in st.session_state:
     st.session_state.journal_trades = []
 
-# Inicializar rutas por defecto seguras en session_state
 if "archivo_pos" not in st.session_state:
     st.session_state.archivo_pos = "posiciones_invitado.json"
 if "archivo_hist" not in st.session_state:
@@ -274,7 +284,6 @@ import base64
 
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
-    # 🖼️ ISOTIPO BLANCO CENTRADO Y RESPONSIVO (DESKTOP Y MÓVIL)
     archivo_iso = "alema_iso.png"
     
     if not os.path.exists(archivo_iso):
@@ -292,9 +301,9 @@ if not st.session_state.autenticado:
             </div>
             ''',
             unsafe_allow_html=True)
+            
     st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados y Suscriptores</div>', unsafe_allow_html=True)
-    
     st.markdown("---")
     
     st.markdown("### 👋 ¡Bienvenido al Portal Institucional!")
@@ -302,7 +311,6 @@ if not st.session_state.autenticado:
         "Este es tu ecosistema de herramientas operativas, calculadoras de gestión de riesgo, "
         "journal de operaciones y biblioteca digital. Ingresa tus credenciales para comenzar."
     )
-    
     st.markdown("---")
     
     st.subheader("🔒 Acceso al Portal Privado")
@@ -328,11 +336,13 @@ if not st.session_state.autenticado:
                     st.session_state.tipo_usuario = user_info['tipo']
                     st.session_state.balance_pedagogico = float(user_info['capital_base'])
                     
-                    # BLINDAJE DE SESIÓN: Fijar rutas únicas directamente en st.session_state
+                    # ASIGNACIÓN DE PERMISOS: Solo True si la hoja dice 'SI' o si es ADMIN
+                    permiso_sim = user_info.get('simulador_habilitado', False)
+                    st.session_state.simulador_habilitado = bool(permiso_sim or (user_info['tipo'] == 'ADMIN'))
+                    
                     st.session_state.archivo_pos = f"posiciones_{matricula_input}.json"
                     st.session_state.archivo_hist = f"historial_{matricula_input}.json"
                     
-                    # Cargar archivos específicos del alumno autenticado
                     if os.path.exists(st.session_state.archivo_pos):
                         st.session_state.posiciones_abiertas = cargar_datos_json(st.session_state.archivo_pos, [])
                     else:
@@ -343,13 +353,13 @@ if not st.session_state.autenticado:
                     else:
                         st.session_state.historial_cerradas = []
                     
-                    st.success("¡Acceso concedido!")
+                    st.success(f"¡Bienvenido, {matricula_input}!")
                     st.rerun()
             else:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
     
     st.markdown("---")
-    st.markdown("###  ¿Aún no tienes tu acceso al Portal?")
+    st.markdown("### ¿Aún no tienes tu acceso al Portal?")
     st.write(
         "Obtén acceso a las **Calculadoras Operativas**, **Biblioteca de Guías en PDF** "
         "y **Cápsulas de Psicotrading** por solo **$150 MXN / mes**."
@@ -360,10 +370,8 @@ if not st.session_state.autenticado:
         "¡Hola Daniela! 👋 Vengo del portal web y me gustaría adquirir mi suscripción "
         "a la Membresía Mensual Alema ($150 MXN/mes) para obtener mis credenciales de acceso."
     )
-
     url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
     
-    # Botón estilo WhatsApp (Fondo verde #25D366, texto blanco centrado)
     st.markdown(
         f'''
         <a href="{url_wa}" target="_blank" style="text-decoration: none;">
@@ -377,8 +385,7 @@ if not st.session_state.autenticado:
                 font-size: 1rem;
                 cursor: pointer;
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
-                margin: 10px 0;
-                transition: background-color 0.2s ease;">
+                margin: 10px 0;">
                 📲 Solicitar Membresía por WhatsApp
             </div>
         </a>
@@ -394,7 +401,6 @@ if not st.session_state.autenticado:
     )
 
     col_info1, col_info2 = st.columns(2)
-
     with col_info1:
         st.markdown("### 📚 Ruta Académica Oficial")
         st.markdown("""
@@ -415,9 +421,7 @@ if not st.session_state.autenticado:
 
     st.divider()
 
-  # --- SECCIÓN DE INSCRIPCIÓN Y WHATSAPP COORDINACIÓN ---
     st.markdown("<h3 style='text-align: center;'>💳 Cuota e Inscripciones</h3>", unsafe_allow_html=True)
-    
     col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
     with col_p2:
         st.info(
@@ -431,17 +435,15 @@ if not st.session_state.autenticado:
             "* Journal Alema\n"
             "* Evaluaciones")
             
-        num_whatsapp = "528136462129"
-        mensaje_preset = (
+        mensaje_preset_ins = (
             "¡Hola Daniela! 👋 Vengo del portal web y me gustaría solicitar información e inscribirme "
             "a ALEMA Trading Academy. ¿Me podrías compartir los datos de pago y requisitos?"
         )
-
-        url_wa = f"https://wa.me/{num_whatsapp}?text={requests.utils.quote(mensaje_preset)}"
+        url_wa_ins = f"https://wa.me/{num_whatsapp}?text={requests.utils.quote(mensaje_preset_ins)}"
 
         st.markdown(
             f'''
-            <a href="{url_wa}" target="_blank" style="text-decoration: none;">
+            <a href="{url_wa_ins}" target="_blank" style="text-decoration: none;">
                 <button style="
                     width: 100%;
                     background-color: #25D366;
@@ -465,7 +467,6 @@ if not st.session_state.autenticado:
 
     st.markdown("<br><p style='text-align: center; color: #718096;'>© ALEMA Trading Academy. Reservados todos los derechos.</p>", unsafe_allow_html=True)
     st.stop()
-
 # ==========================================
 # ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
 # ==========================================
@@ -476,16 +477,16 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
     lista_matriculas = list(USUARIOS_AUTORIZADOS.keys())
     alumno_seleccionado = st.sidebar.selectbox("Gestionar Alumno", lista_matriculas, key="select_admin_alumno")
     
-    # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL DESDE GOOGLE SHEETS ---
-    if st.sidebar.button("🔄 Sincronizar Capital (Sheets)", use_container_width=True):
+    # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL Y PERMISOS DESDE GOOGLE SHEETS ---
+    if st.sidebar.button("🔄 Sincronizar Datos (Sheets)", use_container_width=True):
         st.cache_data.clear()
-        st.sidebar.success(f"Capital de '{alumno_seleccionado}' actualizado desde Google Sheets.")
+        st.sidebar.success(f"Datos de '{alumno_seleccionado}' actualizados desde Google Sheets.")
         st.rerun()
         
     # --- 2. BOTÓN PARA REINICIAR BITÁCORA HISTÓRICA DEL ALUMNO ---
     if st.sidebar.button("🗑️ Reiniciar Bitácora de Alumno", use_container_width=True):
         # Localiza el archivo JSON del alumno seleccionado y lo vacía
-        arch_bita_alumno = f"historial_cerradas_{alumno_seleccionado}.json"
+        arch_bita_alumno = f"historial_{alumno_seleccionado}.json"
         guardar_datos_json(arch_bita_alumno, [])
         
         # Si estás en tu propio perfil dentro del simulador, actualiza la sesión viva
@@ -495,6 +496,13 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         st.cache_data.clear()
         st.sidebar.success(f"Bitácora de '{alumno_seleccionado}' limpiada a 0.")
         st.rerun()
+
+    # --- 3. INDICADOR DE ESTADO DEL SIMULADOR ---
+    datos_sel = USUARIOS_AUTORIZADOS.get(alumno_seleccionado, {})
+    estado_sim = datos_sel.get("simulador_habilitado", False)
+    badge_sim = "🟢 HABILITADO" if estado_sim else "🔴 RESTRINGIDO"
+    
+    st.sidebar.markdown(f"**Estatus Simulador:** {badge_sim}")
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
@@ -507,8 +515,31 @@ st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 st.sidebar.markdown("---")
 
+# --- CONVERSIÓN ESTRICTA A BOOLEANO (Arregla el fallo de "NO" = True) ---
+val_sim = st.session_state.get("simulador_habilitado", False)
+
+if isinstance(val_sim, str):
+    # Solo será True si en la base dice exactamente "SI", "YES", "TRUE" o "1"
+    simulador_permitido = val_sim.strip().upper() in ["SI", "YES", "TRUE", "1"]
+else:
+    simulador_permitido = bool(val_sim)
+
+es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
+
+# CONSTRUCCIÓN DINÁMICA DE OPCIONES SEGÚN PERMISO REAL
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
-    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📝 Evaluaciones", "📉 Alema Trade live", "📚 Biblioteca de Guías"]
+    opciones_disponibles = [
+        "📊 Mi Avance Académico", 
+        "🧮 Calculadoras de Lotes", 
+        "📓 Trading Journal", 
+        "📝 Evaluaciones"
+    ]
+    
+    # SOLO SE AÑADE SI ES ADMIN O SI EN LA BASE TIENE "SI"
+    if es_admin or simulador_permitido:
+        opciones_disponibles.append("📉 Alema Trade live")
+        
+    opciones_disponibles.append("📚 Biblioteca de Guías")
 else:
     opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
 
@@ -522,6 +553,7 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state.autenticado = False
     st.session_state.usuario_actual = ""
     st.session_state.tipo_usuario = "ALUMNO"
+    st.session_state.simulador_habilitado = False
     st.rerun()
 
 # --- SCRIPT DE CIERRE TÁCTIL PARA SAFARI / ANDROID ---
@@ -539,7 +571,6 @@ collapse_script = """
             }
         }
         
-        // Escuchador global de toque/clic en la barra lateral para móviles
         setTimeout(() => {
             const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
             if (sidebar) {
@@ -786,420 +817,626 @@ elif opcion_menu == "🧮 Calculadoras de Lotes":
         💡 <b>LOTAGE SUGERIDO:</b> <span style="color:#FF6B00; font-size: 22px;"><b>{lotaje_rapido:.2f}</b></span>
         </div>
         """, unsafe_allow_html=True)
-
-
 # ==========================================
-# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
+# SECCIÓN: TRADING JOURNAL
 # ==========================================
-elif opcion_menu == "📉 Alema Trade live":
-    
-    import json
-    import os
-    import time
-    from datetime import datetime, timedelta
-    import requests
-    import pandas as pd
-    import numpy as np
-    import plotly.graph_objects as go
-    from streamlit_autorefresh import st_autorefresh
+elif opcion_menu == "📓 Trading Journal":
+    st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title" style="text-align: left;">Journal Institucional de Operaciones y Bitácora Psicológica</div>', unsafe_allow_html=True)
 
-    # Recarga automática de la pantalla cada 4 segundos
-    st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_live")
-
-    # --- IDENTIFICADOR DE USUARIO Y RUTAS PERSISTENTES ---
-    usuario = st.session_state.get("usuario_actual", "alema")
-    ARCH_PERSISTENCIA_ACTIVAS = f"posiciones_activas_{usuario}.json"
-    ARCH_PERSISTENCIA_HISTORIAL = f"historial_cerradas_{usuario}.json"
-
-    def cargar_datos_json(archivo, valor_defecto):
-        if os.path.exists(archivo):
-            try:
-                with open(archivo, "r") as f:
-                    return json.load(f)
-            except Exception:
-                return valor_defecto
-        return valor_defecto
-
-    def guardar_datos_json(archivo, datos):
+    @st.cache_data(ttl=3)
+    def cargar_journal_persiste(matricula_usuario):
         try:
-            with open(archivo, "w") as f:
-                json.dump(datos, f, indent=4)
-        except Exception:
-            pass
-
-    # --- FUNCIÓN DE CONEXIÓN Y LECTURA DE CAPITAL Y CHALLENGE DESDE GOOGLE SHEETS ---
-    @st.cache_data(ttl=10) # Se actualiza cada 10 segundos desde la base de datos
-    def obtener_datos_usuario_desde_sheets(usuario_target):
-        capital_defecto = 300.00
-        nivel_defecto = "Nivel 1"
-        try:
-            sheet_url = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0"
-            df = pd.read_csv(sheet_url)
-            df.columns = [str(c).strip() for c in df.columns]
+            df = pd.read_csv(URL_JOURNAL_CSV, dtype=str)
+            df.columns = df.columns.str.strip()
             
-            # Identificar columnas de Usuario, Capital y Challenge en la hoja
-            col_user = next((c for c in df.columns if any(k in c.lower() for k in ["usuario", "matricula", "user"])), None)
-            col_cap = next((c for c in df.columns if any(k in c.lower() for k in ["capital", "monto", "balance"])), None)
-            col_challenge = next((c for c in df.columns if any(k in c.lower() for k in ["challenge", "nivel", "level"])), None)
-            
-            if col_user:
-                filtro = df[df[col_user].astype(str).str.strip().str.lower() == str(usuario_target).strip().lower()]
-                if not filtro.empty:
-                    # Lectura de Capital
-                    if col_cap:
-                        val_str = str(filtro[col_cap].values[0]).replace("$", "").replace(",", "").strip()
-                        capital_defecto = float(val_str)
-                    # Lectura de Nivel de Challenge
-                    if col_challenge:
-                        val_chal = str(filtro[col_challenge].values[0]).strip()
-                        if val_chal and val_chal.lower() != "nan":
-                            nivel_defecto = val_chal
-        except Exception:
-            pass
-        return capital_defecto, nivel_defecto
-
-    # Cargar operaciones activas e historial
-    st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, [])
-    st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
-
-    # CÁLCULO DINÁMICO DEL BALANCE Y ASIGNACIÓN DE NIVEL DE CHALLENGE
-    capital_base_sheets, nivel_challenge_sheets = obtener_datos_usuario_desde_sheets(usuario)
-    pnl_acumulado_historico = sum(float(trade.get("Beneficio", 0.0)) for trade in st.session_state.historial_cerradas)
-    st.session_state.balance_pedagogico = capital_base_sheets + pnl_acumulado_historico
-    st.session_state.nivel_challenge = nivel_challenge_sheets
-    st.session_state.current_loaded_user = usuario
-
-    if 'cache_precios_forex' not in st.session_state:
-        st.session_state.cache_precios_forex = {}
-    if 'ultimo_tiempo_api' not in st.session_state:
-        st.session_state.ultimo_tiempo_api = {}
-
-    def calcular_pnl_institucional(activo, tipo, entrada, salida, lotes):
-        diferencia = (salida - entrada) if tipo == "BUY" else (entrada - salida)
-        
-        if "XAU" in activo: return diferencia * 100.0 * lotes
-        elif "BTC" in activo: return diferencia * 1.0 * lotes
-        elif "WTI" in activo or "BRENT" in activo: return diferencia * 1000.0 * lotes
-        elif any(idx in activo for idx in ["US30", "SPX500", "NAS100", "GER40"]): return diferencia * 1.0 * lotes
-        elif "JPY" in activo:
-            valor_pip_usd_por_lote = 1000.0 / salida if salida != 0 else 6.80
-            pips = diferencia * 100.0
-            return pips * valor_pip_usd_por_lote * lotes
-        else:
-            return diferencia * 100000.0 * lotes
-
-    def obtener_config_activo(simbolo):
-        if "JPY" in simbolo: return 3, "%.3f", 0.001, 0.100, 0.200, 0.015
-        elif "XAU" in simbolo: return 2, "%.2f", 0.10, 2.00, 4.00, 0.35
-        elif "WTI" in simbolo or "BRENT" in simbolo: return 2, "%.2f", 0.01, 0.30, 0.60, 0.04
-        elif "BTC" in simbolo: return 2, "%.2f", 1.0, 100.0, 200.0, 25.00
-        elif any(idx in simbolo for idx in ["US30", "NAS100", "GER40"]): return 2, "%.2f", 1.0, 20.0, 40.0, 2.00
-        elif "SPX" in simbolo: return 2, "%.2f", 0.10, 4.00, 8.00, 0.40
-        else: return 5, "%.5f", 0.00001, 0.00100, 0.00200, 0.00012
-
-    # Estilos CSS
-    st.markdown("""
-        <style>
-            .mt5-terminal-card { background-color: #131722; border: 1px solid #2A2E39; padding: 10px 15px; border-radius: 4px; margin-bottom: 8px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-            .live-ticker-price { color: #f59e0b; font-weight: 700; font-size: 15px; }
-            .live-ticker-bid { color: #ef5350; font-weight: 700; font-size: 15px; }
-            .live-ticker-ask { color: #26a69a; font-weight: 700; font-size: 15px; }
-            .mt5-table-container { overflow-x: auto; border: 1px solid #2A2E39; border-radius: 4px; margin-top: 10px; }
-            .mt5-table { width: 100%; border-collapse: collapse; font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 13px; background-color: #131722; color: #d1d4dc; }
-            .mt5-table th { background-color: #1e222d; color: #848e9c; padding: 8px 12px; text-align: left; border-bottom: 1px solid #2A2E39; font-weight: 600; white-space: nowrap; }
-            .mt5-table td { padding: 7px 12px; border-bottom: 1px solid #1e222d; white-space: nowrap; }
-            .mt5-buy { color: #2962FF; font-weight: 600; }
-            .mt5-sell { color: #ef5350; font-weight: 600; }
-            .mt5-profit { color: #26a69a; font-weight: 600; }
-            .mt5-loss { color: #ef5350; font-weight: 600; }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional</div>', unsafe_allow_html=True)
-
-    lista_activos = [
-        "EURUSD", "GBPUSD", "USDJPY", "EURJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", 
-        "XAUUSD", "WTIUSD", "BRENTUSD", 
-        "US30", "SPX500", "NAS100", "GER40", "BTCUSD"
-    ]
-
-    par_activo = st.selectbox("Símbolo de Mercado", lista_activos, key="select_chart_asset_forex")
-
-    # --- NÚCLEO DE PRECIOS CON PROTECCIÓN DE API ---
-    def obtener_cotizacion_completa(simbolo):
-        dec, _, step_val, _, _, spread_val = obtener_config_activo(simbolo)
-        simbolos_map = { "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY", "EURJPY": "EUR/JPY", "AUDUSD": "AUD/USD", "USDCAD": "USD/CAD", "USDCHF": "USD/CHF", "GBPJPY": "GBP/JPY", "XAUUSD": "XAU/USD", "WTIUSD": "WTI/USD", "BRENTUSD": "BRENT/USD", "US30": "US30", "SPX500": "SPX", "NAS100": "NDX", "GER40": "DAX", "BTCUSD": "BTC/USD" }
-        simbolo_api = simbolos_map.get(simbolo, "EUR/USD")
-        api_key = "6223c6d78f7a43b2872fc3acbb3f578e"
-        ahora = time.time()
-        tiempo_ultimo = st.session_state.ultimo_tiempo_api.get(simbolo, 0)
-        
-        if ahora - tiempo_ultimo > 45:
-            try:
-                url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
-                res = requests.get(url, timeout=3)
-                if res.status_code == 200:
-                    data = res.json()
-                    if "price" in data:
-                        st.session_state.cache_precios_forex[simbolo] = float(data["price"])
-            except Exception:
-                pass
-            finally:
-                st.session_state.ultimo_tiempo_api[simbolo] = ahora
-
-        if simbolo in st.session_state.cache_precios_forex:
-            precio_base = st.session_state.cache_precios_forex[simbolo]
-        else:
-            precios_fallback = { "EURUSD": 1.15919, "GBPUSD": 1.31210, "USDJPY": 146.850, "EURJPY": 162.450, "XAUUSD": 2512.30, "US30": 41200.00, "BTCUSD": 62500.00 }
-            precio_base = precios_fallback.get(simbolo, 1.0000)
-            st.session_state.cache_precios_forex[simbolo] = precio_base
-
-        ruido = np.random.normal(0, step_val * 1.2)
-        precio_vivo = round(precio_base + ruido, dec)
-        precio_bid = precio_vivo
-        precio_ask = round(precio_bid + spread_val, dec)
-
-        return precio_bid, precio_ask, precio_vivo
-
-    precios_tick_actual = {}
-    
-    def get_precio_sincronizado(simbolo):
-        if simbolo not in precios_tick_actual:
-            precios_tick_actual[simbolo] = obtener_cotizacion_completa(simbolo)
-        return precios_tick_actual[simbolo]
-
-    bid_actual, ask_actual, precio_vivo_actual = get_precio_sincronizado(par_activo)
-
-    if 'mercado_forex_df' not in st.session_state:
-        st.session_state.mercado_forex_df = {}
-
-    def obtener_dataframe_forex(simbolo, precio_actual):
-        if simbolo not in st.session_state.mercado_forex_df:
-            fechas = [datetime.now() - timedelta(minutes=15 * i) for i in range(50)][::-1]
-            vol = precio_actual * 0.0004
-            np.random.seed(123)
-            closes = np.linspace(precio_actual - (vol * 4), precio_actual, 50) + np.random.normal(0, vol * 0.2, 50)
-            opens = closes + np.random.normal(0, vol * 0.1, 50)
-            highs = np.maximum(opens, closes) + abs(np.random.normal(0, vol * 0.2, 50))
-            lows = np.minimum(opens, closes) - abs(np.random.normal(0, vol * 0.2, 50))
-            
-            df_init = pd.DataFrame({'Open': opens, 'High': highs, 'Low': lows, 'Close': closes}, index=fechas)
-            st.session_state.mercado_forex_df[simbolo] = df_init
-            
-        df = st.session_state.mercado_forex_df[simbolo]
-        df.iloc[-1, df.columns.get_loc('Close')] = precio_actual
-        df.iloc[-1, df.columns.get_loc('High')] = max(df.iloc[-1]['Open'], max(df.iloc[-1]['High'], precio_actual))
-        df.iloc[-1, df.columns.get_loc('Low')] = min(df.iloc[-1]['Open'], min(df.iloc[-1]['Low'], precio_actual))
-        return df
-
-    df_history = obtener_dataframe_forex(par_activo, bid_actual)
-
-    # --- MONITOREO DE ORDENES ACTIVAS (CIERRE EXACTO ECN) ---
-    if st.session_state.posiciones_abiertas:
-        posiciones_conservadas = []
-        hubo_cambios_auto = False
-
-        for pos in st.session_state.posiciones_abiertas:
-            sim_pos = pos["activo"]
-            dec_pos, _, _, _, _, _ = obtener_config_activo(sim_pos)
-            
-            p_bid, p_ask, _ = get_precio_sincronizado(sim_pos)
-            
-            pos["bid_vela_actual"] = p_bid
-            pos["ask_vela_actual"] = p_ask
-
-            tp_exacto = round(pos["tp"], dec_pos)
-            sl_exacto = round(pos["sl"], dec_pos)
-
-            cierre_por_tp_sl = False
-            precio_ejecucion_salida = p_bid if pos["tipo"] == "BUY" else p_ask
-
-            if pos["tipo"] == "BUY":
-                if p_bid >= tp_exacto:
-                    cierre_por_tp_sl = True
-                    precio_ejecucion_salida = tp_exacto
-                elif p_bid <= sl_exacto:
-                    cierre_por_tp_sl = True
-                    precio_ejecucion_salida = sl_exacto
-            else: # SELL
-                if p_ask <= tp_exacto:
-                    cierre_por_tp_sl = True
-                    precio_ejecucion_salida = tp_exacto
-                elif p_ask >= sl_exacto:
-                    cierre_por_tp_sl = True
-                    precio_ejecucion_salida = sl_exacto
-
-            if cierre_por_tp_sl:
-                pnl_real = calcular_pnl_institucional(sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"])
-                
-                st.session_state.balance_pedagogico += pnl_real
-                
-                registro_historial = {
-                    "Tipo": pos['tipo'].lower(),
-                    "Volumen": pos['lotes'],
-                    "Símbolo": sim_pos,
-                    "S / L": sl_exacto,
-                    "T / P": tp_exacto,
-                    "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                    "Precio Cierre": precio_ejecucion_salida,
-                    "Beneficio": round(pnl_real, 2)
-                }
-                st.session_state.historial_cerradas.append(registro_historial)
-                guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
-                hubo_cambios_auto = True
+            col_mat = [c for c in df.columns if 'Matricula' in c or 'Matrícula' in c]
+            if col_mat:
+                nombre_col_mat = col_mat[0]
+                df_user = df[df[nombre_col_mat].str.strip().str.upper() == matricula_usuario].copy()
             else:
-                posiciones_conservadas.append(pos)
+                df_user = pd.DataFrame()
 
-        if hubo_cambios_auto:
-            st.session_state.posiciones_abiertas = posiciones_conservadas
-            guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.rerun()
+            col_res = [c for c in df.columns if 'Resultado' in c or 'USD' in c or 'pnl' in c.lower()]
+            if col_res:
+                df_user['Resultado_Num'] = pd.to_numeric(df_user[col_res[0]], errors='coerce').fillna(0.0)
+            else:
+                df_user['Resultado_Num'] = 0.0
 
-    # --- DASHBOARD Y GRÁFICOS CON VISUALIZACIÓN DE CHALLENGE Y ROL ADMIN ---
-    es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
+            return df_user
+        except Exception:
+            return pd.DataFrame()
 
-    if es_admin:
-        col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
+    df_user_journal = cargar_journal_persiste(st.session_state.usuario_actual)
+    total_trades = len(df_user_journal)
+
+    if total_trades > 0:
+        pnl_total = df_user_journal['Resultado_Num'].sum()
+        wins = len(df_user_journal[df_user_journal['Resultado_Num'] > 0])
+        win_rate = (wins / total_trades) * 100
     else:
-        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        pnl_total = 0.0
+        win_rate = 0.0
 
-    with col_m1: 
-        st.metric("Balance Base", f"${st.session_state.balance_pedagogico:,.2f}")
-    with col_m2:
-        pnl_flotante_total = sum([
-            calcular_pnl_institucional(p["activo"], p["tipo"], p["entrada"], p.get("bid_vela_actual", p["entrada"]) if p["tipo"] == "BUY" else p.get("ask_vela_actual", p["entrada"]), p["lotes"]) 
-            for p in st.session_state.posiciones_abiertas
-        ])
-        st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
-    with col_m3: 
-        st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
-    with col_m4:
-        st.metric("Fase Challenge", st.session_state.get("nivel_challenge", "Nivel 1"))
-
-    if es_admin:
-        with col_m5: 
-            if st.button("🔄 Sincronizar Sheets"):
-                st.cache_data.clear()
-                st.rerun()
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric("Total de Trades", f"{total_trades}")
+    with m2:
+        st.metric("Win Rate (%)", f"{win_rate:.1f}%")
+    with m3:
+        st.metric("P&L Total ($ USD)", f"${pnl_total:.2f}")
 
     st.divider()
 
-    col_grafico, col_panel = st.columns([2.4, 1.0])
-    n_decimals, formato_str, step_val, dist_sl, dist_tp, spread_val = obtener_config_activo(par_activo)
-
-    with col_grafico:
-        st.markdown(
-            f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>"
-            f"Gráfico {par_activo} | Precio Actual: <span class='live-ticker-price'>{formato_str % precio_vivo_actual}</span> | "
-            f"BID: <span class='live-ticker-bid'>{formato_str % bid_actual}</span> | ASK: <span class='live-ticker-ask'>{formato_str % ask_actual}</span> | "
-            f"Spread: <b style='color:#d1d4dc;'>{formato_str % spread_val}</b></div>", unsafe_allow_html=True
-        )
-
-        fig = go.Figure()
-        if not df_history.empty:
-            fig.add_trace(go.Candlestick(x=df_history.index, open=df_history['Open'], high=df_history['High'], low=df_history['Low'], close=df_history['Close'], name=par_activo, increasing_line_color='#26a69a', decreasing_line_color='#ef5350'))
-
-        for pos in st.session_state.posiciones_abiertas:
-            if pos["activo"] == par_activo:
-                fig.add_hline(y=pos["entrada"], line_dash="dash", line_color="#2962FF", annotation_text=f"Entrada ({pos['entrada']})")
-                fig.add_hline(y=pos["tp"], line_dash="dot", line_color="#26a69a", annotation_text=f"TP ({pos['tp']})")
-                fig.add_hline(y=pos["sl"], line_dash="dot", line_color="#ef5350", annotation_text=f"SL ({pos['sl']})")
-
-        fig.update_layout(template="plotly_dark", paper_bgcolor="#131722", plot_bgcolor="#131722", height=430, margin=dict(l=10, r=10, t=10, b=10), xaxis=dict(showgrid=True, gridcolor='#2A2E39', rangeslider=dict(visible=False)), yaxis=dict(showgrid=True, gridcolor='#2A2E39', zeroline=False), dragmode='pan')
-        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True, 'displaylogo': False})
-
-    with col_panel:
-        st.markdown("### Nueva Orden")
-        sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_forex")
-        sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01)
+    st.subheader("✍️ Registrar Nueva Operación Manual")
+    
+    with st.form("form_journal_directo", clear_on_submit=True):
+        col_j1, col_j2 = st.columns(2)
         
-        precio_ref_orden = ask_actual if sim_tipo == "BUY" else bid_actual
-
-        key_sl = f"sim_precio_sl_{par_activo}_{sim_tipo}"
-        key_tp = f"sim_precio_tp_{par_activo}_{sim_tipo}"
-
-        if key_sl not in st.session_state:
-            st.session_state[key_sl] = float(round(precio_ref_orden - dist_sl if sim_tipo == "BUY" else precio_ref_orden + dist_sl, n_decimals))
-        if key_tp not in st.session_state:
-            st.session_state[key_tp] = float(round(precio_ref_orden + dist_tp if sim_tipo == "BUY" else precio_ref_orden - dist_tp, n_decimals))
-
-        sim_precio_sl = st.number_input("Stop Loss", format=formato_str, step=step_val, key=key_sl)
-        sim_precio_tp = st.number_input("Take Profit", format=formato_str, step=step_val, key=key_tp)
-
-        texto_boton = "🟢 EJECUTAR ORDEN DE COMPRA" if sim_tipo == "BUY" else "🔴 EJECUTAR ORDEN DE VENTA"
-        
-        if st.button(texto_boton, use_container_width=True):
-            nueva_orden = {
-                "id": int(datetime.now().timestamp()),
-                "tiempo_apertura": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                "activo": par_activo, "tipo": sim_tipo, "lotes": float(sim_lotes),
-                "entrada": float(precio_ref_orden), "sl": float(sim_precio_sl), "tp": float(sim_precio_tp),
-                "bid_vela_actual": float(bid_actual), "ask_vela_actual": float(ask_actual)
-            }
-            st.session_state.posiciones_abiertas.append(nueva_orden)
-            guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
-            st.rerun()
-
-    # --- POSICIONES ACTIVAS ---
-    st.markdown("### Posiciones Abiertas (Monitoreo ECN en Vivo)")
-    if st.session_state.posiciones_abiertas:
-        for idx, pos in enumerate(st.session_state.posiciones_abiertas):
-            p_salida = pos.get("bid_vela_actual", pos["entrada"]) if pos["tipo"] == "BUY" else pos.get("ask_vela_actual", pos["entrada"])
-            dec_pos, fmt_pos, _, _, _, _ = obtener_config_activo(pos["activo"])
-            pnl_card = calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], p_salida, pos["lotes"])
-
-            st.markdown(f"""
-                <div class="mt5-terminal-card">
-                    <b>{pos['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}">{pos['tipo']}</span> | 
-                    Entrada: <code>{fmt_pos % pos['entrada']}</code> | Salida Actual: <code style="color: #26a69a;">{fmt_pos % p_salida}</code> | 
-                    TP: <span style="color:#26a69a;">{fmt_pos % pos['tp']}</span> | SL: <span style="color:#ef5350;">{fmt_pos % pos['sl']}</span> | 
-                    PnL: <b style="color: {'#26a69a' if pnl_card>=0 else '#ef5350'}">${pnl_card:,.2f} USD</b>
-                </div>
-            """, unsafe_allow_html=True)
+        with col_j1:
+            j_fecha = st.date_input("Fecha", value=datetime.now())
+            j_activo = st.text_input("Activo / Par", value="EUR/USD").strip().upper()
+            j_tipo = st.selectbox("Tipo", ["BUY", "SELL"])
+            j_lotes = st.number_input("Lotes Operados", value=0.10, step=0.01)
             
-            if st.button(f"Cerrar Manual #{pos['id']}", key=f"btn_close_{pos['id']}_{idx}"):
-                st.session_state.balance_pedagogico += pnl_card
-                st.session_state.historial_cerradas.append({
-                    "Tipo": pos['tipo'].lower(), "Volumen": pos['lotes'], "Símbolo": pos['activo'],
-                    "S / L": pos['sl'], "T / P": pos['tp'], "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
-                    "Precio Cierre": round(p_salida, dec_pos), "Beneficio": round(pnl_card, 2)
-                })
-                guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
-                st.session_state.posiciones_abiertas.pop(idx)
+        with col_j2:
+            j_pips = st.number_input("Pips (+/-)", value=20.0, step=1.0)
+            j_pnl = st.number_input("Resultado ($ USD)", value=20.0, step=1.0)
+            j_emocion = st.selectbox("Estado Emocional / Psicotrading", [
+                "🟢 Disciplinado",
+                "🟡 Ansiedad",
+                "🔴 Impulsivo / FOMO",
+                "🔴 Revancha"
+            ])
+            j_link = st.text_input("Enlace / Captura de TradingView", value="")
+
+        j_notas = st.text_area("Observaciones / Conclusión Técnica", placeholder="¿Por qué entraste? ¿Qué confirmó tu setup?")
+        
+        submitted = st.form_submit_button("💾 Guardar en Journal", use_container_width=True)
+        
+        if submitted:
+            form_data = {
+                "entry.990498500": st.session_state.usuario_actual,
+                "entry.155506709": str(j_fecha),
+                "entry.906926856": j_activo,
+                "entry.1849778551": j_tipo,
+                "entry.974887529": str(j_lotes),
+                "entry.46118986": str(j_pips),
+                "entry.1003289205": str(j_pnl),
+                "entry.372443422": j_emocion,
+                "entry.332810614": j_notas,
+                "entry.635428194": j_link
+            }
+            
+            try:
+                res = requests.post(URL_FORM_RESPONSE, data=form_data)
+                if res.status_code == 200 or res.status_code == 0:
+                    st.success("✅ Operación registrada exitosamente en tu bitácora permanente.")
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("⚠️ Error al registrar la operación en Google Sheets.")
+            except Exception as e:
+                st.error(f"Error de conexión: {e}")
+
+    st.divider()
+
+    st.subheader("📋 Bitácora Histórica Permanente")
+    if not df_user_journal.empty:
+        df_mostrar = df_user_journal.drop(columns=['Resultado_Num'], errors='ignore')
+        st.dataframe(df_mostrar, use_container_width=True)
+    else:
+        st.info("💡 Aún no tienes trades guardados en tu historial permanente.")
+# ==========================================
+# 📉 SECCIÓN: ALEMA TRADE LIVE
+# ==========================================
+elif opcion_menu == "📉 Alema Trade live":
+    import time
+    import pandas as pd
+
+    # 1. Identificar usuario activo en la sesión
+    usuario_actual = st.session_state.get("usuario_actual", "").strip()
+
+    # --- LECTURA DIRECTA DE GOOGLE SHEETS SIN CACHÉ DE SERVIDOR ---
+    def consultar_bd_en_vivo(usuario_target):
+        # Timestamp para forzar a Google Sheets a no usar caché de CDN
+        timestamp = int(time.time())
+        sheet_url = f"https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0&_t={timestamp}"
+        
+        capital = 300.00
+        nivel = "Nivel 1"
+        simulador_permitido = False
+        es_administrador = False
+        valor_raw_columna = "NO ENCONTRADO"
+        
+        try:
+            df = pd.read_csv(sheet_url)
+            df.columns = [str(c).strip() for c in df.columns]
+            
+            # Mapeo de columnas
+            col_user = next((c for c in df.columns if any(k in c.lower() for k in ["usuario", "matricula", "user"])), None)
+            col_cap = next((c for c in df.columns if any(k in c.lower() for k in ["capital", "monto", "balance"])), None)
+            col_chal = next((c for c in df.columns if any(k in c.lower() for k in ["challenge", "nivel"])), None)
+            col_sim = next((c for c in df.columns if any(k in c.lower() for k in ["simulador", "habilitado"])), None)
+            col_tipo = next((c for c in df.columns if any(k in c.lower() for k in ["tipo", "rol"])), None)
+            
+            if col_user:
+                # Filtrar fila exacta del usuario
+                filtro = df[df[col_user].astype(str).str.strip().str.lower() == str(usuario_target).strip().lower()]
+                
+                if not filtro.empty:
+                    # Validar Rol Admin
+                    if col_tipo:
+                        val_tipo = str(filtro[col_tipo].values[0]).strip().upper()
+                        es_administrador = (val_tipo == "ADMIN")
+                    
+                    # Validar Capital
+                    if col_cap:
+                        val_cap = str(filtro[col_cap].values[0]).replace("$", "").replace(",", "").strip()
+                        capital = float(val_cap) if val_cap != "nan" else 300.0
+                        
+                    # Validar Challenge
+                    if col_chal:
+                        val_chal = str(filtro[col_chal].values[0]).strip()
+                        if val_chal and val_chal.lower() != "nan":
+                            nivel = val_chal
+
+                    # Validar Simulador Habilitado
+                    if col_sim:
+                        valor_raw_columna = str(filtro[col_sim].values[0]).strip().upper()
+                        # Solo asigna True si el texto es exactamente "SI", "TRUE" o "1"
+                        simulador_permitido = valor_raw_columna in ["SI", "YES", "TRUE", "1"]
+        except Exception as e:
+            st.error(f"Error de conexión con la base de datos: {e}")
+            
+        return capital, nivel, simulador_permitido, es_administrador, valor_raw_columna
+
+    # 2. Obtener datos limpios
+    capital_base, nivel_challenge, simulador_activo, es_admin, valor_raw = consultar_bd_en_vivo(usuario_actual)
+
+    # --- PANEL DE DIAGNÓSTICO (Visible temporalmente para pruebas) ---
+    with st.expander("🔍 DIAGNÓSTICO DE ACCESO EN TIEMPO REAL", expanded=True):
+        col_d1, col_d2, col_d3, col_d4 = st.columns(4)
+        col_d1.write(f"**Usuario en Sesión:** `{usuario_actual}`")
+        col_d2.write(f"**¿Es Admin en BD?:** `{es_admin}`")
+        col_d3.write(f"**Valor Columna G:** `{valor_raw}`")
+        col_d4.write(f"**Acceso Permitido:** `{es_admin or simulador_activo}`")
+
+    # 3. EVALUACIÓN ESTRICTA DE LA PUERTA DE ACCESO
+    if es_admin or simulador_activo:
+        st.title("📉 Alema Trade Live")
+        
+        
+        # ==========================================
+        # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
+        # (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
+        # ==========================================
+        import json
+        import os
+        import time
+        from datetime import datetime, timedelta
+        import requests
+        import pandas as pd
+        import numpy as np
+        import plotly.graph_objects as go
+        from streamlit_autorefresh import st_autorefresh
+
+        # Recarga automática de la pantalla cada 4 segundos
+        st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_live")
+
+        # --- IDENTIFICADOR DE USUARIO Y RUTAS PERSISTENTES ---
+        usuario = st.session_state.get("usuario_actual", "alema")
+        ARCH_PERSISTENCIA_ACTIVAS = f"posiciones_activas_{usuario}.json"
+        ARCH_PERSISTENCIA_HISTORIAL = f"historial_cerradas_{usuario}.json"
+
+        def cargar_datos_json(archivo, valor_defecto):
+            if os.path.exists(archivo):
+                try:
+                    with open(archivo, "r") as f:
+                        return json.load(f)
+                except Exception:
+                    return valor_defecto
+            return valor_defecto
+
+        def guardar_datos_json(archivo, datos):
+            try:
+                with open(archivo, "w") as f:
+                    json.dump(datos, f, indent=4)
+            except Exception:
+                pass
+
+        # --- FUNCIÓN DE CONEXIÓN Y LECTURA DE CAPITAL Y CHALLENGE DESDE GOOGLE SHEETS ---
+        @st.cache_data(ttl=10) # Se actualiza cada 10 segundos desde la base de datos
+        def obtener_datos_usuario_desde_sheets(usuario_target):
+            capital_defecto = 300.00
+            nivel_defecto = "Nivel 1"
+            try:
+                sheet_url = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0"
+                df = pd.read_csv(sheet_url)
+                df.columns = [str(c).strip() for c in df.columns]
+                
+                # Identificar columnas de Usuario, Capital y Challenge en la hoja
+                col_user = next((c for c in df.columns if any(k in c.lower() for k in ["usuario", "matricula", "user"])), None)
+                col_cap = next((c for c in df.columns if any(k in c.lower() for k in ["capital", "monto", "balance"])), None)
+                col_challenge = next((c for c in df.columns if any(k in c.lower() for k in ["challenge", "nivel", "level"])), None)
+                
+                if col_user:
+                    filtro = df[df[col_user].astype(str).str.strip().str.lower() == str(usuario_target).strip().lower()]
+                    if not filtro.empty:
+                        # Lectura de Capital
+                        if col_cap:
+                            val_str = str(filtro[col_cap].values[0]).replace("$", "").replace(",", "").strip()
+                            capital_defecto = float(val_str)
+                        # Lectura de Nivel de Challenge
+                        if col_challenge:
+                            val_chal = str(filtro[col_challenge].values[0]).strip()
+                            if val_chal and val_chal.lower() != "nan":
+                                nivel_defecto = val_chal
+            except Exception:
+                pass
+            return capital_defecto, nivel_defecto
+
+        # Cargar operaciones activas e historial
+        st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, [])
+        st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
+
+        # CÁLCULO DINÁMICO DEL BALANCE Y ASIGNACIÓN DE NIVEL DE CHALLENGE
+        capital_base_sheets, nivel_challenge_sheets = obtener_datos_usuario_desde_sheets(usuario)
+        pnl_acumulado_historico = sum(float(trade.get("Beneficio", 0.0)) for trade in st.session_state.historial_cerradas)
+        st.session_state.balance_pedagogico = capital_base_sheets + pnl_acumulado_historico
+        st.session_state.nivel_challenge = nivel_challenge_sheets
+        st.session_state.current_loaded_user = usuario
+
+        if 'cache_precios_forex' not in st.session_state:
+            st.session_state.cache_precios_forex = {}
+        if 'ultimo_tiempo_api' not in st.session_state:
+            st.session_state.ultimo_tiempo_api = {}
+
+        def calcular_pnl_institucional(activo, tipo, entrada, salida, lotes):
+            diferencia = (salida - entrada) if tipo == "BUY" else (entrada - salida)
+            
+            if "XAU" in activo: return diferencia * 100.0 * lotes
+            elif "BTC" in activo: return diferencia * 1.0 * lotes
+            elif "WTI" in activo or "BRENT" in activo: return diferencia * 1000.0 * lotes
+            elif any(idx in activo for idx in ["US30", "SPX500", "NAS100", "GER40"]): return diferencia * 1.0 * lotes
+            elif "JPY" in activo:
+                valor_pip_usd_por_lote = 1000.0 / salida if salida != 0 else 6.80
+                pips = diferencia * 100.0
+                return pips * valor_pip_usd_por_lote * lotes
+            else:
+                return diferencia * 100000.0 * lotes
+
+        def obtener_config_activo(simbolo):
+            if "JPY" in simbolo: return 3, "%.3f", 0.001, 0.100, 0.200, 0.015
+            elif "XAU" in simbolo: return 2, "%.2f", 0.10, 2.00, 4.00, 0.35
+            elif "WTI" in simbolo or "BRENT" in simbolo: return 2, "%.2f", 0.01, 0.30, 0.60, 0.04
+            elif "BTC" in simbolo: return 2, "%.2f", 1.0, 100.0, 200.0, 25.00
+            elif any(idx in simbolo for idx in ["US30", "NAS100", "GER40"]): return 2, "%.2f", 1.0, 20.0, 40.0, 2.00
+            elif "SPX" in simbolo: return 2, "%.2f", 0.10, 4.00, 8.00, 0.40
+            else: return 5, "%.5f", 0.00001, 0.00100, 0.00200, 0.00012
+
+        # Estilos CSS
+        st.markdown("""
+            <style>
+                .mt5-terminal-card { background-color: #131722; border: 1px solid #2A2E39; padding: 10px 15px; border-radius: 4px; margin-bottom: 8px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+                .live-ticker-price { color: #f59e0b; font-weight: 700; font-size: 15px; }
+                .live-ticker-bid { color: #ef5350; font-weight: 700; font-size: 15px; }
+                .live-ticker-ask { color: #26a69a; font-weight: 700; font-size: 15px; }
+                .mt5-table-container { overflow-x: auto; border: 1px solid #2A2E39; border-radius: 4px; margin-top: 10px; }
+                .mt5-table { width: 100%; border-collapse: collapse; font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 13px; background-color: #131722; color: #d1d4dc; }
+                .mt5-table th { background-color: #1e222d; color: #848e9c; padding: 8px 12px; text-align: left; border-bottom: 1px solid #2A2E39; font-weight: 600; white-space: nowrap; }
+                .mt5-table td { padding: 7px 12px; border-bottom: 1px solid #1e222d; white-space: nowrap; }
+                .mt5-buy { color: #2962FF; font-weight: 600; }
+                .mt5-sell { color: #ef5350; font-weight: 600; }
+                .mt5-profit { color: #26a69a; font-weight: 600; }
+                .mt5-loss { color: #ef5350; font-weight: 600; }
+            </style>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional</div>', unsafe_allow_html=True)
+
+        lista_activos = [
+            "EURUSD", "GBPUSD", "USDJPY", "EURJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", 
+            "XAUUSD", "WTIUSD", "BRENTUSD", 
+            "US30", "SPX500", "NAS100", "GER40", "BTCUSD"
+        ]
+
+        par_activo = st.selectbox("Símbolo de Mercado", lista_activos, key="select_chart_asset_forex")
+
+        # --- NÚCLEO DE PRECIOS CON PROTECCIÓN DE API ---
+        def obtener_cotizacion_completa(simbolo):
+            dec, _, step_val, _, _, spread_val = obtener_config_activo(simbolo)
+            simbolos_map = { "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY", "EURJPY": "EUR/JPY", "AUDUSD": "AUD/USD", "USDCAD": "USD/CAD", "USDCHF": "USD/CHF", "GBPJPY": "GBP/JPY", "XAUUSD": "XAU/USD", "WTIUSD": "WTI/USD", "BRENTUSD": "BRENT/USD", "US30": "US30", "SPX500": "SPX", "NAS100": "NDX", "GER40": "DAX", "BTCUSD": "BTC/USD" }
+            simbolo_api = simbolos_map.get(simbolo, "EUR/USD")
+            api_key = "6223c6d78f7a43b2872fc3acbb3f578e"
+            ahora = time.time()
+            tiempo_ultimo = st.session_state.ultimo_tiempo_api.get(simbolo, 0)
+            
+            if ahora - tiempo_ultimo > 45:
+                try:
+                    url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
+                    res = requests.get(url, timeout=3)
+                    if res.status_code == 200:
+                        data = res.json()
+                        if "price" in data:
+                            st.session_state.cache_precios_forex[simbolo] = float(data["price"])
+                except Exception:
+                    pass
+                finally:
+                    st.session_state.ultimo_tiempo_api[simbolo] = ahora
+            
+            if simbolo in st.session_state.cache_precios_forex:
+                precio_base = st.session_state.cache_precios_forex[simbolo]
+            else:
+                precios_fallback = { "EURUSD": 1.15919, "GBPUSD": 1.31210, "USDJPY": 146.850, "EURJPY": 162.450, "XAUUSD": 2512.30, "US30": 41200.00, "BTCUSD": 62500.00 }
+                precio_base = precios_fallback.get(simbolo, 1.0000)
+                st.session_state.cache_precios_forex[simbolo] = precio_base
+            
+            ruido = np.random.normal(0, step_val * 1.2)
+            precio_vivo = round(precio_base + ruido, dec)
+            precio_bid = precio_vivo
+            precio_ask = round(precio_bid + spread_val, dec)
+            
+            return precio_bid, precio_ask, precio_vivo
+
+        precios_tick_actual = {}
+
+        def get_precio_sincronizado(simbolo):
+            if simbolo not in precios_tick_actual:
+                precios_tick_actual[simbolo] = obtener_cotizacion_completa(simbolo)
+            return precios_tick_actual[simbolo]
+
+        bid_actual, ask_actual, precio_vivo_actual = get_precio_sincronizado(par_activo)
+
+        if 'mercado_forex_df' not in st.session_state:
+            st.session_state.mercado_forex_df = {}
+
+        def obtener_dataframe_forex(simbolo, precio_actual):
+            if simbolo not in st.session_state.mercado_forex_df:
+                fechas = [datetime.now() - timedelta(minutes=15 * i) for i in range(50)][::-1]
+                vol = precio_actual * 0.0004
+                np.random.seed(123)
+                closes = np.linspace(precio_actual - (vol * 4), precio_actual, 50) + np.random.normal(0, vol * 0.2, 50)
+                opens = closes + np.random.normal(0, vol * 0.1, 50)
+                highs = np.maximum(opens, closes) + abs(np.random.normal(0, vol * 0.2, 50))
+                lows = np.minimum(opens, closes) - abs(np.random.normal(0, vol * 0.2, 50))
+                
+                df_init = pd.DataFrame({'Open': opens, 'High': highs, 'Low': lows, 'Close': closes}, index=fechas)
+                st.session_state.mercado_forex_df[simbolo] = df_init
+                
+            df = st.session_state.mercado_forex_df[simbolo]
+            df.iloc[-1, df.columns.get_loc('Close')] = precio_actual
+            df.iloc[-1, df.columns.get_loc('High')] = max(df.iloc[-1]['Open'], max(df.iloc[-1]['High'], precio_actual))
+            df.iloc[-1, df.columns.get_loc('Low')] = min(df.iloc[-1]['Open'], min(df.iloc[-1]['Low'], precio_actual))
+            return df
+
+        df_history = obtener_dataframe_forex(par_activo, bid_actual)
+
+        # --- MONITOREO DE ORDENES ACTIVAS (CIERRE EXACTO ECN) ---
+        if st.session_state.posiciones_abiertas:
+            posiciones_conservadas = []
+            hubo_cambios_auto = False
+
+            for pos in st.session_state.posiciones_abiertas:
+                sim_pos = pos["activo"]
+                dec_pos, _, _, _, _, _ = obtener_config_activo(sim_pos)
+                
+                p_bid, p_ask, _ = get_precio_sincronizado(sim_pos)
+                
+                pos["bid_vela_actual"] = p_bid
+                pos["ask_vela_actual"] = p_ask
+
+                tp_exacto = round(pos["tp"], dec_pos)
+                sl_exacto = round(pos["sl"], dec_pos)
+
+                cierre_por_tp_sl = False
+                precio_ejecucion_salida = p_bid if pos["tipo"] == "BUY" else p_ask
+
+                if pos["tipo"] == "BUY":
+                    if p_bid >= tp_exacto:
+                        cierre_por_tp_sl = True
+                        precio_ejecucion_salida = tp_exacto
+                    elif p_bid <= sl_exacto:
+                        cierre_por_tp_sl = True
+                        precio_ejecucion_salida = sl_exacto
+                else: # SELL
+                    if p_ask <= tp_exacto:
+                        cierre_por_tp_sl = True
+                        precio_ejecucion_salida = tp_exacto
+                    elif p_ask >= sl_exacto:
+                        cierre_por_tp_sl = True
+                        precio_ejecucion_salida = sl_exacto
+
+                if cierre_por_tp_sl:
+                    pnl_real = calcular_pnl_institucional(sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"])
+                    
+                    st.session_state.balance_pedagogico += pnl_real
+                    
+                    registro_historial = {
+                        "Tipo": pos['tipo'].lower(),
+                        "Volumen": pos['lotes'],
+                        "Símbolo": sim_pos,
+                        "S / L": sl_exacto,
+                        "T / P": tp_exacto,
+                        "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                        "Precio Cierre": precio_ejecucion_salida,
+                        "Beneficio": round(pnl_real, 2)
+                    }
+                    st.session_state.historial_cerradas.append(registro_historial)
+                    guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
+                    hubo_cambios_auto = True
+                else:
+                    posiciones_conservadas.append(pos)
+
+            if hubo_cambios_auto:
+                st.session_state.posiciones_abiertas = posiciones_conservadas
                 guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
                 st.rerun()
-    else:
-        st.info("No hay posiciones activas.")
 
-    # --- BITÁCORA ---
-    st.markdown("<br>", unsafe_allow_html=True)
+        # --- DASHBOARD Y GRÁFICOS CON VISUALIZACIÓN DE CHALLENGE Y ROL ADMIN ---
+        if es_admin:
+            col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
+        else:
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
 
-    if st.session_state.get("tipo_usuario") == "ADMIN":
-        col_tit_bita, col_btn_bita = st.columns([3.0, 1.0])
-        with col_tit_bita: 
-            st.markdown("### Bitácora Histórica")
-        with col_btn_bita:
-            if st.button("🗑️ Limpiar Historial"):
-                st.session_state.historial_cerradas = []
-                guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
-                st.rerun()
-    else:
-        st.markdown("### Bitácora Histórica")
+        with col_m1: 
+            st.metric("Balance Base", f"${st.session_state.balance_pedagogico:,.2f}")
+        with col_m2:
+            pnl_flotante_total = sum([
+                calcular_pnl_institucional(p["activo"], p["tipo"], p["entrada"], p.get("bid_vela_actual", p["entrada"]) if p["tipo"] == "BUY" else p.get("ask_vela_actual", p["entrada"]), p["lotes"]) 
+                for p in st.session_state.posiciones_abiertas
+            ])
+            st.metric("Beneficio Flotante", f"${pnl_flotante_total:,.2f}", delta=f"${pnl_flotante_total:,.2f}")
+        with col_m3: 
+            st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
+        with col_m4:
+            st.metric("Fase Challenge", st.session_state.get("nivel_challenge", "Nivel 1"))
 
-    if st.session_state.historial_cerradas:
-        filas_html = []
-        for item in reversed(st.session_state.historial_cerradas):
-            _, fmt_pos, _, _, _, _ = obtener_config_activo(item.get("Símbolo", "EURUSD"))
-            filas_html.append(
-                f'<tr><td>{item.get("Tiempo Cierre")}</td><td class="{"mt5-buy" if item.get("Tipo")=="buy" else "mt5-sell"}">{item.get("Tipo")}</td>'
-                f'<td>{item.get("Volumen"):.2f}</td><td>{item.get("Símbolo")}</td><td>{fmt_pos % item.get("S / L")}</td>'
-                f'<td>{fmt_pos % item.get("T / P")}</td><td>{fmt_pos % item.get("Precio Cierre")}</td>'
-                f'<td class="{"mt5-profit" if item.get("Beneficio")>=0 else "mt5-loss"}">{item.get("Beneficio"):+.2f}</td></tr>'
+        if es_admin:
+            with col_m5: 
+                if st.button("🔄 Sincronizar Sheets"):
+                    st.cache_data.clear()
+                    st.rerun()
+
+        st.divider()
+
+        col_grafico, col_panel = st.columns([2.4, 1.0])
+        n_decimals, formato_str, step_val, dist_sl, dist_tp, spread_val = obtener_config_activo(par_activo)
+
+        with col_grafico:
+            st.markdown(
+                f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>"
+                f"Gráfico {par_activo} | Precio Actual: <span class='live-ticker-price'>{formato_str % precio_vivo_actual}</span> | "
+                f"BID: <span class='live-ticker-bid'>{formato_str % bid_actual}</span> | ASK: <span class='live-ticker-ask'>{formato_str % ask_actual}</span> | "
+                f"Spread: <b style='color:#d1d4dc;'>{formato_str % spread_val}</b></div>", unsafe_allow_html=True
             )
-        st.markdown(f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Vol.</th><th>Símbolo</th><th>S/L</th><th>T/P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{"".join(filas_html)}</tbody></table></div>', unsafe_allow_html=True)
-    else:
-        st.info("Aún no hay operaciones cerradas.")
+
+            fig = go.Figure()
+            if not df_history.empty:
+                fig.add_trace(go.Candlestick(x=df_history.index, open=df_history['Open'], high=df_history['High'], low=df_history['Low'], close=df_history['Close'], name=par_activo, increasing_line_color='#26a69a', decreasing_line_color='#ef5350'))
+
+            for pos in st.session_state.posiciones_abiertas:
+                if pos["activo"] == par_activo:
+                    fig.add_hline(y=pos["entrada"], line_dash="dash", line_color="#2962FF", annotation_text=f"Entrada ({pos['entrada']})")
+                    fig.add_hline(y=pos["tp"], line_dash="dot", line_color="#26a69a", annotation_text=f"TP ({pos['tp']})")
+                    fig.add_hline(y=pos["sl"], line_dash="dot", line_color="#ef5350", annotation_text=f"SL ({pos['sl']})")
+
+            fig.update_layout(template="plotly_dark", paper_bgcolor="#131722", plot_bgcolor="#131722", height=430, margin=dict(l=10, r=10, t=10, b=10), xaxis=dict(showgrid=True, gridcolor='#2A2E39', rangeslider=dict(visible=False)), yaxis=dict(showgrid=True, gridcolor='#2A2E39', zeroline=False), dragmode='pan')
+            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True, 'displaylogo': False})
+
+        with col_panel:
+            st.markdown("### Nueva Orden")
+            sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_forex")
+            sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01)
+            
+            precio_ref_orden = ask_actual if sim_tipo == "BUY" else bid_actual
+
+            key_sl = f"sim_precio_sl_{par_activo}_{sim_tipo}"
+            key_tp = f"sim_precio_tp_{par_activo}_{sim_tipo}"
+
+            if key_sl not in st.session_state:
+                st.session_state[key_sl] = float(round(precio_ref_orden - dist_sl if sim_tipo == "BUY" else precio_ref_orden + dist_sl, n_decimals))
+            if key_tp not in st.session_state:
+                st.session_state[key_tp] = float(round(precio_ref_orden + dist_tp if sim_tipo == "BUY" else precio_ref_orden - dist_tp, n_decimals))
+
+            sim_precio_sl = st.number_input("Stop Loss", format=formato_str, step=step_val, key=key_sl)
+            sim_precio_tp = st.number_input("Take Profit", format=formato_str, step=step_val, key=key_tp)
+
+            texto_boton = "🟢 EJECUTAR ORDEN DE COMPRA" if sim_tipo == "BUY" else "🔴 EJECUTAR ORDEN DE VENTA"
+            
+            if st.button(texto_boton, use_container_width=True):
+                nueva_orden = {
+                    "id": int(datetime.now().timestamp()),
+                    "tiempo_apertura": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                    "activo": par_activo, "tipo": sim_tipo, "lotes": float(sim_lotes),
+                    "entrada": float(precio_ref_orden), "sl": float(sim_precio_sl), "tp": float(sim_precio_tp),
+                    "bid_vela_actual": float(bid_actual), "ask_vela_actual": float(ask_actual)
+                }
+                st.session_state.posiciones_abiertas.append(nueva_orden)
+                guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
+                st.rerun()
+
+        # --- POSICIONES ACTIVAS ---
+        st.markdown("### Posiciones Abiertas (Monitoreo ECN en Vivo)")
+        if st.session_state.posiciones_abiertas:
+            for idx, pos in enumerate(st.session_state.posiciones_abiertas):
+                p_salida = pos.get("bid_vela_actual", pos["entrada"]) if pos["tipo"] == "BUY" else pos.get("ask_vela_actual", pos["entrada"])
+                dec_pos, fmt_pos, _, _, _, _ = obtener_config_activo(pos["activo"])
+                pnl_card = calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], p_salida, pos["lotes"])
+
+                st.markdown(f"""
+                    <div class="mt5-terminal-card">
+                        <b>{pos['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}">{pos['tipo']}</span> | 
+                        Entrada: <code>{fmt_pos % pos['entrada']}</code> | Salida Actual: <code style="color: #26a69a;">{fmt_pos % p_salida}</code> | 
+                        TP: <span style="color:#26a69a;">{fmt_pos % pos['tp']}</span> | SL: <span style="color:#ef5350;">{fmt_pos % pos['sl']}</span> | 
+                        PnL: <b style="color: {'#26a69a' if pnl_card>=0 else '#ef5350'}">${pnl_card:,.2f} USD</b>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button(f"Cerrar Manual #{pos['id']}", key=f"btn_close_{pos['id']}_{idx}"):
+                    st.session_state.balance_pedagogico += pnl_card
+                    st.session_state.historial_cerradas.append({
+                        "Tipo": pos['tipo'].lower(), "Volumen": pos['lotes'], "Símbolo": pos['activo'],
+                        "S / L": pos['sl'], "T / P": pos['tp'], "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                        "Precio Cierre": round(p_salida, dec_pos), "Beneficio": round(pnl_card, 2)
+                    })
+                    guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, st.session_state.historial_cerradas)
+                    st.session_state.posiciones_abiertas.pop(idx)
+                    guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
+                    st.rerun()
+        else:
+            st.info("No hay posiciones activas.")
+
+        # --- BITÁCORA ---
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        if es_admin:
+            col_tit_bita, col_btn_bita = st.columns([3.0, 1.0])
+            with col_tit_bita: 
+                st.markdown("### Bitácora Histórica")
+            with col_btn_bita:
+                if st.button("🗑️ Limpiar Historial"):
+                    st.session_state.historial_cerradas = []
+                    guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
+                    st.rerun()
+        else:
+            st.markdown("### Bitácora Histórica")
+
+        if st.session_state.historial_cerradas:
+            filas_html = []
+            for item in reversed(st.session_state.historial_cerradas):
+                _, fmt_pos, _, _, _, _ = obtener_config_activo(item.get("Símbolo", "EURUSD"))
+                filas_html.append(
+                    f'<tr><td>{item.get("Tiempo Cierre")}</td><td class="{"mt5-buy" if item.get("Tipo")=="buy" else "mt5-sell"}">{item.get("Tipo")}</td>'
+                    f'<td>{item.get("Volumen"):.2f}</td><td>{item.get("Símbolo")}</td><td>{fmt_pos % item.get("S / L")}</td>'
+                    f'<td>{fmt_pos % item.get("T / P")}</td><td>{fmt_pos % item.get("Precio Cierre")}</td>'
+                    f'<td class="{"mt5-profit" if item.get("Beneficio")>=0 else "mt5-loss"}">{item.get("Beneficio"):+.2f}</td></tr>'
+                )
+            st.markdown(f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Vol.</th><th>Símbolo</th><th>S/L</th><th>T/P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{"".join(filas_html)}</tbody></table></div>', unsafe_allow_html=True)
+        else:
+            st.info("Aún no hay operaciones cerradas.")
+
+       else:
+        # 🔒 BLOQUE DEL CANDADO / ACCESO RESTRINGIDO
+        st.markdown("<h1 style='text-align: center; color: #F1F5F9;'>🔒 Plataforma Educativa Live</h1>", unsafe_allow_html=True)
+        st.write("")
+        st.markdown("""
+            <div class="card-box" style="text-align: center; padding: 35px 25px; border-left: 4px solid #FF6B00; background-color: #131722; border-radius: 8px;">
+                <div style="font-size: 45px; margin-bottom: 10px;">⚠️</div>
+                <h2 style="color: #FF6B00; margin-top: 0px; font-size: 22px;">
+                    Aún no tienes habilitada la opción a la Plataforma Educativa Live
+                </h2>
+                <p style="color: #94A3B8; font-size: 15px; max-width: 600px; margin: 15px auto 0px auto; line-height: 1.6;">
+                    Esta herramienta práctica de ejecución en vivo se activa de forma personalizada 
+                    al avanzar al <b>Nivel Avanzado Práctico</b> de tu programa académico.
+                </p>
+                <div style="background-color: #0E1726; border-radius: 8px; padding: 15px; margin-top: 25px; border: 1px solid #334155;">
+                    <p style="color: #CBD5E1; font-size: 13px; margin: 0;">
+                        📌 <b>¿Qué debes hacer?</b> Completa tus evaluaciones teóricas del bloque actual y solicita la validación a través de la coordinación académica o con tu mentor asignado.
+                    </p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
