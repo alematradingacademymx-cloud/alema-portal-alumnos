@@ -233,7 +233,6 @@ def cargar_usuarios_desde_sheets():
             return dict_usuarios
         except Exception:
             return {}
-
 @st.cache_data(ttl=10)
 def obtener_avance_alumno(matricula_usuario):
     try:
