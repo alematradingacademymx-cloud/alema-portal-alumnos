@@ -181,7 +181,6 @@ def parsear_fecha(fecha_str):
         except ValueError:
             pass
     return datetime(2030, 12, 31).date()
-
 # ==========================================
 # 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
@@ -198,39 +197,45 @@ def cargar_usuarios_desde_sheets():
         df = pd.read_csv(URL_USUARIOS, dtype=str)
     except Exception:
         try:
-            url_fallback = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
+            url_fallback = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
             df = pd.read_csv(url_fallback, dtype=str)
         except Exception:
             return {}
 
-    # Normalizar nombres de columnas (quitar espacios, guiones bajos y convertir a mayúsculas)
+    # Normalización exhaustiva de encabezados de columnas
     df.columns = df.columns.str.strip().str.upper().str.replace(' ', '_')
     
-    df['MATRICULA'] = df['MATRICULA'].fillna('').str.strip().str.upper() if 'MATRICULA' in df.columns else ''
-    df['PASSWORD'] = df['PASSWORD'].fillna('').str.strip() if 'PASSWORD' in df.columns else ''
-    df['TIPO_USUARIO'] = df['TIPO_USUARIO'].fillna('ALUMNO').str.strip().str.upper() if 'TIPO_USUARIO' in df.columns else 'ALUMNO'
-    df['FECHA_VENCIMIENTO'] = df['FECHA_VENCIMIENTO'].fillna('2030-12-31').str.strip() if 'FECHA_VENCIMIENTO' in df.columns else '2030-12-31'
-    
-    col_capital = 'CAPITAL' if 'CAPITAL' in df.columns else 'CAPITAL_BASE'
-    df['CAPITAL_LIMPIO'] = pd.to_numeric(df[col_capital].fillna('300'), errors='coerce').fillna(300.0) if col_capital in df.columns else 300.0
+    # Identificar la columna que contiene los permisos del simulador
+    col_simulador = None
+    for col in df.columns:
+        if 'SIMULADOR' in col:
+            col_simulador = col
+            break
 
-    # Normalizar columna del simulador por si se llama diferente en Sheets
-    col_sim = next((c for c in df.columns if 'SIMULADOR' in c), None)
-    
     dict_usuarios = {}
     for _, row in df.iterrows():
-        mat = row.get('MATRICULA', '')
-        if not mat:
+        # Matrícula limpia como clave
+        matricula = str(row.get('MATRICULA', '')).strip().upper()
+        if not matricula:
             continue
             
-        val_sim = str(row.get(col_sim, 'NO')).strip().upper() if col_sim else 'NO'
+        # Evaluación estricta de 'Simulador_Habilitado'
+        val_sim = str(row.get(col_simulador, 'NO')).strip().upper() if col_simulador else 'NO'
         sim_hab = val_sim in ['SI', 'TRUE', '1']
         
-        dict_usuarios[mat] = {
-            'password': row.get('PASSWORD', ''),
-            'tipo': row.get('TIPO_USUARIO', 'ALUMNO'),
-            'vencimiento': row.get('FECHA_VENCIMIENTO', '2030-12-31'),
-            'capital_base': float(row.get('CAPITAL_LIMPIO', 300.0)),
+        # Tipo de usuario
+        tipo_user = str(row.get('TIPO_USUARIO', 'ALUMNO')).strip().upper()
+        
+        # Capital limpio
+        col_cap = 'CAPITAL' if 'CAPITAL' in df.columns else 'CAPITAL_BASE'
+        capital_val = row.get(col_cap, '300')
+        capital_limpio = float(pd.to_numeric(capital_val, errors='coerce') if pd.notnull(capital_val) else 300.0)
+
+        dict_usuarios[matricula] = {
+            'password': str(row.get('PASSWORD', '')).strip(),
+            'tipo': tipo_user,
+            'vencimiento': str(row.get('FECHA_VENCIMIENTO', '2030-12-31')).strip(),
+            'capital_base': capital_limpio if capital_limpio > 0 else 300.0,
             'simulador_habilitado': sim_hab
         }
     return dict_usuarios
@@ -329,9 +334,9 @@ if not st.session_state.autenticado:
                     st.session_state.tipo_usuario = user_info['tipo']
                     st.session_state.balance_pedagogico = float(user_info['capital_base'])
                     
-                    # ASIGNACIÓN DE PERMISOS LIMPIA Y SIN CÓDIGO INALCANZABLE
+                    # ASIGNACIÓN DE PERMISOS: Solo True si la hoja dice 'SI' o si es ADMIN
                     permiso_sim = user_info.get('simulador_habilitado', False)
-                    st.session_state.simulador_habilitado = permiso_sim or (user_info['tipo'] == 'ADMIN')
+                    st.session_state.simulador_habilitado = bool(permiso_sim or (user_info['tipo'] == 'ADMIN'))
                     
                     st.session_state.archivo_pos = f"posiciones_{matricula_input}.json"
                     st.session_state.archivo_hist = f"historial_{matricula_input}.json"
@@ -939,15 +944,15 @@ elif opcion_menu == "📉 Alema Trade live":
         import numpy as np
         import plotly.graph_objects as go
         from streamlit_autorefresh import st_autorefresh
-    
+
         # Recarga automática de la pantalla cada 4 segundos
         st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_live")
-    
+
         # --- IDENTIFICADOR DE USUARIO Y RUTAS PERSISTENTES ---
         usuario = st.session_state.get("usuario_actual", "alema")
         ARCH_PERSISTENCIA_ACTIVAS = f"posiciones_activas_{usuario}.json"
         ARCH_PERSISTENCIA_HISTORIAL = f"historial_cerradas_{usuario}.json"
-    
+
         def cargar_datos_json(archivo, valor_defecto):
             if os.path.exists(archivo):
                 try:
@@ -956,14 +961,14 @@ elif opcion_menu == "📉 Alema Trade live":
                 except Exception:
                     return valor_defecto
             return valor_defecto
-    
+
         def guardar_datos_json(archivo, datos):
             try:
                 with open(archivo, "w") as f:
                     json.dump(datos, f, indent=4)
             except Exception:
                 pass
-    
+
         # --- FUNCIÓN DE CONEXIÓN Y LECTURA DE CAPITAL Y CHALLENGE DESDE GOOGLE SHEETS ---
         @st.cache_data(ttl=10) # Se actualiza cada 10 segundos desde la base de datos
         def obtener_datos_usuario_desde_sheets(usuario_target):
@@ -994,23 +999,23 @@ elif opcion_menu == "📉 Alema Trade live":
             except Exception:
                 pass
             return capital_defecto, nivel_defecto
-    
+
         # Cargar operaciones activas e historial
         st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, [])
         st.session_state.historial_cerradas = cargar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
-    
+
         # CÁLCULO DINÁMICO DEL BALANCE Y ASIGNACIÓN DE NIVEL DE CHALLENGE
         capital_base_sheets, nivel_challenge_sheets = obtener_datos_usuario_desde_sheets(usuario)
         pnl_acumulado_historico = sum(float(trade.get("Beneficio", 0.0)) for trade in st.session_state.historial_cerradas)
         st.session_state.balance_pedagogico = capital_base_sheets + pnl_acumulado_historico
         st.session_state.nivel_challenge = nivel_challenge_sheets
         st.session_state.current_loaded_user = usuario
-    
+
         if 'cache_precios_forex' not in st.session_state:
             st.session_state.cache_precios_forex = {}
         if 'ultimo_tiempo_api' not in st.session_state:
             st.session_state.ultimo_tiempo_api = {}
-    
+
         def calcular_pnl_institucional(activo, tipo, entrada, salida, lotes):
             diferencia = (salida - entrada) if tipo == "BUY" else (entrada - salida)
             
@@ -1024,7 +1029,7 @@ elif opcion_menu == "📉 Alema Trade live":
                 return pips * valor_pip_usd_por_lote * lotes
             else:
                 return diferencia * 100000.0 * lotes
-    
+
         def obtener_config_activo(simbolo):
             if "JPY" in simbolo: return 3, "%.3f", 0.001, 0.100, 0.200, 0.015
             elif "XAU" in simbolo: return 2, "%.2f", 0.10, 2.00, 4.00, 0.35
@@ -1033,7 +1038,7 @@ elif opcion_menu == "📉 Alema Trade live":
             elif any(idx in simbolo for idx in ["US30", "NAS100", "GER40"]): return 2, "%.2f", 1.0, 20.0, 40.0, 2.00
             elif "SPX" in simbolo: return 2, "%.2f", 0.10, 4.00, 8.00, 0.40
             else: return 5, "%.5f", 0.00001, 0.00100, 0.00200, 0.00012
-    
+
         # Estilos CSS
         st.markdown("""
             <style>
@@ -1051,17 +1056,17 @@ elif opcion_menu == "📉 Alema Trade live":
                 .mt5-loss { color: #ef5350; font-weight: 600; }
             </style>
         """, unsafe_allow_html=True)
-    
+
         st.markdown('<div class="main-title" style="text-align: left; font-size: 24px; font-weight: 700;">ALEMA TRADING ACADEMY | Terminal Institucional</div>', unsafe_allow_html=True)
-    
+
         lista_activos = [
             "EURUSD", "GBPUSD", "USDJPY", "EURJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", 
             "XAUUSD", "WTIUSD", "BRENTUSD", 
             "US30", "SPX500", "NAS100", "GER40", "BTCUSD"
         ]
-    
+
         par_activo = st.selectbox("Símbolo de Mercado", lista_activos, key="select_chart_asset_forex")
-    
+
         # --- NÚCLEO DE PRECIOS CON PROTECCIÓN DE API ---
         def obtener_cotizacion_completa(simbolo):
             dec, _, step_val, _, _, spread_val = obtener_config_activo(simbolo)
@@ -1097,19 +1102,19 @@ elif opcion_menu == "📉 Alema Trade live":
             precio_ask = round(precio_bid + spread_val, dec)
             
             return precio_bid, precio_ask, precio_vivo
-    
+
         precios_tick_actual = {}
-        
+
         def get_precio_sincronizado(simbolo):
             if simbolo not in precios_tick_actual:
                 precios_tick_actual[simbolo] = obtener_cotizacion_completa(simbolo)
             return precios_tick_actual[simbolo]
-    
+
         bid_actual, ask_actual, precio_vivo_actual = get_precio_sincronizado(par_activo)
-    
+
         if 'mercado_forex_df' not in st.session_state:
             st.session_state.mercado_forex_df = {}
-    
+
         def obtener_dataframe_forex(simbolo, precio_actual):
             if simbolo not in st.session_state.mercado_forex_df:
                 fechas = [datetime.now() - timedelta(minutes=15 * i) for i in range(50)][::-1]
@@ -1128,14 +1133,14 @@ elif opcion_menu == "📉 Alema Trade live":
             df.iloc[-1, df.columns.get_loc('High')] = max(df.iloc[-1]['Open'], max(df.iloc[-1]['High'], precio_actual))
             df.iloc[-1, df.columns.get_loc('Low')] = min(df.iloc[-1]['Open'], min(df.iloc[-1]['Low'], precio_actual))
             return df
-    
+
         df_history = obtener_dataframe_forex(par_activo, bid_actual)
-    
+
         # --- MONITOREO DE ORDENES ACTIVAS (CIERRE EXACTO ECN) ---
         if st.session_state.posiciones_abiertas:
             posiciones_conservadas = []
             hubo_cambios_auto = False
-    
+
             for pos in st.session_state.posiciones_abiertas:
                 sim_pos = pos["activo"]
                 dec_pos, _, _, _, _, _ = obtener_config_activo(sim_pos)
@@ -1144,13 +1149,13 @@ elif opcion_menu == "📉 Alema Trade live":
                 
                 pos["bid_vela_actual"] = p_bid
                 pos["ask_vela_actual"] = p_ask
-    
+
                 tp_exacto = round(pos["tp"], dec_pos)
                 sl_exacto = round(pos["sl"], dec_pos)
-    
+
                 cierre_por_tp_sl = False
                 precio_ejecucion_salida = p_bid if pos["tipo"] == "BUY" else p_ask
-    
+
                 if pos["tipo"] == "BUY":
                     if p_bid >= tp_exacto:
                         cierre_por_tp_sl = True
@@ -1165,7 +1170,7 @@ elif opcion_menu == "📉 Alema Trade live":
                     elif p_ask >= sl_exacto:
                         cierre_por_tp_sl = True
                         precio_ejecucion_salida = sl_exacto
-    
+
                 if cierre_por_tp_sl:
                     pnl_real = calcular_pnl_institucional(sim_pos, pos["tipo"], pos["entrada"], precio_ejecucion_salida, pos["lotes"])
                     
@@ -1186,18 +1191,18 @@ elif opcion_menu == "📉 Alema Trade live":
                     hubo_cambios_auto = True
                 else:
                     posiciones_conservadas.append(pos)
-    
+
             if hubo_cambios_auto:
                 st.session_state.posiciones_abiertas = posiciones_conservadas
                 guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
                 st.rerun()
-    
+
         # --- DASHBOARD Y GRÁFICOS CON VISUALIZACIÓN DE CHALLENGE Y ROL ADMIN ---
         if es_admin:
             col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
         else:
             col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    
+
         with col_m1: 
             st.metric("Balance Base", f"${st.session_state.balance_pedagogico:,.2f}")
         with col_m2:
@@ -1210,18 +1215,18 @@ elif opcion_menu == "📉 Alema Trade live":
             st.metric("Posiciones Activas", f"{len(st.session_state.posiciones_abiertas)}")
         with col_m4:
             st.metric("Fase Challenge", st.session_state.get("nivel_challenge", "Nivel 1"))
-    
+
         if es_admin:
             with col_m5: 
                 if st.button("🔄 Sincronizar Sheets"):
                     st.cache_data.clear()
                     st.rerun()
-    
+
         st.divider()
-    
+
         col_grafico, col_panel = st.columns([2.4, 1.0])
         n_decimals, formato_str, step_val, dist_sl, dist_tp, spread_val = obtener_config_activo(par_activo)
-    
+
         with col_grafico:
             st.markdown(
                 f"<div style='color: #94A3B8; font-size: 13px; margin-bottom: 4px;'>"
@@ -1229,38 +1234,38 @@ elif opcion_menu == "📉 Alema Trade live":
                 f"BID: <span class='live-ticker-bid'>{formato_str % bid_actual}</span> | ASK: <span class='live-ticker-ask'>{formato_str % ask_actual}</span> | "
                 f"Spread: <b style='color:#d1d4dc;'>{formato_str % spread_val}</b></div>", unsafe_allow_html=True
             )
-    
+
             fig = go.Figure()
             if not df_history.empty:
                 fig.add_trace(go.Candlestick(x=df_history.index, open=df_history['Open'], high=df_history['High'], low=df_history['Low'], close=df_history['Close'], name=par_activo, increasing_line_color='#26a69a', decreasing_line_color='#ef5350'))
-    
+
             for pos in st.session_state.posiciones_abiertas:
                 if pos["activo"] == par_activo:
                     fig.add_hline(y=pos["entrada"], line_dash="dash", line_color="#2962FF", annotation_text=f"Entrada ({pos['entrada']})")
                     fig.add_hline(y=pos["tp"], line_dash="dot", line_color="#26a69a", annotation_text=f"TP ({pos['tp']})")
                     fig.add_hline(y=pos["sl"], line_dash="dot", line_color="#ef5350", annotation_text=f"SL ({pos['sl']})")
-    
+
             fig.update_layout(template="plotly_dark", paper_bgcolor="#131722", plot_bgcolor="#131722", height=430, margin=dict(l=10, r=10, t=10, b=10), xaxis=dict(showgrid=True, gridcolor='#2A2E39', rangeslider=dict(visible=False)), yaxis=dict(showgrid=True, gridcolor='#2A2E39', zeroline=False), dragmode='pan')
             st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True, 'displaylogo': False})
-    
+
         with col_panel:
             st.markdown("### Nueva Orden")
             sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_forex")
             sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01)
             
             precio_ref_orden = ask_actual if sim_tipo == "BUY" else bid_actual
-    
+
             key_sl = f"sim_precio_sl_{par_activo}_{sim_tipo}"
             key_tp = f"sim_precio_tp_{par_activo}_{sim_tipo}"
-    
+
             if key_sl not in st.session_state:
                 st.session_state[key_sl] = float(round(precio_ref_orden - dist_sl if sim_tipo == "BUY" else precio_ref_orden + dist_sl, n_decimals))
             if key_tp not in st.session_state:
                 st.session_state[key_tp] = float(round(precio_ref_orden + dist_tp if sim_tipo == "BUY" else precio_ref_orden - dist_tp, n_decimals))
-    
+
             sim_precio_sl = st.number_input("Stop Loss", format=formato_str, step=step_val, key=key_sl)
             sim_precio_tp = st.number_input("Take Profit", format=formato_str, step=step_val, key=key_tp)
-    
+
             texto_boton = "🟢 EJECUTAR ORDEN DE COMPRA" if sim_tipo == "BUY" else "🔴 EJECUTAR ORDEN DE VENTA"
             
             if st.button(texto_boton, use_container_width=True):
@@ -1274,7 +1279,7 @@ elif opcion_menu == "📉 Alema Trade live":
                 st.session_state.posiciones_abiertas.append(nueva_orden)
                 guardar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, st.session_state.posiciones_abiertas)
                 st.rerun()
-    
+
         # --- POSICIONES ACTIVAS ---
         st.markdown("### Posiciones Abiertas (Monitoreo ECN en Vivo)")
         if st.session_state.posiciones_abiertas:
@@ -1282,7 +1287,7 @@ elif opcion_menu == "📉 Alema Trade live":
                 p_salida = pos.get("bid_vela_actual", pos["entrada"]) if pos["tipo"] == "BUY" else pos.get("ask_vela_actual", pos["entrada"])
                 dec_pos, fmt_pos, _, _, _, _ = obtener_config_activo(pos["activo"])
                 pnl_card = calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], p_salida, pos["lotes"])
-    
+
                 st.markdown(f"""
                     <div class="mt5-terminal-card">
                         <b>{pos['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}">{pos['tipo']}</span> | 
@@ -1305,7 +1310,7 @@ elif opcion_menu == "📉 Alema Trade live":
                     st.rerun()
         else:
             st.info("No hay posiciones activas.")
-    
+
         # --- BITÁCORA ---
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -1335,8 +1340,10 @@ elif opcion_menu == "📉 Alema Trade live":
         else:
             st.info("Aún no hay operaciones cerradas.")
 
+    # ==========================================
+    # 🔒 BLOQUE DEL CANDADO / ACCESO RESTRINGIDO
+    # ==========================================
     else:
-        # 🔴 ACCESO RESTRINGIDO
         st.markdown("<h1 style='text-align: center; color: #F1F5F9;'>🔒 Plataforma Educativa Live</h1>", unsafe_allow_html=True)
         st.write("")
         st.markdown("""
