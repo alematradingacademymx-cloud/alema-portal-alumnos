@@ -195,53 +195,44 @@ URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tq
 def cargar_usuarios_desde_sheets():
     try:
         df = pd.read_csv(URL_USUARIOS, dtype=str)
+        df.columns = df.columns.str.strip()
+        df['Matricula'] = df['Matricula'].fillna('').str.strip().str.upper()
+        df['Password'] = df['Password'].fillna('').str.strip()
+        df['Tipo_Usuario'] = df['Tipo_Usuario'].fillna('ALUMNO').str.strip().str.upper()
+        df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
+        df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
+        
+        dict_usuarios = {}
+        for _, row in df.iterrows():
+            dict_usuarios[row['Matricula']] = {
+                'password': row['Password'],
+                'tipo': row['Tipo_Usuario'],
+                'vencimiento': row['Fecha_Vencimiento'],
+                'capital_base': float(row['Capital'])
+            }
+        return dict_usuarios
     except Exception:
         try:
-            url_fallback = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
+            url_fallback = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
             df = pd.read_csv(url_fallback, dtype=str)
+            df.columns = df.columns.str.strip()
+            df['Matricula'] = df['Matricula'].fillna('').str.strip().str.upper()
+            df['Password'] = df['Password'].fillna('').str.strip()
+            df['Tipo_Usuario'] = df['Tipo_Usuario'].fillna('ALUMNO').str.strip().str.upper()
+            df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
+            df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
+            
+            dict_usuarios = {}
+            for _, row in df.iterrows():
+                dict_usuarios[row['Matricula']] = {
+                    'password': row['Password'],
+                    'tipo': row['Tipo_Usuario'],
+                    'vencimiento': row['Fecha_Vencimiento'],
+                    'capital_base': float(row['Capital'])
+                }
+            return dict_usuarios
         except Exception:
             return {}
-
-    # Normalización exhaustiva de encabezados de columnas
-    df.columns = df.columns.str.strip().str.upper().str.replace(' ', '_')
-    
-    # Identificar la columna que contiene los permisos del simulador
-    col_simulador = None
-    for col in df.columns:
-        if 'SIMULADOR' in col:
-            col_simulador = col
-            break
-
-    dict_usuarios = {}
-    for _, row in df.iterrows():
-        # Matrícula limpia como clave
-        matricula = str(row.get('MATRICULA', '')).strip().upper()
-        if not matricula:
-            continue
-            
-        # 1. Evaluación estricta del valor recibido de Google Sheets
-val_sim = str(row.get(col_simulador, 'NO')).strip().upper() if col_simulador else 'NO'
-sim_hab = val_sim in ['SI', 'TRUE', '1']  # Devuelve True solo si es "SI", si es "NO" devuelve False
-
-tipo_user = str(row.get('Tipo_Usuario', 'ALUMNO')).strip().upper()
-
-# 2. Guardar en el estado de la sesión (session_state)
-st.session_state.simulador_habilitado = sim_hab  # Guarda True/False
-st.session_state.tipo_usuario = tipo_user
-
-# Capital limpio 
-col_cap = 'CAPITAL' if 'CAPITAL' in df.columns else 'CAPITAL_BASE'
-capital_val = row.get(col_cap, '300')
-capital_limpio = float(pd.to_numeric(capital_val, errors='coerce') if pd.notnull(capital_val) else 300.0)
-
-dict_usuarios[matricula] = {
-    'password': str(row.get('PASSWORD', '')).strip(),
-    'tipo': tipo_user,
-    'vencimiento': str(row.get('FECHA_VENCIMIENTO', '2030-12-31')).strip(),
-    'capital_base': capital_limpio if capital_limpio > 0 else 300.0,
-    'simulador_habilitado': sim_hab
-}
-return dict_usuarios
 
 @st.cache_data(ttl=10)
 def obtener_avance_alumno(matricula_usuario):
