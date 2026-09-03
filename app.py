@@ -440,6 +440,7 @@ if opcion_menu == "📊 Mi Avance Académico":
     else:
         st.warning("⚠️ No se encontraron registros de avance para tu matrícula. Consulta con coordinación.")
 
+
 # ==========================================
 # SECCIÓN: CALCULADORAS DE LOTES
 # ==========================================
