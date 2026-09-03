@@ -32,7 +32,7 @@ else:
 st.set_page_config(
     page_title="ALEMA Trading Academy - Portal de Alumnos", 
     page_icon=icono_pagina, 
-    layout="centered"
+    layout="centered")
 # ==========================================
 # 🛠️ FUNCIONES DE PERSISTENCIA JSON AUXILIARES
 # ==========================================
