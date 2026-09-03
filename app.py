@@ -239,8 +239,7 @@ dict_usuarios[matricula] = {
     'tipo': tipo_user,
     'vencimiento': str(row.get('FECHA_VENCIMIENTO', '2030-12-31')).strip(),
     'capital_base': capital_limpio if capital_limpio > 0 else 300.0,
-    'simulador_habilitado': sim_hab
-}
+    'simulador_habilitado': sim_hab}
 
 @st.cache_data(ttl=10)
 def obtener_avance_alumno(matricula_usuario):
