@@ -327,7 +327,7 @@ if not st.session_state.autenticado:
                     st.session_state.tipo_usuario = user_info['tipo']
                     st.session_state.balance_pedagogico = float(user_info['capital_base'])
                     
-                    # ASIGNACIÓN DE PERMISOS: Solo True si la hoja dice 'SI' o si es ADMIN
+                    # ASIGNACIÓN DE PERMISOS
                     permiso_sim = user_info.get('simulador_habilitado', False)
                     st.session_state.simulador_habilitado = bool(permiso_sim or (user_info['tipo'] == 'ADMIN'))
                     
@@ -457,7 +457,7 @@ if not st.session_state.autenticado:
         )
 
     st.markdown("<br><p style='text-align: center; color: #718096;'>© ALEMA Trading Academy. Reservados todos los derechos.</p>", unsafe_allow_html=True)
-    st.stop()
+    st.stop() # 🛑 AQUÍ DETIENE TODO SI NO HA INICIADO SESIÓN
 # ==========================================
 # ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
 # ==========================================
