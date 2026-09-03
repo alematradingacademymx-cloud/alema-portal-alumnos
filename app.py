@@ -228,18 +228,20 @@ tipo_user = str(row.get('Tipo_Usuario', 'ALUMNO')).strip().upper()
 # 2. Guardar en el estado de la sesión (session_state)
 st.session_state.simulador_habilitado = sim_hab  # Guarda True/False
 st.session_state.tipo_usuario = tipo_user
-        # Capital limpio col_cap = 'CAPITAL' if 'CAPITAL' in df.columns else 'CAPITAL_BASE'
-        capital_val = row.get(col_cap, '300')
-        capital_limpio = float(pd.to_numeric(capital_val, errors='coerce') if pd.notnull(capital_val) else 300.0)
 
-        dict_usuarios[matricula] = {
-            'password': str(row.get('PASSWORD', '')).strip(),
-            'tipo': tipo_user,
-            'vencimiento': str(row.get('FECHA_VENCIMIENTO', '2030-12-31')).strip(),
-            'capital_base': capital_limpio if capital_limpio > 0 else 300.0,
-            'simulador_habilitado': sim_hab
-        }
-    return dict_usuarios
+# Capital limpio 
+col_cap = 'CAPITAL' if 'CAPITAL' in df.columns else 'CAPITAL_BASE'
+capital_val = row.get(col_cap, '300')
+capital_limpio = float(pd.to_numeric(capital_val, errors='coerce') if pd.notnull(capital_val) else 300.0)
+
+dict_usuarios[matricula] = {
+    'password': str(row.get('PASSWORD', '')).strip(),
+    'tipo': tipo_user,
+    'vencimiento': str(row.get('FECHA_VENCIMIENTO', '2030-12-31')).strip(),
+    'capital_base': capital_limpio if capital_limpio > 0 else 300.0,
+    'simulador_habilitado': sim_hab
+}
+return dict_usuarios
 
 @st.cache_data(ttl=10)
 def obtener_avance_alumno(matricula_usuario):
