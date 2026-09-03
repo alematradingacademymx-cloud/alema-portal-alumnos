@@ -34,6 +34,7 @@ st.set_page_config(
     page_icon=icono_pagina, 
     layout="centered"
 )
+
 # ==========================================
 # 🛠️ FUNCIONES DE PERSISTENCIA JSON AUXILIARES
 # ==========================================
@@ -56,36 +57,6 @@ def guardar_datos_json(filepath, data):
 # Estilos CSS personalizados con Fondo Azul Oscuro Elegante y Botón Verde
 st.markdown("""
     <style>
-    /* 🙈 OCULTAR BARRA SUPERIOR, GITHUB Y MENÚS */
-    header[data-testid="stHeader"], 
-    [data-testid="stToolbar"], 
-    [data-testid="stHeaderActionElements"],
-    header, 
-    .stAppHeader {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0px !important;
-    }
-    
-    /* 🙈 OCULTAR FOOTER Y ÍCONOS FLOTANTES INFERIORES */
-    footer {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    [data-testid="stStatusWidget"] {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    [data-testid="stDecoration"] {
-        display: none !important;
-    }
-    div[class*="viewerBadge"] {
-        display: none !important;
-    }
-    #MainMenu {
-        display: none !important;
-    }
-
     /* Fondo General Azul Oscuro */
     .stApp {
         background-color: #0E1726;
@@ -181,6 +152,7 @@ def parsear_fecha(fecha_str):
         except ValueError:
             pass
     return datetime(2030, 12, 31).date()
+
 # ==========================================
 # 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
@@ -247,7 +219,7 @@ def obtener_avance_alumno(matricula_usuario):
         return None
     except Exception:
         return None
-# Carga inicial de usuarios
+
 USUARIOS_AUTORIZADOS = cargar_usuarios_desde_sheets()
 
 # --- CONTROL Y PERSISTENCIA DE SESIÓN ---
@@ -260,41 +232,20 @@ if "usuario_actual" not in st.session_state:
 if "tipo_usuario" not in st.session_state:
     st.session_state.tipo_usuario = "ALUMNO"
 
-if "simulador_habilitado" not in st.session_state:
-    st.session_state.simulador_habilitado = False
-
 if "journal_trades" not in st.session_state:
     st.session_state.journal_trades = []
 
+# Inicializar rutas por defecto seguras en session_state
 if "archivo_pos" not in st.session_state:
     st.session_state.archivo_pos = "posiciones_invitado.json"
 if "archivo_hist" not in st.session_state:
     st.session_state.archivo_hist = "historial_invitado.json"
 
-import base64
-
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
-    archivo_iso = "alema_iso.png"
-    
-    if not os.path.exists(archivo_iso):
-        coincidencias = [f for f in os.listdir(".") if f.lower().startswith("alema_iso") or f.lower().startswith("alema_a")]
-        if coincidencias:
-            archivo_iso = coincidencias[0]
-
-    if os.path.exists(archivo_iso):
-        with open(archivo_iso, "rb") as img_file:
-            img_b64 = base64.b64encode(img_file.read()).decode()
-        st.markdown(
-            f'''
-            <div style="text-align: center; margin-bottom: 15px;">
-                <img src="data:image/png;base64,{img_b64}" style="width: 95px; height: auto;">
-            </div>
-            ''',
-            unsafe_allow_html=True)
-            
     st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados y Suscriptores</div>', unsafe_allow_html=True)
+    
     st.markdown("---")
     
     st.markdown("### 👋 ¡Bienvenido al Portal Institucional!")
@@ -302,6 +253,7 @@ if not st.session_state.autenticado:
         "Este es tu ecosistema de herramientas operativas, calculadoras de gestión de riesgo, "
         "journal de operaciones y biblioteca digital. Ingresa tus credenciales para comenzar."
     )
+    
     st.markdown("---")
     
     st.subheader("🔒 Acceso al Portal Privado")
@@ -327,13 +279,11 @@ if not st.session_state.autenticado:
                     st.session_state.tipo_usuario = user_info['tipo']
                     st.session_state.balance_pedagogico = float(user_info['capital_base'])
                     
-                    # ASIGNACIÓN DE PERMISOS: Solo True si la hoja dice 'SI' o si es ADMIN
-                    permiso_sim = user_info.get('simulador_habilitado', False)
-                    st.session_state.simulador_habilitado = bool(permiso_sim or (user_info['tipo'] == 'ADMIN'))
-                    
+                    # BLINDAJE DE SESIÓN: Fijar rutas únicas directamente en st.session_state
                     st.session_state.archivo_pos = f"posiciones_{matricula_input}.json"
                     st.session_state.archivo_hist = f"historial_{matricula_input}.json"
                     
+                    # Cargar archivos específicos del alumno autenticado
                     if os.path.exists(st.session_state.archivo_pos):
                         st.session_state.posiciones_abiertas = cargar_datos_json(st.session_state.archivo_pos, [])
                     else:
@@ -344,13 +294,13 @@ if not st.session_state.autenticado:
                     else:
                         st.session_state.historial_cerradas = []
                     
-                    st.success(f"¡Bienvenido, {matricula_input}!")
+                    st.success("¡Acceso concedido!")
                     st.rerun()
             else:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
     
     st.markdown("---")
-    st.markdown("### ¿Aún no tienes tu acceso al Portal?")
+    st.markdown("### 🚀 ¿Aún no tienes tu acceso al Portal?")
     st.write(
         "Obtén acceso a las **Calculadoras Operativas**, **Biblioteca de Guías en PDF** "
         "y **Cápsulas de Psicotrading** por solo **$150 MXN / mes**."
@@ -359,104 +309,13 @@ if not st.session_state.autenticado:
     num_whatsapp = "528136462129"
     mensaje_preset = (
         "¡Hola Daniela! 👋 Vengo del portal web y me gustaría adquirir mi suscripción "
-        "a la Membresía Mensual Alema ($150 MXN/mes) para obtener mis credenciales de acceso."
+        "a la Membresía ALEMA Suite ($150 MXN/mes) para obtener mis credenciales de acceso."
     )
+
     url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
-    
-    st.markdown(
-        f'''
-        <a href="{url_wa}" target="_blank" style="text-decoration: none;">
-            <div style="
-                background-color: #25D366;
-                color: #FFFFFF;
-                padding: 12px 20px;
-                border-radius: 8px;
-                text-align: center;
-                font-weight: bold;
-                font-size: 1rem;
-                cursor: pointer;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
-                margin: 10px 0;">
-                📲 Solicitar Membresía por WhatsApp
-            </div>
-        </a>
-        ''',
-        unsafe_allow_html=True)
+    st.link_button("📲 Solicitar Membresía por WhatsApp", url_wa, use_container_width=True)
 
-    st.markdown("<h2 style='text-align: center;'> ¿Deseas Formarte como Trader en ALEMA?</h2>", unsafe_allow_html=True)
-    st.markdown(
-        "<p style='text-align: center; color: #a0aec0; font-size: 1.1rem;'>"
-        "Conoce nuestro programa educativo integral, herramientas operativas y acompañamiento personalizado."
-        "</p>", 
-        unsafe_allow_html=True
-    )
-
-    col_info1, col_info2 = st.columns(2)
-    with col_info1:
-        st.markdown("### 📚 Ruta Académica Oficial")
-        st.markdown("""
-        * **Módulo Básico:** Fundamentos de mercados financieros, estructura de precios y lectura de velas.
-        * **Módulo Intermedio:** Metodología institucional, zonas de oferta/demanda y Fibonacci.
-        * **Módulo Avanzado:** Wyckoff, liquidez de mercado y modelos de entrada de alta probabilidad.
-        * **Módulo Práctico & Psicotrading:** Gestión de riesgo matemática, bitácora y control emocional.
-        """)
-
-    with col_info2:
-        st.markdown("### 💡 Beneficios del Portal Privado")
-        st.markdown("""
-        * **Calculadoras Operativas:** Gestión exacta de lotaje y riesgo por operación.
-        * **Evaluaciones Progresivas:** Exámenes técnicos revisados directamente por Dirección General.
-        * **Constancia Institucional:** Reconocimiento con validez interna al aprobar cada nivel.
-        * **Biblioteca y Reportes:** Descarga de manuales en PDF y retroalimentación personalizada.
-        """)
-
-    st.divider()
-
-    st.markdown("<h3 style='text-align: center;'>💳 Cuota e Inscripciones</h3>", unsafe_allow_html=True)
-    col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
-    with col_p2:
-        st.info(
-            "📌 **Membresía Elite ALEMA / Acceso al Portal:** **$1890 MXN / mes**\n\n"
-            "**Incluye:**\n"
-            "* Acceso completo al portal de alumnos\n"
-            "* Calculadoras de gestión\n"
-            "* Biblioteca digital\n"
-            "* Clases personalizadas en vivo vía Zoom\n"
-            "* Plataforma Educativa\n"
-            "* Journal Alema\n"
-            "* Evaluaciones")
-            
-        mensaje_preset_ins = (
-            "¡Hola Daniela! 👋 Vengo del portal web y me gustaría solicitar información e inscribirme "
-            "a ALEMA Trading Academy. ¿Me podrías compartir los datos de pago y requisitos?"
-        )
-        url_wa_ins = f"https://wa.me/{num_whatsapp}?text={requests.utils.quote(mensaje_preset_ins)}"
-
-        st.markdown(
-            f'''
-            <a href="{url_wa_ins}" target="_blank" style="text-decoration: none;">
-                <button style="
-                    width: 100%;
-                    background-color: #25D366;
-                    color: white;
-                    padding: 14px 20px;
-                    border: none;
-                    border-radius: 8px;
-                    cursor: pointer;
-                    font-size: 16px;
-                    font-weight: bold;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 10px;">
-                    📲 ¡Quiero Inscribirme! (Contactar a Daniela por WhatsApp)
-                </button>
-            </a>
-            ''',
-            unsafe_allow_html=True
-        )
-
-    st.markdown("<br><p style='text-align: center; color: #718096;'>© ALEMA Trading Academy. Reservados todos los derechos.</p>", unsafe_allow_html=True)
+    st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
     st.stop()
 # ==========================================
 # ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
