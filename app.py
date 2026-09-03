@@ -948,17 +948,12 @@ elif opcion_menu == "📉 Alema Trade live":
     
     # 3. PUERTA DE ACCESO
     if es_admin or simulador_activo:
-        # 🟢 TODO ESTO LLEVA TABULACIÓN / SANGRÍA A LA DERECHA
         st.title("📉 Alema Trade Live")
         
-        import json
-        import os
-     # ==========================================
-     # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-     # (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
-     # ==========================================
-
-    
+        # ==========================================
+        # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
+        # (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
+        # ==========================================
         import json
         import os
         import time
@@ -1112,19 +1107,19 @@ elif opcion_menu == "📉 Alema Trade live":
                     pass
                 finally:
                     st.session_state.ultimo_tiempo_api[simbolo] = ahora
-    
+            
             if simbolo in st.session_state.cache_precios_forex:
                 precio_base = st.session_state.cache_precios_forex[simbolo]
             else:
                 precios_fallback = { "EURUSD": 1.15919, "GBPUSD": 1.31210, "USDJPY": 146.850, "EURJPY": 162.450, "XAUUSD": 2512.30, "US30": 41200.00, "BTCUSD": 62500.00 }
                 precio_base = precios_fallback.get(simbolo, 1.0000)
                 st.session_state.cache_precios_forex[simbolo] = precio_base
-    
+            
             ruido = np.random.normal(0, step_val * 1.2)
             precio_vivo = round(precio_base + ruido, dec)
             precio_bid = precio_vivo
             precio_ask = round(precio_bid + spread_val, dec)
-    
+            
             return precio_bid, precio_ask, precio_vivo
     
         precios_tick_actual = {}
@@ -1222,8 +1217,6 @@ elif opcion_menu == "📉 Alema Trade live":
                 st.rerun()
     
         # --- DASHBOARD Y GRÁFICOS CON VISUALIZACIÓN DE CHALLENGE Y ROL ADMIN ---
-        es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
-    
         if es_admin:
             col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
         else:
@@ -1339,8 +1332,8 @@ elif opcion_menu == "📉 Alema Trade live":
     
         # --- BITÁCORA ---
         st.markdown("<br>", unsafe_allow_html=True)
-    
-        if st.session_state.get("tipo_usuario") == "ADMIN":
+        
+        if es_admin:
             col_tit_bita, col_btn_bita = st.columns([3.0, 1.0])
             with col_tit_bita: 
                 st.markdown("### Bitácora Histórica")
@@ -1349,24 +1342,25 @@ elif opcion_menu == "📉 Alema Trade live":
                     st.session_state.historial_cerradas = []
                     guardar_datos_json(ARCH_PERSISTENCIA_HISTORIAL, [])
                     st.rerun()
-                else:
-                    st.markdown("### Bitácora Histórica")
-            
-                if st.session_state.historial_cerradas:
-                    filas_html = []
-                    for item in reversed(st.session_state.historial_cerradas):
-                        _, fmt_pos, _, _, _, _ = obtener_config_activo(item.get("Símbolo", "EURUSD"))
-                        filas_html.append(
-                            f'<tr><td>{item.get("Tiempo Cierre")}</td><td class="{"mt5-buy" if item.get("Tipo")=="buy" else "mt5-sell"}">{item.get("Tipo")}</td>'
-                            f'<td>{item.get("Volumen"):.2f}</td><td>{item.get("Símbolo")}</td><td>{fmt_pos % item.get("S / L")}</td>'
-                            f'<td>{fmt_pos % item.get("T / P")}</td><td>{fmt_pos % item.get("Precio Cierre")}</td>'
-                            f'<td class="{"mt5-profit" if item.get("Beneficio")>=0 else "mt5-loss"}">{item.get("Beneficio"):+.2f}</td></tr>'
-                        )
-                    st.markdown(f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Vol.</th><th>Símbolo</th><th>S/L</th><th>T/P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{"".join(filas_html)}</tbody></table></div>', unsafe_allow_html=True)
-                else:
-                    st.info("Aún no hay operaciones cerradas.")
-else:
-        # 🔴 ACCESO RESTRINGIDO (Misma alineación vertical que el 'if')
+        else:
+            st.markdown("### Bitácora Histórica")
+
+        if st.session_state.historial_cerradas:
+            filas_html = []
+            for item in reversed(st.session_state.historial_cerradas):
+                _, fmt_pos, _, _, _, _ = obtener_config_activo(item.get("Símbolo", "EURUSD"))
+                filas_html.append(
+                    f'<tr><td>{item.get("Tiempo Cierre")}</td><td class="{"mt5-buy" if item.get("Tipo")=="buy" else "mt5-sell"}">{item.get("Tipo")}</td>'
+                    f'<td>{item.get("Volumen"):.2f}</td><td>{item.get("Símbolo")}</td><td>{fmt_pos % item.get("S / L")}</td>'
+                    f'<td>{fmt_pos % item.get("T / P")}</td><td>{fmt_pos % item.get("Precio Cierre")}</td>'
+                    f'<td class="{"mt5-profit" if item.get("Beneficio")>=0 else "mt5-loss"}">{item.get("Beneficio"):+.2f}</td></tr>'
+                )
+            st.markdown(f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Vol.</th><th>Símbolo</th><th>S/L</th><th>T/P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{"".join(filas_html)}</tbody></table></div>', unsafe_allow_html=True)
+        else:
+            st.info("Aún no hay operaciones cerradas.")
+
+    else:
+        # 🔴 ACCESO RESTRINGIDO
         st.markdown("<h1 style='text-align: center; color: #F1F5F9;'>🔒 Plataforma Educativa Live</h1>", unsafe_allow_html=True)
         st.write("")
         st.markdown("""
