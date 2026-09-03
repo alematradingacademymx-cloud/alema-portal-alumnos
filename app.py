@@ -345,7 +345,71 @@ if not st.session_state.autenticado:
             else:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
        
+ st.markdown("###  ¿Aún no tienes tu acceso al Portal?")
+    st.write(
+        "Obtén acceso a las **Calculadoras Operativas**, **Biblioteca de Guías en PDF** "
+        "y **Cápsulas de Psicotrading** por solo **$150 MXN / mes**."
+    )
 
+    num_whatsapp = "528136462129"
+    mensaje_preset = (
+        "¡Hola Daniela! 👋 Vengo del portal web y me gustaría adquirir mi suscripción "
+        "a la Membresía Mensual Alema ($150 MXN/mes) para obtener mis credenciales de acceso."
+    )
+
+    url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
+    
+    # Botón estilo WhatsApp (Fondo verde #25D366, texto blanco centrado)
+    st.markdown(
+        f'''
+        <a href="{url_wa}" target="_blank" style="text-decoration: none;">
+            <div style="
+                background-color: #25D366;
+                color: #FFFFFF;
+                padding: 12px 20px;
+                border-radius: 8px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 1rem;
+                cursor: pointer;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+                margin: 10px 0;
+                transition: background-color 0.2s ease;">
+                📲 Solicitar Membresía por WhatsApp
+            </div>
+        </a>
+        ''',
+        unsafe_allow_html=True)
+
+    st.markdown("<h2 style='text-align: center;'> ¿Deseas Formarte como Trader en ALEMA?</h2>", unsafe_allow_html=True)
+    st.markdown(
+        "<p style='text-align: center; color: #a0aec0; font-size: 1.1rem;'>"
+        "Conoce nuestro programa educativo integral, herramientas operativas y acompañamiento personalizado."
+        "</p>", 
+        unsafe_allow_html=True
+    )
+
+    col_info1, col_info2 = st.columns(2)
+
+    with col_info1:
+        st.markdown("### 📚 Ruta Académica Oficial")
+        st.markdown("""
+        * **Módulo Básico:** Fundamentos de mercados financieros, estructura de precios y lectura de velas.
+        * **Módulo Intermedio:** Metodología institucional, zonas de oferta/demanda y Fibonacci.
+        * **Módulo Avanzado:** Wyckoff, liquidez de mercado y modelos de entrada de alta probabilidad.
+        * **Módulo Práctico & Psicotrading:** Gestión de riesgo matemática, bitácora y control emocional.
+        """)
+
+    with col_info2:
+        st.markdown("### 💡 Beneficios del Portal Privado")
+        st.markdown("""
+        * **Calculadoras Operativas:** Gestión exacta de lotaje y riesgo por operación.
+        * **Evaluaciones Progresivas:** Exámenes técnicos revisados directamente por Dirección General.
+        * **Constancia Institucional:** Reconocimiento con validez interna al aprobar cada nivel.
+        * **Biblioteca y Reportes:** Descarga de manuales en PDF y retroalimentación personalizada.
+        """)
+
+    st.divider()
 
 # ==========================================
 # ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
