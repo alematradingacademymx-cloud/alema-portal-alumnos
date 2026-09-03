@@ -507,15 +507,6 @@ st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 st.sidebar.markdown("---")
 
-# 🔍 VALIDACIÓN LOCAL DE PERMISOS PARA EL SIMULADOR
-usuario_activo = st.session_state.get("usuario_actual", "").strip().upper()
-candados_locales = cargar_datos_json(FILE_DESBLOQUEOS, {})
-permisos_usuario = candados_locales.get(usuario_activo, [])
-
-# Habilitar simulador solo si es ADMIN o si tiene "Simulador" en sus permisos del JSON
-es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
-simulador_permitido = es_admin or ("Simulador" in permisos_usuario)
-
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
     # Lista base de opciones académicas
     opciones_disponibles = [
@@ -525,9 +516,6 @@ if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
         "📝 Evaluaciones"
     ]
     
-    # 🔓 SOLO AGREGAR EL SIMULADOR SI ESTÁ AUTORIZADO
-    if simulador_permitido:
-        opciones_disponibles.append("📉 Alema Trade live")
         
     opciones_disponibles.append("📚 Biblioteca de Guías")
 else:
