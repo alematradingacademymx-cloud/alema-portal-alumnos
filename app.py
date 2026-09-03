@@ -918,33 +918,6 @@ elif opcion_menu == "📓 Trading Journal":
         st.dataframe(df_mostrar, use_container_width=True)
     else:
         st.info("💡 Aún no tienes trades guardados en tu historial permanente.")
-# ==========================================
-# SECCIÓN: SIMULADOR DE TRADING
-# ==========================================
-elif opcion_menu == "📉 Simulador":
-    import streamlit as st
-    import json
-    import os
-
-    # 1. Obtener usuario y normalizar
-    usuario_actual = st.session_state.get("usuario_actual", "").strip().upper()
-    es_admin = (usuario_actual == "DIRALEX")
-
-    # 2. Cargar permisos del JSON
-    FILE_DESBLOQUEOS = "bd_desbloqueos_alumnos.json"
-    permisos_alumnos = cargar_json_local(FILE_DESBLOQUEOS, {})
-    permisos_usuario = permisos_alumnos.get(usuario_actual, ["Básico"])
-
-    # 3. VERIFICACIÓN DE CANDADO (Bloqueo de acceso)
-    if not es_admin and "Simulador" not in permisos_usuario:
-        st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
-        st.error("🔒 **Acceso Restringido - Simulador Bloqueado**")
-        st.warning("Actualmente no tienes habilitado el acceso a **Alema Trade Live**. Ponte en contacto con Dirección General o Coordinación para activar tu acceso.")
-        st.stop()  # <--- AQUÍ SE DETIENE SI NO TIENE PERMISO
-
-    # 4. ENCABEZADO DE LA PÁGINA (Solo se muestra si TIENE permiso)
-    st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADE LIVE</div>', unsafe_allow_html=True)
-    st.caption("Simulador Operativo en Tiempo Real - ALEMA Trading Academy")
 
 # ==========================================
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
