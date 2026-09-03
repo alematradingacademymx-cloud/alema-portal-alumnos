@@ -1333,12 +1333,8 @@ elif opcion_menu == "📚 Biblioteca de Guías":
     if os.path.exists(archivo_pdf):
         st.success(f"📄 Documento seleccionado: **{guia_seleccionada}**")
         
-        @st.cache_data
-        def cargar_bytes_pdf(ruta):
-            with open(ruta, "rb") as f:
-                return f.read()
-
-        pdf_bytes = cargar_bytes_pdf(archivo_pdf)
+        with open(archivo_pdf, "rb") as f:
+            pdf_bytes = f.read()
 
         st.download_button(
             label=f"📥 Abrir / Descargar Guía Completa ({guia_seleccionada})",
@@ -1353,6 +1349,7 @@ elif opcion_menu == "📚 Biblioteca de Guías":
     else:
         st.warning(f"⚠️ El archivo `{archivo_pdf}` no se encuentra en el repositorio.")
 
+# ==========================================
 # SECCIÓN: EVALUACIONES Y CONTROL ACADÉMICO
 # ==========================================
 elif opcion_menu == "📝 Evaluaciones":
