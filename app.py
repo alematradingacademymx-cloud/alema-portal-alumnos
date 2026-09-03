@@ -1,13 +1,14 @@
+import os
+import json
+import time
 import requests
+import pandas as pd
+import yfinance as yf
+from PIL import Image
+from datetime import datetime
 import streamlit as st
 import streamlit.components.v1 as components
 import plotly.graph_objects as go
-import os
-import json
-import pandas as pd
-from datetime import datetime
-import yfinance as yf
-from PIL import Image
 
 # ==========================================
 # ⚙️ CONFIGURACIÓN DE PÁGINA Y LOGO OFICIAL
@@ -35,7 +36,7 @@ st.set_page_config(
     layout="centered"
 )
 # ==========================================
-# 🛠️ FUNCIONES DE PERSISTENCIA JSON AUXILIARES
+# 🛠️ FUNCIONES DE PERSISTENCIA Y UTILIDADES
 # ==========================================
 def cargar_datos_json(filepath, default_value):
     if os.path.exists(filepath):
@@ -53,37 +54,41 @@ def guardar_datos_json(filepath, data):
     except Exception:
         pass
 
-# Estilos CSS personalizados con Fondo Azul Oscuro Elegante y Botón Verde
+def parsear_fecha(fecha_str):
+    if not fecha_str or str(fecha_str).strip() == '':
+        return datetime(2030, 12, 31).date()
+    
+    fecha_clean = str(fecha_str).strip()
+    formatos = [
+        "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y",
+        "%d-%m-%Y", "%Y/%m/%d", "%d/%m/%y", "%Y-%m-%d %H:%M:%S"
+    ]
+    for fmt in formatos:
+        try:
+            return datetime.strptime(fecha_clean, fmt).date()
+        except ValueError:
+            pass
+    return datetime(2030, 12, 31).date()
+
+# ==========================================
+# 🎨 ESTILOS CSS PERSONALIZADOS
+# ==========================================
 st.markdown("""
     <style>
-    /* 🙈 OCULTAR BARRA SUPERIOR, GITHUB Y MENÚS */
+    /* 🙈 OCULTAR BARRA SUPERIOR, GITHUB Y MENÚS DE STREAMLIT */
     header[data-testid="stHeader"], 
     [data-testid="stToolbar"], 
     [data-testid="stHeaderActionElements"],
     header, 
-    .stAppHeader {
+    .stAppHeader,
+    footer,
+    [data-testid="stStatusWidget"],
+    [data-testid="stDecoration"],
+    div[class*="viewerBadge"],
+    #MainMenu {
         display: none !important;
         visibility: hidden !important;
         height: 0px !important;
-    }
-    
-    /* 🙈 OCULTAR FOOTER Y ÍCONOS FLOTANTES INFERIORES */
-    footer {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    [data-testid="stStatusWidget"] {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    [data-testid="stDecoration"] {
-        display: none !important;
-    }
-    div[class*="viewerBadge"] {
-        display: none !important;
-    }
-    #MainMenu {
-        display: none !important;
     }
 
     /* Fondo General Azul Oscuro */
@@ -162,7 +167,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
 # ==========================================
 # 🔑 FUNCIÓN PARA CONVERTIR CUALQUIER FECHA
 # ==========================================
@@ -191,7 +195,7 @@ URL_AVANCES = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=ou
 URL_FORM_RESPONSE = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
 URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Journal"
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=5) # Reducido a 5 segundos para actualización rápida
 def cargar_usuarios_desde_sheets():
     try:
         df = pd.read_csv(URL_USUARIOS, dtype=str)
@@ -202,37 +206,31 @@ def cargar_usuarios_desde_sheets():
         except Exception:
             return {}
 
-    # Normalización exhaustiva de encabezados de columnas
+    # Normalización exhaustiva de encabezados de columnas (TODOS A MAYÚSCULAS)
     df.columns = df.columns.str.strip().str.upper().str.replace(' ', '_')
     
-    # Identificar la columna que contiene los permisos del simulador
-    col_simulador = None
-    for col in df.columns:
-        if 'SIMULADOR' in col:
-            col_simulador = col
-            break
+    # Identificar la columna del simulador
+    col_simulador = next((c for c in df.columns if 'SIMULADOR' in c or 'HABILITADO' in c), None)
 
     dict_usuarios = {}
     for _, row in df.iterrows():
-        # Matrícula limpia como clave
         matricula = str(row.get('MATRICULA', '')).strip().upper()
         if not matricula:
             continue
             
-        # 1. Evaluación estricta del valor recibido de Google Sheets
-val_sim = str(row.get(col_simulador, 'NO')).strip().upper() if col_simulador else 'NO'
-sim_hab = val_sim in ['SI', 'TRUE', '1']  # Devuelve True solo si es "SI", si es "NO" devuelve False
+        # 1. Evaluación estricta del valor recibido ("SI" -> True | "NO" -> False)
+        val_sim = str(row.get(col_simulador, 'NO')).strip().upper() if col_simulador else 'NO'
+        sim_hab = val_sim in ['SI', 'YES', 'TRUE', '1']
 
-tipo_user = str(row.get('Tipo_Usuario', 'ALUMNO')).strip().upper()
+        # 2. Lectura correcta del Rol (Mayúsculas)
+        tipo_user = str(row.get('TIPO_USUARIO', row.get('TIPO', 'ALUMNO'))).strip().upper()
 
-# 2. Guardar en el estado de la sesión (session_state)
-st.session_state.simulador_habilitado = sim_hab  # Guarda True/False
-st.session_state.tipo_usuario = tipo_user
         # Capital limpio
         col_cap = 'CAPITAL' if 'CAPITAL' in df.columns else 'CAPITAL_BASE'
         capital_val = row.get(col_cap, '300')
         capital_limpio = float(pd.to_numeric(capital_val, errors='coerce') if pd.notnull(capital_val) else 300.0)
 
+        # Se guardan los datos en el diccionario del usuario correspondiente
         dict_usuarios[matricula] = {
             'password': str(row.get('PASSWORD', '')).strip(),
             'tipo': tipo_user,
@@ -322,6 +320,9 @@ if not st.session_state.autenticado:
     col_btn, _ = st.columns([1, 1])
     with col_btn:
         if st.button("🔑 Iniciar Sesión", use_container_width=True):
+            # Forzar recarga fresca de usuarios al hacer click en login
+            USUARIOS_AUTORIZADOS = cargar_usuarios_desde_sheets()
+            
             if matricula_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[matricula_input]['password'] == password_input:
                 user_info = USUARIOS_AUTORIZADOS[matricula_input]
                 
@@ -336,9 +337,11 @@ if not st.session_state.autenticado:
                     st.session_state.tipo_usuario = user_info['tipo']
                     st.session_state.balance_pedagogico = float(user_info['capital_base'])
                     
-                    # ASIGNACIÓN DE PERMISOS: Solo True si la hoja dice 'SI' o si es ADMIN
+                    # ASIGNACIÓN CORRECTA: Asigna el permiso exacto del usuario específico que inicia sesión
                     permiso_sim = user_info.get('simulador_habilitado', False)
-                    st.session_state.simulador_habilitado = bool(permiso_sim or (user_info['tipo'] == 'ADMIN'))
+                    es_admin_user = (user_info['tipo'] == 'ADMIN')
+                    
+                    st.session_state.simulador_habilitado = bool(permiso_sim or es_admin_user)
                     
                     st.session_state.archivo_pos = f"posiciones_{matricula_input}.json"
                     st.session_state.archivo_hist = f"historial_{matricula_input}.json"
@@ -474,7 +477,12 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
     st.sidebar.divider()
     st.sidebar.markdown("### ⚙️ Panel Coordinación Admin")
     
-    lista_matriculas = list(USUARIOS_AUTORIZADOS.keys())
+    # Obtención de la lista de alumnos autorizados
+    if "USUARIOS_AUTORIZADOS" in globals():
+        lista_matriculas = list(USUARIOS_AUTORIZADOS.keys())
+    else:
+        lista_matriculas = st.session_state.get("lista_usuarios", [st.session_state.get("usuario_actual", "Admin")])
+        
     alumno_seleccionado = st.sidebar.selectbox("Gestionar Alumno", lista_matriculas, key="select_admin_alumno")
     
     # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL Y PERMISOS DESDE GOOGLE SHEETS ---
@@ -498,21 +506,19 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         st.rerun()
 
     # --- 3. INDICADOR DE ESTADO DEL SIMULADOR ---
-    datos_sel = USUARIOS_AUTORIZADOS.get(alumno_seleccionado, {})
-    estado_sim = datos_sel.get("simulador_habilitado", False)
-    badge_sim = "🟢 HABILITADO" if estado_sim else "🔴 RESTRINGIDO"
-    
-    st.sidebar.markdown(f"**Estatus Simulador:** {badge_sim}")
+    if "USUARIOS_AUTORIZADOS" in globals():
+        datos_sel = USUARIOS_AUTORIZADOS.get(alumno_seleccionado, {})
+        estado_sim = datos_sel.get("simulador_habilitado", False)
+        badge_sim = "🟢 HABILITADO" if estado_sim else "🔴 RESTRINGIDO"
+        st.sidebar.markdown(f"**Estatus Simulador:** {badge_sim}")
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
-import streamlit.components.v1 as components
-
 st.sidebar.image("alema trading academy.png", width=180)
 
 st.sidebar.markdown("### 🎓 ALEMA PORTAL")
-st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
-st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
+st.sidebar.write(f"Usuario: **{st.session_state.get('usuario_actual', '')}**")
+st.sidebar.caption(f"Rol: {st.session_state.get('tipo_usuario', 'ALUMNO')}")
 st.sidebar.markdown("---")
 
 # --- CONVERSIÓN ESTRICTA A BOOLEANO (Arregla el fallo de "NO" = True) ---
@@ -527,7 +533,7 @@ else:
 es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
 
 # CONSTRUCCIÓN DINÁMICA DE OPCIONES SEGÚN PERMISO REAL
-if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
+if st.session_state.get("tipo_usuario") in ["ADMIN", "ALUMNO"]:
     opciones_disponibles = [
         "📊 Mi Avance Académico", 
         "🧮 Calculadoras de Lotes", 
@@ -535,7 +541,7 @@ if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
         "📝 Evaluaciones"
     ]
     
-    # SOLO SE AÑADE SI ES ADMIN O SI EN LA BASE TIENE "SI"
+    # SOLO SE AÑADE SI ES ADMIN O SI EN LA BASE TIENE PERMISO "SI"
     if es_admin or simulador_permitido:
         opciones_disponibles.append("📉 Alema Trade live")
         
@@ -984,14 +990,14 @@ elif opcion_menu == "📉 Alema Trade live":
                     # Validar Simulador Habilitado
                     if col_sim:
                         valor_raw_columna = str(filtro[col_sim].values[0]).strip().upper()
-                        # Solo asigna True si el texto es exactamente "SI", "TRUE" o "1"
+                        # Solo asigna True si el texto es exactamente "SI", "YES", "TRUE" o "1"
                         simulador_permitido = valor_raw_columna in ["SI", "YES", "TRUE", "1"]
         except Exception as e:
             st.error(f"Error de conexión con la base de datos: {e}")
             
         return capital, nivel, simulador_permitido, es_administrador, valor_raw_columna
 
-    # 2. Obtener datos limpios
+    # 2. Obtener datos limpios en vivo
     capital_base, nivel_challenge, simulador_activo, es_admin, valor_raw = consultar_bd_en_vivo(usuario_actual)
 
     # --- PANEL DE DIAGNÓSTICO (Visible temporalmente para pruebas) ---
@@ -1002,9 +1008,12 @@ elif opcion_menu == "📉 Alema Trade live":
         col_d3.write(f"**Valor Columna G:** `{valor_raw}`")
         col_d4.write(f"**Acceso Permitido:** `{es_admin or simulador_activo}`")
 
-    # 3. EVALUACIÓN ESTRICTA DE LA PUERTA DE ACCESO
+    # 3. EVALUACIÓN ESTRICTA Y DESPLIEGUE DEL SIMULADOR
     if es_admin or simulador_activo:
         st.title("📉 Alema Trade Live")
+        st.write(f"**Balance Inicial:** ${capital_base:,.2f} USD | **Fase:** {nivel_challenge}")
+    else:
+        st.error("🚫 No tienes permisos activos para acceder al simulador. Contacta a coordinación.")
         
         
         # ==========================================
@@ -1416,7 +1425,7 @@ elif opcion_menu == "📉 Alema Trade live":
         else:
             st.info("Aún no hay operaciones cerradas.")
 
-       else:
+    else:
         # 🔒 BLOQUE DEL CANDADO / ACCESO RESTRINGIDO
         st.markdown("<h1 style='text-align: center; color: #F1F5F9;'>🔒 Plataforma Educativa Live</h1>", unsafe_allow_html=True)
         st.write("")
