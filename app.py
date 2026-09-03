@@ -507,8 +507,29 @@ st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 st.sidebar.markdown("---")
 
+# 🔍 VALIDACIÓN LOCAL DE PERMISOS PARA EL SIMULADOR
+usuario_activo = st.session_state.get("usuario_actual", "").strip().upper()
+candados_locales = cargar_datos_json(FILE_DESBLOQUEOS, {})
+permisos_usuario = candados_locales.get(usuario_activo, [])
+
+# Habilitar simulador solo si es ADMIN o si tiene "Simulador" en sus permisos del JSON
+es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
+simulador_permitido = es_admin or ("Simulador" in permisos_usuario)
+
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
-    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📝 Evaluaciones", "📉 Alema Trade live", "📚 Biblioteca de Guías"]
+    # Lista base de opciones académicas
+    opciones_disponibles = [
+        "📊 Mi Avance Académico", 
+        "🧮 Calculadoras de Lotes", 
+        "📓 Trading Journal", 
+        "📝 Evaluaciones"
+    ]
+    
+    # 🔓 SOLO AGREGAR EL SIMULADOR SI ESTÁ AUTORIZADO
+    if simulador_permitido:
+        opciones_disponibles.append("📉 Alema Trade live")
+        
+    opciones_disponibles.append("📚 Biblioteca de Guías")
 else:
     opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
 
@@ -1658,15 +1679,28 @@ elif opcion_menu == "📝 Evaluaciones":
                 
                 with st.form("form_permisos_alumno"):
                     nuevos_permisos = []
+                    
+                    # 1. Módulos Académicos Existentes (Sin cambios)
                     for m in LISTA_MODULOS:
                         check = st.checkbox(f"🔓 Habilitar Módulo: {m}", value=(m in permisos_actuales_alumno))
                         if check:
                             nuevos_permisos.append(m)
 
+                    st.markdown("---")
+                    
+                    # 2. Casilla exclusiva e independiente para el Simulador
+                    check_simulador = st.checkbox(
+                        "📉 Habilitar Acceso al Simulador (Alema Trade Live)", 
+                        value=("Simulador" in permisos_actuales_alumno)
+                    )
+                    if check_simulador:
+                        nuevos_permisos.append("Simulador")
+
+                    # 3. Guardado local
                     if st.form_submit_button("💾 Guardar Permisos", use_container_width=True):
                         permisos_alumnos[alumno_mat_permiso] = nuevos_permisos
                         guardar_json_local(FILE_DESBLOQUEOS, permisos_alumnos)
-                        st.success(f"✅ Permisos actualizados para **{alumno_mat_permiso}**.")
+                        st.success(f"✅ Permisos y acceso al simulador actualizados para **{alumno_mat_permiso}**.")
                         st.rerun()
 
         # -------------------------------------------------------------
