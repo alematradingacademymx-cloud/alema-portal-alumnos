@@ -1307,7 +1307,6 @@ if st.session_state.historial_cerradas:
     st.markdown(f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Vol.</th><th>Símbolo</th><th>S/L</th><th>T/P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{"".join(filas_html)}</tbody></table></div>', unsafe_allow_html=True)
 else:
     st.info("Aún no hay operaciones cerradas.")
-      
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
