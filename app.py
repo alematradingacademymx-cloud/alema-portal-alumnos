@@ -513,7 +513,18 @@ st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 st.sidebar.markdown("---")
 
-# CONSTRUCCIÓN DINÁMICA DE OPCIONES (SEGUN PERMISO REAL DEL SIMULADOR)
+# --- CONVERSIÓN ESTRICTA A BOOLEANO (Arregla el fallo de "NO" = True) ---
+val_sim = st.session_state.get("simulador_habilitado", False)
+
+if isinstance(val_sim, str):
+    # Solo será True si en la base dice exactamente "SI", "YES", "TRUE" o "1"
+    simulador_permitido = val_sim.strip().upper() in ["SI", "YES", "TRUE", "1"]
+else:
+    simulador_permitido = bool(val_sim)
+
+es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
+
+# CONSTRUCCIÓN DINÁMICA DE OPCIONES SEGÚN PERMISO REAL
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
     opciones_disponibles = [
         "📊 Mi Avance Académico", 
@@ -522,8 +533,8 @@ if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
         "📝 Evaluaciones"
     ]
     
-    # SOLO SE AÑADE EL SIMULADOR SI ESTÁ AUTORIZADO O ES ADMIN
-    if st.session_state.get("simulador_habilitado", False):
+    # SOLO SE AÑADE SI ES ADMIN O SI EN LA BASE TIENE "SI"
+    if es_admin or simulador_permitido:
         opciones_disponibles.append("📉 Alema Trade live")
         
     opciones_disponibles.append("📚 Biblioteca de Guías")
