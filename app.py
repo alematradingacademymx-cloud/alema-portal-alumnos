@@ -196,60 +196,44 @@ URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tq
 def cargar_usuarios_desde_sheets():
     try:
         df = pd.read_csv(URL_USUARIOS, dtype=str)
-        df.columns = df.columns.str.strip()
-        df['Matricula'] = df['Matricula'].fillna('').str.strip().str.upper()
-        df['Password'] = df['Password'].fillna('').str.strip()
-        df['Tipo_Usuario'] = df['Tipo_Usuario'].fillna('ALUMNO').str.strip().str.upper()
-        df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
-        df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
-        
-        # 🆕 VALIDACIÓN DE COLUMNA SIMULADOR_HABILITADO
-        if 'Simulador_Habilitado' not in df.columns:
-            df['Simulador_Habilitado'] = 'NO'
-        
-        dict_usuarios = {}
-        for _, row in df.iterrows():
-            # Evalúa 'SI', 'Si', 'si', 'TRUE', etc.
-            val_sim = str(row.get('Simulador_Habilitado', 'NO')).strip().upper()
-            sim_hab = val_sim in ['SI', 'TRUE', '1']
-            
-            dict_usuarios[row['Matricula']] = {
-                'password': row['Password'],
-                'tipo': row['Tipo_Usuario'],
-                'vencimiento': row['Fecha_Vencimiento'],
-                'capital_base': float(row['Capital']),
-                'simulador_habilitado': sim_hab
-            }
-        return dict_usuarios
     except Exception:
         try:
             url_fallback = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
             df = pd.read_csv(url_fallback, dtype=str)
-            df.columns = df.columns.str.strip()
-            df['Matricula'] = df['Matricula'].fillna('').str.strip().str.upper()
-            df['Password'] = df['Password'].fillna('').str.strip()
-            df['Tipo_Usuario'] = df['Tipo_Usuario'].fillna('ALUMNO').str.strip().str.upper()
-            df['Fecha_Vencimiento'] = df['Fecha_Vencimiento'].fillna('2030-12-31').str.strip()
-            df['Capital'] = pd.to_numeric(df['Capital'].fillna('300'), errors='coerce').fillna(300.0)
-            
-            if 'Simulador_Habilitado' not in df.columns:
-                df['Simulador_Habilitado'] = 'NO'
-                
-            dict_usuarios = {}
-            for _, row in df.iterrows():
-                val_sim = str(row.get('Simulador_Habilitado', 'NO')).strip().upper()
-                sim_hab = val_sim in ['SI', 'TRUE', '1']
-                
-                dict_usuarios[row['Matricula']] = {
-                    'password': row['Password'],
-                    'tipo': row['Tipo_Usuario'],
-                    'vencimiento': row['Fecha_Vencimiento'],
-                    'capital_base': float(row['Capital']),
-                    'simulador_habilitado': sim_hab
-                }
-            return dict_usuarios
         except Exception:
             return {}
+
+    # Normalizar nombres de columnas (quitar espacios, guiones bajos y convertir a mayúsculas)
+    df.columns = df.columns.str.strip().str.upper().str.replace(' ', '_')
+    
+    df['MATRICULA'] = df['MATRICULA'].fillna('').str.strip().str.upper() if 'MATRICULA' in df.columns else ''
+    df['PASSWORD'] = df['PASSWORD'].fillna('').str.strip() if 'PASSWORD' in df.columns else ''
+    df['TIPO_USUARIO'] = df['TIPO_USUARIO'].fillna('ALUMNO').str.strip().str.upper() if 'TIPO_USUARIO' in df.columns else 'ALUMNO'
+    df['FECHA_VENCIMIENTO'] = df['FECHA_VENCIMIENTO'].fillna('2030-12-31').str.strip() if 'FECHA_VENCIMIENTO' in df.columns else '2030-12-31'
+    
+    col_capital = 'CAPITAL' if 'CAPITAL' in df.columns else 'CAPITAL_BASE'
+    df['CAPITAL_LIMPIO'] = pd.to_numeric(df[col_capital].fillna('300'), errors='coerce').fillna(300.0) if col_capital in df.columns else 300.0
+
+    # Normalizar columna del simulador por si se llama diferente en Sheets
+    col_sim = next((c for c in df.columns if 'SIMULADOR' in c), None)
+    
+    dict_usuarios = {}
+    for _, row in df.iterrows():
+        mat = row.get('MATRICULA', '')
+        if not mat:
+            continue
+            
+        val_sim = str(row.get(col_sim, 'NO')).strip().upper() if col_sim else 'NO'
+        sim_hab = val_sim in ['SI', 'TRUE', '1']
+        
+        dict_usuarios[mat] = {
+            'password': row.get('PASSWORD', ''),
+            'tipo': row.get('TIPO_USUARIO', 'ALUMNO'),
+            'vencimiento': row.get('FECHA_VENCIMIENTO', '2030-12-31'),
+            'capital_base': float(row.get('CAPITAL_LIMPIO', 300.0)),
+            'simulador_habilitado': sim_hab
+        }
+    return dict_usuarios
 
 @st.cache_data(ttl=10)
 def obtener_avance_alumno(matricula_usuario):
@@ -278,14 +262,12 @@ if "usuario_actual" not in st.session_state:
 if "tipo_usuario" not in st.session_state:
     st.session_state.tipo_usuario = "ALUMNO"
 
-# 🆕 VARIABLE DE CONTROL PARA EL SIMULADOR
 if "simulador_habilitado" not in st.session_state:
     st.session_state.simulador_habilitado = False
 
 if "journal_trades" not in st.session_state:
     st.session_state.journal_trades = []
 
-# Rutas de persistencia individual por alumno
 if "archivo_pos" not in st.session_state:
     st.session_state.archivo_pos = "posiciones_invitado.json"
 if "archivo_hist" not in st.session_state:
@@ -295,7 +277,6 @@ import base64
 
 # --- PANTALLA DE INICIO DE SESIÓN ---
 if not st.session_state.autenticado:
-    # 🖼️ ISOTIPO BLANCO CENTRADO Y RESPONSIVO (DESKTOP Y MÓVIL)
     archivo_iso = "alema_iso.png"
     
     if not os.path.exists(archivo_iso):
@@ -313,9 +294,9 @@ if not st.session_state.autenticado:
             </div>
             ''',
             unsafe_allow_html=True)
+            
     st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados y Suscriptores</div>', unsafe_allow_html=True)
-    
     st.markdown("---")
     
     st.markdown("### 👋 ¡Bienvenido al Portal Institucional!")
@@ -323,7 +304,6 @@ if not st.session_state.autenticado:
         "Este es tu ecosistema de herramientas operativas, calculadoras de gestión de riesgo, "
         "journal de operaciones y biblioteca digital. Ingresa tus credenciales para comenzar."
     )
-    
     st.markdown("---")
     
     st.subheader("🔒 Acceso al Portal Privado")
@@ -334,36 +314,28 @@ if not st.session_state.autenticado:
     
     col_btn, _ = st.columns([1, 1])
     with col_btn:
-       if st.button("🔑 Iniciar Sesión", use_container_width=True):
-    if matricula_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[matricula_input]['password'] == password_input:
-        user_info = USUARIOS_AUTORIZADOS[matricula_input]
-        
-        fecha_venc = parsear_fecha(user_info['vencimiento'])
-        hoy = datetime.now().date()
-        
-        if hoy > fecha_venc:
-            st.error(f"⛔ **Suscripción Vencida:** Tu acceso venció el {fecha_venc.strftime('%d/%m/%Y')}. Por favor, renueva tu suscripción para volver a ingresar.")
-        else:
-            st.session_state.autenticado = True
-            st.session_state.usuario_actual = matricula_input
-            st.session_state.tipo_usuario = user_info['tipo']
-            st.session_state.balance_pedagogico = float(user_info['capital_base'])
-            
-            # 🔑 ¡ESTA LÍNEA ES LA QUE TE FALTABA PARA ACTIVAR EL PERMISO!
-            st.session_state.simulador_habilitado = user_info.get('simulador_habilitado', False)
-            
-            st.success(f"¡Bienvenido, {matricula_input}!")
-            st.rerun()
+        if st.button("🔑 Iniciar Sesión", use_container_width=True):
+            if matricula_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[matricula_input]['password'] == password_input:
+                user_info = USUARIOS_AUTORIZADOS[matricula_input]
+                
+                fecha_venc = parsear_fecha(user_info['vencimiento'])
+                hoy = datetime.now().date()
+                
+                if hoy > fecha_venc:
+                    st.error(f"⛔ **Suscripción Vencida:** Tu acceso venció el {fecha_venc.strftime('%d/%m/%Y')}. Por favor, renueva tu suscripción para volver a ingresar.")
+                else:
+                    st.session_state.autenticado = True
+                    st.session_state.usuario_actual = matricula_input
+                    st.session_state.tipo_usuario = user_info['tipo']
+                    st.session_state.balance_pedagogico = float(user_info['capital_base'])
                     
-                    # 👈 NUEVO: CARGAR PERMISO DEL SIMULADOR SEGÚN LA BASE DE DATOS O SI ES ADMIN
+                    # ASIGNACIÓN DE PERMISOS LIMPIA Y SIN CÓDIGO INALCANZABLE
                     permiso_sim = user_info.get('simulador_habilitado', False)
                     st.session_state.simulador_habilitado = permiso_sim or (user_info['tipo'] == 'ADMIN')
                     
-                    # BLINDAJE DE SESIÓN: Fijar rutas únicas directamente en st.session_state
                     st.session_state.archivo_pos = f"posiciones_{matricula_input}.json"
                     st.session_state.archivo_hist = f"historial_{matricula_input}.json"
                     
-                    # Cargar archivos específicos del alumno autenticado
                     if os.path.exists(st.session_state.archivo_pos):
                         st.session_state.posiciones_abiertas = cargar_datos_json(st.session_state.archivo_pos, [])
                     else:
@@ -374,13 +346,13 @@ if not st.session_state.autenticado:
                     else:
                         st.session_state.historial_cerradas = []
                     
-                    st.success("¡Acceso concedido!")
+                    st.success(f"¡Bienvenido, {matricula_input}!")
                     st.rerun()
             else:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
     
     st.markdown("---")
-    st.markdown("###  ¿Aún no tienes tu acceso al Portal?")
+    st.markdown("### ¿Aún no tienes tu acceso al Portal?")
     st.write(
         "Obtén acceso a las **Calculadoras Operativas**, **Biblioteca de Guías en PDF** "
         "y **Cápsulas de Psicotrading** por solo **$150 MXN / mes**."
@@ -391,10 +363,8 @@ if not st.session_state.autenticado:
         "¡Hola Daniela! 👋 Vengo del portal web y me gustaría adquirir mi suscripción "
         "a la Membresía Mensual Alema ($150 MXN/mes) para obtener mis credenciales de acceso."
     )
-
     url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
     
-    # Botón estilo WhatsApp (Fondo verde #25D366, texto blanco centrado)
     st.markdown(
         f'''
         <a href="{url_wa}" target="_blank" style="text-decoration: none;">
@@ -408,8 +378,7 @@ if not st.session_state.autenticado:
                 font-size: 1rem;
                 cursor: pointer;
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
-                margin: 10px 0;
-                transition: background-color 0.2s ease;">
+                margin: 10px 0;">
                 📲 Solicitar Membresía por WhatsApp
             </div>
         </a>
@@ -425,7 +394,6 @@ if not st.session_state.autenticado:
     )
 
     col_info1, col_info2 = st.columns(2)
-
     with col_info1:
         st.markdown("### 📚 Ruta Académica Oficial")
         st.markdown("""
@@ -446,9 +414,7 @@ if not st.session_state.autenticado:
 
     st.divider()
 
-    # --- SECCIÓN DE INSCRIPCIÓN Y WHATSAPP COORDINACIÓN ---
     st.markdown("<h3 style='text-align: center;'>💳 Cuota e Inscripciones</h3>", unsafe_allow_html=True)
-    
     col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
     with col_p2:
         st.info(
@@ -462,17 +428,15 @@ if not st.session_state.autenticado:
             "* Journal Alema\n"
             "* Evaluaciones")
             
-        num_whatsapp = "528136462129"
-        mensaje_preset = (
+        mensaje_preset_ins = (
             "¡Hola Daniela! 👋 Vengo del portal web y me gustaría solicitar información e inscribirme "
             "a ALEMA Trading Academy. ¿Me podrías compartir los datos de pago y requisitos?"
         )
-
-        url_wa = f"https://wa.me/{num_whatsapp}?text={requests.utils.quote(mensaje_preset)}"
+        url_wa_ins = f"https://wa.me/{num_whatsapp}?text={requests.utils.quote(mensaje_preset_ins)}"
 
         st.markdown(
             f'''
-            <a href="{url_wa}" target="_blank" style="text-decoration: none;">
+            <a href="{url_wa_ins}" target="_blank" style="text-decoration: none;">
                 <button style="
                     width: 100%;
                     background-color: #25D366;
@@ -544,8 +508,20 @@ st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 st.sidebar.markdown("---")
 
+# CONSTRUCCIÓN DINÁMICA DE OPCIONES (SEGUN PERMISO REAL DEL SIMULADOR)
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
-    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📝 Evaluaciones", "📉 Alema Trade live", "📚 Biblioteca de Guías"]
+    opciones_disponibles = [
+        "📊 Mi Avance Académico", 
+        "🧮 Calculadoras de Lotes", 
+        "📓 Trading Journal", 
+        "📝 Evaluaciones"
+    ]
+    
+    # SOLO SE AÑADE EL SIMULADOR SI ESTÁ AUTORIZADO O ES ADMIN
+    if st.session_state.get("simulador_habilitado", False):
+        opciones_disponibles.append("📉 Alema Trade live")
+        
+    opciones_disponibles.append("📚 Biblioteca de Guías")
 else:
     opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
 
@@ -559,6 +535,7 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state.autenticado = False
     st.session_state.usuario_actual = ""
     st.session_state.tipo_usuario = "ALUMNO"
+    st.session_state.simulador_habilitado = False
     st.rerun()
 
 # --- SCRIPT DE CIERRE TÁCTIL PARA SAFARI / ANDROID ---
@@ -576,7 +553,6 @@ collapse_script = """
             }
         }
         
-        // Escuchador global de toque/clic en la barra lateral para móviles
         setTimeout(() => {
             const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
             if (sidebar) {
