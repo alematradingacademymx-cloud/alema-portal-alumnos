@@ -940,16 +940,19 @@ elif opcion_menu == "📉 Alema Trade live":
     
     # 1. Identificar usuario y rol
     usuario_actual = st.session_state.get("usuario_actual", "")
-    es_admin = st.session_state.tipo_usuario == "ADMIN"
+    es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
     
-    # 2. LECTURA EN TIEMPO REAL: Consultar permiso directamente en la base cargada
+    # 2. LECTURA EN TIEMPO REAL DESDE LA BD
     datos_usuario = USUARIOS_AUTORIZADOS.get(usuario_actual, {})
     simulador_activo = datos_usuario.get("simulador_habilitado", False)
     
-    # 3. PUERTA DE ACCESO (VALIDACIÓN)
+    # 3. PUERTA DE ACCESO
     if es_admin or simulador_activo:
-        # 🟢 ACCESO PERMITIDO
+        # 🟢 TODO ESTO LLEVA TABULACIÓN / SANGRÍA A LA DERECHA
         st.title("📉 Alema Trade Live")
+        
+        import json
+        import os
      # ==========================================
      # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
      # (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
@@ -1363,7 +1366,7 @@ elif opcion_menu == "📉 Alema Trade live":
                 else:
                     st.info("Aún no hay operaciones cerradas.")
 else:
-        # 🔴 ACCESO RESTRINGIDO
+        # 🔴 ACCESO RESTRINGIDO (Misma alineación vertical que el 'if')
         st.markdown("<h1 style='text-align: center; color: #F1F5F9;'>🔒 Plataforma Educativa Live</h1>", unsafe_allow_html=True)
         st.write("")
         st.markdown("""
