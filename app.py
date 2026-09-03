@@ -247,7 +247,6 @@ def obtener_avance_alumno(matricula_usuario):
         return None
     except Exception:
         return None
-
 # Carga inicial de usuarios
 USUARIOS_AUTORIZADOS = cargar_usuarios_desde_sheets()
 
