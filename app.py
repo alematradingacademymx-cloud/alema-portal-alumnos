@@ -1666,7 +1666,7 @@ elif opcion_menu == "📝 Evaluaciones":
                 st.success(f"✅ Examen **{key_target}** guardado con éxito.")
                 st.rerun()
 
-        # -------------------------------------------------------------
+       # -------------------------------------------------------------
         # PESTAÑA 4: GESTOR DE CANDADOS (ADMIN)
         # -------------------------------------------------------------
         with tab_permisos:
@@ -1680,7 +1680,7 @@ elif opcion_menu == "📝 Evaluaciones":
                 with st.form("form_permisos_alumno"):
                     nuevos_permisos = []
                     
-                    # 1. Módulos Académicos Existentes (Sin cambios)
+                    # 1. Checkboxes de los módulos educativos habituales
                     for m in LISTA_MODULOS:
                         check = st.checkbox(f"🔓 Habilitar Módulo: {m}", value=(m in permisos_actuales_alumno))
                         if check:
@@ -1688,7 +1688,7 @@ elif opcion_menu == "📝 Evaluaciones":
 
                     st.markdown("---")
                     
-                    # 2. Casilla exclusiva e independiente para el Simulador
+                    # 2. Casilla exclusiva e independiente para activar/desactivar el Simulador
                     check_simulador = st.checkbox(
                         "📉 Habilitar Acceso al Simulador (Alema Trade Live)", 
                         value=("Simulador" in permisos_actuales_alumno)
@@ -1696,11 +1696,11 @@ elif opcion_menu == "📝 Evaluaciones":
                     if check_simulador:
                         nuevos_permisos.append("Simulador")
 
-                    # 3. Guardado local
+                    # 3. Guardado en el archivo local de candados
                     if st.form_submit_button("💾 Guardar Permisos", use_container_width=True):
                         permisos_alumnos[alumno_mat_permiso] = nuevos_permisos
                         guardar_json_local(FILE_DESBLOQUEOS, permisos_alumnos)
-                        st.success(f"✅ Permisos y acceso al simulador actualizados para **{alumno_mat_permiso}**.")
+                        st.success(f"✅ Permisos actualizados para **{alumno_mat_permiso}**.")
                         st.rerun()
 
         # -------------------------------------------------------------
