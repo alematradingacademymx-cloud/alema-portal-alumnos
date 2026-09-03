@@ -344,8 +344,9 @@ if not st.session_state.autenticado:
                     st.rerun()
             else:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
-       
- st.markdown("###  ¿Aún no tienes tu acceso al Portal?")
+    
+    st.markdown("---")
+    st.markdown("###  ¿Aún no tienes tu acceso al Portal?")
     st.write(
         "Obtén acceso a las **Calculadoras Operativas**, **Biblioteca de Guías en PDF** "
         "y **Cápsulas de Psicotrading** por solo **$150 MXN / mes**."
@@ -410,6 +411,59 @@ if not st.session_state.autenticado:
         """)
 
     st.divider()
+
+  # --- SECCIÓN DE INSCRIPCIÓN Y WHATSAPP COORDINACIÓN ---
+    st.markdown("<h3 style='text-align: center;'>💳 Cuota e Inscripciones</h3>", unsafe_allow_html=True)
+    
+    col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
+    with col_p2:
+        st.info(
+            "📌 **Membresía Elite ALEMA / Acceso al Portal:** **$1890 MXN / mes**\n\n"
+            "**Incluye:**\n"
+            "* Acceso completo al portal de alumnos\n"
+            "* Calculadoras de gestión\n"
+            "* Biblioteca digital\n"
+            "* Clases personalizadas en vivo vía Zoom\n"
+            "* Plataforma Educativa\n"
+            "* Journal Alema\n"
+            "* Evaluaciones")
+            
+        num_whatsapp = "528136462129"
+        mensaje_preset = (
+            "¡Hola Daniela! 👋 Vengo del portal web y me gustaría solicitar información e inscribirme "
+            "a ALEMA Trading Academy. ¿Me podrías compartir los datos de pago y requisitos?"
+        )
+
+        url_wa = f"https://wa.me/{num_whatsapp}?text={requests.utils.quote(mensaje_preset)}"
+
+        st.markdown(
+            f'''
+            <a href="{url_wa}" target="_blank" style="text-decoration: none;">
+                <button style="
+                    width: 100%;
+                    background-color: #25D366;
+                    color: white;
+                    padding: 14px 20px;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    font-weight: bold;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;">
+                    📲 ¡Quiero Inscribirme! (Contactar a Daniela por WhatsApp)
+                </button>
+            </a>
+            ''',
+            unsafe_allow_html=True
+        )
+
+    st.markdown("<br><p style='text-align: center; color: #718096;'>© ALEMA Trading Academy. Reservados todos los derechos.</p>", unsafe_allow_html=True)
+    st.stop()
+
+
 
 # ==========================================
 # ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
