@@ -918,88 +918,81 @@ elif opcion_menu == "📓 Trading Journal":
 # 📉 SECCIÓN: ALEMA TRADE LIVE
 # ==========================================
 elif opcion_menu == "📉 Alema Trade live":
-    
-    # 1. Identificar usuario
-    usuario_actual = st.session_state.get("usuario_actual", "")
-    
-    # --- FUNCIÓN DE CONEXIÓN Y LECTURA EN TIEMPO REAL DESDE GOOGLE SHEETS ---
-    @st.cache_data(ttl=5) # Se actualiza cada 5 segundos desde la base de datos
-    def obtener_datos_usuario_desde_sheets(usuario_target):
-        capital_defecto = 300.00
-        nivel_defecto = "Nivel 1"
-        simulador_defecto = False
-        es_admin_defecto = False
+    import time
+    import pandas as pd
+
+    # 1. Identificar usuario activo en la sesión
+    usuario_actual = st.session_state.get("usuario_actual", "").strip()
+
+    # --- LECTURA DIRECTA DE GOOGLE SHEETS SIN CACHÉ DE SERVIDOR ---
+    def consultar_bd_en_vivo(usuario_target):
+        # Timestamp para forzar a Google Sheets a no usar caché de CDN
+        timestamp = int(time.time())
+        sheet_url = f"https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0&_t={timestamp}"
+        
+        capital = 300.00
+        nivel = "Nivel 1"
+        simulador_permitido = False
+        es_administrador = False
+        valor_raw_columna = "NO ENCONTRADO"
         
         try:
-            sheet_url = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0"
             df = pd.read_csv(sheet_url)
             df.columns = [str(c).strip() for c in df.columns]
             
-            # Identificar columnas
+            # Mapeo de columnas
             col_user = next((c for c in df.columns if any(k in c.lower() for k in ["usuario", "matricula", "user"])), None)
             col_cap = next((c for c in df.columns if any(k in c.lower() for k in ["capital", "monto", "balance"])), None)
-            col_challenge = next((c for c in df.columns if any(k in c.lower() for k in ["challenge", "nivel", "level"])), None)
+            col_chal = next((c for c in df.columns if any(k in c.lower() for k in ["challenge", "nivel"])), None)
             col_sim = next((c for c in df.columns if any(k in c.lower() for k in ["simulador", "habilitado"])), None)
             col_tipo = next((c for c in df.columns if any(k in c.lower() for k in ["tipo", "rol"])), None)
             
             if col_user:
+                # Filtrar fila exacta del usuario
                 filtro = df[df[col_user].astype(str).str.strip().str.lower() == str(usuario_target).strip().lower()]
+                
                 if not filtro.empty:
-                    # Lectura de Capital
-                    if col_cap:
-                        val_str = str(filtro[col_cap].values[0]).replace("$", "").replace(",", "").strip()
-                        capital_defecto = float(val_str)
-                    
-                    # Lectura de Challenge
-                    if col_challenge:
-                        val_chal = str(filtro[col_challenge].values[0]).strip()
-                        if val_chal and val_chal.lower() != "nan":
-                            nivel_defecto = val_chal
-
-                    # Lectura de Rol Admin
+                    # Validar Rol Admin
                     if col_tipo:
                         val_tipo = str(filtro[col_tipo].values[0]).strip().upper()
-                        es_admin_defecto = (val_tipo == "ADMIN")
+                        es_administrador = (val_tipo == "ADMIN")
                     
-                    # Lectura ESTRICTA de Simulador Habilitado ("SI" -> True | "NO" -> False)
+                    # Validar Capital
+                    if col_cap:
+                        val_cap = str(filtro[col_cap].values[0]).replace("$", "").replace(",", "").strip()
+                        capital = float(val_cap) if val_cap != "nan" else 300.0
+                        
+                    # Validar Challenge
+                    if col_chal:
+                        val_chal = str(filtro[col_chal].values[0]).strip()
+                        if val_chal and val_chal.lower() != "nan":
+                            nivel = val_chal
+
+                    # Validar Simulador Habilitado
                     if col_sim:
-                        val_sim = str(filtro[col_sim].values[0]).strip().upper()
-                        simulador_defecto = val_sim in ["SI", "YES", "TRUE", "1"]
-        except Exception:
-            pass
+                        valor_raw_columna = str(filtro[col_sim].values[0]).strip().upper()
+                        # Solo asigna True si el texto es exactamente "SI", "TRUE" o "1"
+                        simulador_permitido = valor_raw_columna in ["SI", "YES", "TRUE", "1"]
+        except Exception as e:
+            st.error(f"Error de conexión con la base de datos: {e}")
             
-        return capital_defecto, nivel_defecto, simulador_defecto, es_admin_defecto
+        return capital, nivel, simulador_permitido, es_administrador, valor_raw_columna
 
-    # 2. Cargar variables actualizadas en vivo
-    capital_base_sheets, nivel_challenge_sheets, simulador_activo, es_admin = obtener_datos_usuario_desde_sheets(usuario_actual)
+    # 2. Obtener datos limpios
+    capital_base, nivel_challenge, simulador_activo, es_admin, valor_raw = consultar_bd_en_vivo(usuario_actual)
 
-    # 3. PUERTA DE ACCESO
+    # --- PANEL DE DIAGNÓSTICO (Visible temporalmente para pruebas) ---
+    with st.expander("🔍 DIAGNÓSTICO DE ACCESO EN TIEMPO REAL", expanded=True):
+        col_d1, col_d2, col_d3, col_d4 = st.columns(4)
+        col_d1.write(f"**Usuario en Sesión:** `{usuario_actual}`")
+        col_d2.write(f"**¿Es Admin en BD?:** `{es_admin}`")
+        col_d3.write(f"**Valor Columna G:** `{valor_raw}`")
+        col_d4.write(f"**Acceso Permitido:** `{es_admin or simulador_activo}`")
+
+    # 3. EVALUACIÓN ESTRICTA DE LA PUERTA DE ACCESO
     if es_admin or simulador_activo:
         st.title("📉 Alema Trade Live")
         
-        # ... [AQUÍ VA TODO TU CÓDIGO DEL SIMULADOR, GRÁFICOS Y TABLAS] ...
-        
-    else:
-        # 🔒 BLOQUE DEL CANDADO / ACCESO RESTRINGIDO
-        st.markdown("<h1 style='text-align: center; color: #F1F5F9;'>🔒 Plataforma Educativa Live</h1>", unsafe_allow_html=True)
-        st.write("")
-        st.markdown("""
-            <div class="card-box" style="text-align: center; padding: 35px 25px; border-left: 4px solid #FF6B00;">
-                <div style="font-size: 45px; margin-bottom: 10px;">⚠️</div>
-                <h2 style="color: #FF6B00; margin-top: 0px; font-size: 22px;">
-                    Aún no tienes habilitada la opción a la Plataforma Educativa Live
-                </h2>
-                <p style="color: #94A3B8; font-size: 15px; max-width: 600px; margin: 15px auto 0px auto; line-height: 1.6;">
-                    Esta herramienta práctica de ejecución en vivo se activa de forma personalizada 
-                    al avanzar al <b>Nivel Avanzado Práctico</b> de tu programa académico.
-                </p>
-                <div style="background-color: #0E1726; border-radius: 8px; padding: 15px; margin-top: 25px; border: 1px solid #334155;">
-                    <p style="color: #CBD5E1; font-size: 13px; margin: 0;">
-                        📌 <b>¿Qué debes hacer?</b> Completa tus evaluaciones teóricas del bloque actual y solicita la validación a través de la coordinación académica o con tu mentor asignado.
-                    </p>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
         
         # ==========================================
         # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
@@ -1410,14 +1403,12 @@ elif opcion_menu == "📉 Alema Trade live":
         else:
             st.info("Aún no hay operaciones cerradas.")
 
-    # ==========================================
-    # 🔒 BLOQUE DEL CANDADO / ACCESO RESTRINGIDO
-    # ==========================================
-    else:
+       else:
+        # 🔒 BLOQUE DEL CANDADO / ACCESO RESTRINGIDO
         st.markdown("<h1 style='text-align: center; color: #F1F5F9;'>🔒 Plataforma Educativa Live</h1>", unsafe_allow_html=True)
         st.write("")
         st.markdown("""
-            <div class="card-box" style="text-align: center; padding: 35px 25px; border-left: 4px solid #FF6B00;">
+            <div class="card-box" style="text-align: center; padding: 35px 25px; border-left: 4px solid #FF6B00; background-color: #131722; border-radius: 8px;">
                 <div style="font-size: 45px; margin-bottom: 10px;">⚠️</div>
                 <h2 style="color: #FF6B00; margin-top: 0px; font-size: 22px;">
                     Aún no tienes habilitada la opción a la Plataforma Educativa Live
