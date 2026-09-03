@@ -1353,7 +1353,6 @@ elif opcion_menu == "📚 Biblioteca de Guías":
     else:
         st.warning(f"⚠️ El archivo `{archivo_pdf}` no se encuentra en el repositorio.")
 
-# ==========================================
 # SECCIÓN: EVALUACIONES Y CONTROL ACADÉMICO
 # ==========================================
 elif opcion_menu == "📝 Evaluaciones":
