@@ -365,31 +365,8 @@ st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
 st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 st.sidebar.markdown("---")
 
-# --- CONVERSIÓN ESTRICTA A BOOLEANO (Arregla el fallo de "NO" = True) ---
-val_sim = st.session_state.get("simulador_habilitado", False)
-
-if isinstance(val_sim, str):
-    # Solo será True si en la base dice exactamente "SI", "YES", "TRUE" o "1"
-    simulador_permitido = val_sim.strip().upper() in ["SI", "YES", "TRUE", "1"]
-else:
-    simulador_permitido = bool(val_sim)
-
-es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
-
-# CONSTRUCCIÓN DINÁMICA DE OPCIONES SEGÚN PERMISO REAL
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
-    opciones_disponibles = [
-        "📊 Mi Avance Académico", 
-        "🧮 Calculadoras de Lotes", 
-        "📓 Trading Journal", 
-        "📝 Evaluaciones"
-    ]
-    
-    # SOLO SE AÑADE SI ES ADMIN O SI EN LA BASE TIENE "SI"
-    if es_admin or simulador_permitido:
-        opciones_disponibles.append("📉 Alema Trade live")
-        
-    opciones_disponibles.append("📚 Biblioteca de Guías")
+    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📝 Evaluaciones", "📉 Alema Trade live", "📚 Biblioteca de Guías"]
 else:
     opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
 
@@ -403,7 +380,6 @@ if st.sidebar.button("🚪 Cerrar Sesión"):
     st.session_state.autenticado = False
     st.session_state.usuario_actual = ""
     st.session_state.tipo_usuario = "ALUMNO"
-    st.session_state.simulador_habilitado = False
     st.rerun()
 
 # --- SCRIPT DE CIERRE TÁCTIL PARA SAFARI / ANDROID ---
@@ -421,6 +397,7 @@ collapse_script = """
             }
         }
         
+        // Escuchador global de toque/clic en la barra lateral para móviles
         setTimeout(() => {
             const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
             if (sidebar) {
@@ -435,39 +412,6 @@ collapse_script = """
 </script>
 """
 components.html(collapse_script, height=0, width=0)
-
-# --- TICKER DE TRADINGVIEW SUPERIOR ---
-ticker_html = """
-<div class="tradingview-widget-container">
-  <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
-  {
-  "symbols": [
-    {"proName": "FX_IDC:EURUSD", "title": "EUR/USD"},
-    {"proName": "FX_IDC:GBPUSD", "title": "GBP/USD"},
-    {"proName": "FX_IDC:USDJPY", "title": "USD/JPY"},
-    {"proName": "FX_IDC:AUDUSD", "title": "AUD/USD"},
-    {"proName": "FX_IDC:USDCAD", "title": "USD/CAD"},
-    {"proName": "FX_IDC:USDCHF", "title": "USD/CHF"},
-    {"proName": "BITSTAMP:BTCUSD", "title": "BTC/USD"}
-  ],
-  "showSymbolLogo": true,
-  "isTransparent": false,
-  "displayMode": "adaptive",
-  "colorTheme": "dark",
-  "locale": "es"
-}
-  </script>
-</div>
-<style>
-  .tradingview-widget-container {
-    background-color: #FF6B00 !important;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-</style>
-"""
-components.html(ticker_html, height=78)
 # ==========================================
 # SECCIÓN: MI AVANCE ACADÉMICO (ALUMNOS/ADMIN)
 # ==========================================
