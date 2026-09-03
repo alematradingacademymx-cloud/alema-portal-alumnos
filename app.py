@@ -35,135 +35,6 @@ st.set_page_config(
     layout="centered"
 )
 # ==========================================
-# 🛠️ FUNCIONES DE PERSISTENCIA JSON AUXILIARES
-# ==========================================
-def cargar_datos_json(filepath, default_value):
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return default_value
-    return default_value
-
-def guardar_datos_json(filepath, data):
-    try:
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    except Exception:
-        pass
-
-# Estilos CSS personalizados con Fondo Azul Oscuro Elegante y Botón Verde
-st.markdown("""
-    <style>
-    /* 🙈 OCULTAR BARRA SUPERIOR, GITHUB Y MENÚS */
-    header[data-testid="stHeader"], 
-    [data-testid="stToolbar"], 
-    [data-testid="stHeaderActionElements"],
-    header, 
-    .stAppHeader {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0px !important;
-    }
-    
-    /* 🙈 OCULTAR FOOTER Y ÍCONOS FLOTANTES INFERIORES */
-    footer {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    [data-testid="stStatusWidget"] {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    [data-testid="stDecoration"] {
-        display: none !important;
-    }
-    div[class*="viewerBadge"] {
-        display: none !important;
-    }
-    #MainMenu {
-        display: none !important;
-    }
-
-    /* Fondo General Azul Oscuro */
-    .stApp {
-        background-color: #0E1726;
-        color: #F1F5F9;
-    }
-    
-    /* Encabezados y Textos */
-    .main-title {
-        text-align: center;
-        font-size: 30px;
-        font-weight: 800;
-        color: #FF6B00; /* Naranja Institucional */
-        margin-top: 10px;
-        margin-bottom: 0px;
-        letter-spacing: 1px;
-    }
-    .sub-title {
-        text-align: center;
-        font-size: 16px;
-        color: #94A3B8;
-        margin-bottom: 20px;
-    }
-    
-    /* Contenedor de Copia Rápida */
-    .copy-box {
-        background-color: #1E293B;
-        border: 1px solid #334155;
-        border-radius: 8px;
-        padding: 15px;
-        font-family: monospace;
-        font-size: 15px;
-        color: #38BDF8;
-        margin-top: 10px;
-        margin-bottom: 15px;
-    }
-    
-    /* Estilo Caja de Login y Tarjetas */
-    .card-box {
-        background-color: #1E293B;
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid #334155;
-        margin-top: 10px;
-        margin-bottom: 15px;
-    }
-    
-    /* Personalización Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: #141E2E;
-        border-right: 1px solid #334155;
-    }
-
-    /* ESTILO BOTÓN VERDE DE EJECUCIÓN */
-    div.stButton > button[key="btn_ejecutar_sim"] {
-        background-color: #10B981 !important;
-        color: #FFFFFF !important;
-        font-weight: bold !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 10px 20px !important;
-        transition: 0.3s !important;
-    }
-    div.stButton > button[key="btn_ejecutar_sim"]:hover {
-        background-color: #059669 !important;
-        box-shadow: 0px 4px 12px rgba(16, 185, 129, 0.4) !important;
-    }
-
-    /* ESTILO PRECIO ENTRADA AMARILLO (EJECUCIÓN EN VIVO) */
-    .precio-amarillo input {
-        background-color: #FEF08A !important;
-        color: #0F172A !important;
-        font-weight: bold !important;
-        border: 2px solid #EAB308 !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# ==========================================
 # 🔑 FUNCIÓN PARA CONVERTIR CUALQUIER FECHA
 # ==========================================
 def parsear_fecha(fecha_str):
@@ -181,6 +52,7 @@ def parsear_fecha(fecha_str):
         except ValueError:
             pass
     return datetime(2030, 12, 31).date()
+
 # ==========================================
 # 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
@@ -494,7 +366,6 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         st.cache_data.clear()
         st.sidebar.success(f"Bitácora de '{alumno_seleccionado}' limpiada a 0.")
         st.rerun()
-
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
@@ -508,16 +379,7 @@ st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
 st.sidebar.markdown("---")
 
 if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
-    # Lista base de opciones académicas
-    opciones_disponibles = [
-        "📊 Mi Avance Académico", 
-        "🧮 Calculadoras de Lotes", 
-        "📓 Trading Journal", 
-        "📝 Evaluaciones"
-    ]
-    
-        
-    opciones_disponibles.append("📚 Biblioteca de Guías")
+    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📝 Evaluaciones", "📉 Alema Trade live", "📚 Biblioteca de Guías"]
 else:
     opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
 
@@ -596,7 +458,6 @@ ticker_html = """
 </style>
 """
 components.html(ticker_html, height=78)
-
 # ==========================================
 # SECCIÓN: MI AVANCE ACADÉMICO (ALUMNOS/ADMIN)
 # ==========================================
@@ -1319,7 +1180,6 @@ elif opcion_menu == "📉 Alema Trade live":
         st.markdown(f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Vol.</th><th>Símbolo</th><th>S/L</th><th>T/P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{"".join(filas_html)}</tbody></table></div>', unsafe_allow_html=True)
     else:
         st.info("Aún no hay operaciones cerradas.")
-
 # ==========================================
 # SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
