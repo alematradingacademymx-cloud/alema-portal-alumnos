@@ -219,13 +219,15 @@ def cargar_usuarios_desde_sheets():
         if not matricula:
             continue
             
-        # Evaluación estricta de 'Simulador_Habilitado'
-        val_sim = str(row.get(col_simulador, 'NO')).strip().upper() if col_simulador else 'NO'
-        sim_hab = val_sim in ['SI', 'TRUE', '1']
-        
-        # Tipo de usuario
-        tipo_user = str(row.get('TIPO_USUARIO', 'ALUMNO')).strip().upper()
-        
+        # 1. Evaluación estricta del valor recibido de Google Sheets
+val_sim = str(row.get(col_simulador, 'NO')).strip().upper() if col_simulador else 'NO'
+sim_hab = val_sim in ['SI', 'TRUE', '1']  # Devuelve True solo si es "SI", si es "NO" devuelve False
+
+tipo_user = str(row.get('Tipo_Usuario', 'ALUMNO')).strip().upper()
+
+# 2. Guardar en el estado de la sesión (session_state)
+st.session_state.simulador_habilitado = sim_hab  # Guarda True/False
+st.session_state.tipo_usuario = tipo_user
         # Capital limpio
         col_cap = 'CAPITAL' if 'CAPITAL' in df.columns else 'CAPITAL_BASE'
         capital_val = row.get(col_cap, '300')
