@@ -687,6 +687,111 @@ def render_simulador_alema_live():
                     "No se pudo cargar la lista de alumnos desde la base de datos."
                 )
 
+    # --- PANEL ADMIN: MONITOREO Y CIERRE DE OPERACIONES DE ALUMNOS ---
+    if es_admin:
+        with st.expander("🛡️ Monitoreo y Cierre de Operaciones de Alumnos"):
+            try:
+                sheet_url_alumnos_ops = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=2037302400"
+                df_alumnos_ops = pd.read_csv(sheet_url_alumnos_ops)
+                df_alumnos_ops.columns = df_alumnos_ops.columns.str.strip()
+                lista_matriculas_ops = (
+                    df_alumnos_ops["Matricula"].dropna().unique().tolist()
+                )
+            except Exception:
+                lista_matriculas_ops = []
+
+            if lista_matriculas_ops:
+                matricula_monitoreo = st.selectbox(
+                    "Selecciona el alumno a monitorear:",
+                    lista_matriculas_ops,
+                    key="select_monitoreo_alumno_admin",
+                )
+
+                archivo_activas_alumno = f"posiciones_activas_{matricula_monitoreo}.json"
+                archivo_historial_alumno_mon = (
+                    f"historial_cerradas_{matricula_monitoreo}.json"
+                )
+                posiciones_alumno = cargar_datos_json(archivo_activas_alumno, [])
+
+                if posiciones_alumno:
+                    st.caption(f"Operaciones activas de **{matricula_monitoreo}**:")
+                    for idx_mon, pos_mon in enumerate(posiciones_alumno):
+                        p_bid_mon, p_ask_mon, _ = get_precio_sincronizado(
+                            pos_mon["activo"]
+                        )
+                        p_salida_mon = (
+                            p_bid_mon if pos_mon["tipo"] == "BUY" else p_ask_mon
+                        )
+                        dec_mon, fmt_mon, _, _, _, _ = obtener_config_activo(
+                            pos_mon["activo"]
+                        )
+                        pnl_mon = calcular_pnl_institucional(
+                            pos_mon["activo"],
+                            pos_mon["tipo"],
+                            pos_mon["entrada"],
+                            p_salida_mon,
+                            pos_mon["lotes"],
+                        )
+
+                        col_info_mon, col_btn_mon = st.columns([3, 1])
+                        with col_info_mon:
+                            st.markdown(
+                                f"""
+                                    <div class="mt5-terminal-card">
+                                        <b>{pos_mon['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos_mon['tipo']=='BUY' else '#ef5350'}">{pos_mon['tipo']}</span> | 
+                                        Entrada: <code>{fmt_mon % pos_mon['entrada']}</code> | Actual: <code style="color: #26a69a;">{fmt_mon % p_salida_mon}</code> | 
+                                        Lotes: {pos_mon['lotes']:.2f} | 
+                                        PnL: <b style="color: {'#26a69a' if pnl_mon>=0 else '#ef5350'}">${pnl_mon:,.2f} USD</b>
+                                    </div>
+                                """,
+                                unsafe_allow_html=True,
+                            )
+                        with col_btn_mon:
+                            if st.button(
+                                "🔒 Cerrar (Admin)",
+                                key=f"btn_close_admin_{matricula_monitoreo}_{pos_mon['id']}_{idx_mon}",
+                                use_container_width=True,
+                            ):
+                                historial_alumno_mon = cargar_datos_json(
+                                    archivo_historial_alumno_mon, []
+                                )
+                                historial_alumno_mon.append({
+                                    "Tipo": pos_mon["tipo"].lower(),
+                                    "Volumen": pos_mon["lotes"],
+                                    "Símbolo": pos_mon["activo"],
+                                    "S / L": pos_mon["sl"],
+                                    "T / P": pos_mon["tp"],
+                                    "Tiempo Cierre": datetime.now().strftime(
+                                        "%Y.%m.%d %H:%M:%S"
+                                    ),
+                                    "Precio Cierre": round(p_salida_mon, dec_mon),
+                                    "Beneficio": round(pnl_mon, 2),
+                                    "cerrado_por": "ADMIN",
+                                })
+                                guardar_datos_json(
+                                    archivo_historial_alumno_mon, historial_alumno_mon
+                                )
+
+                                posiciones_alumno.pop(idx_mon)
+                                guardar_datos_json(
+                                    archivo_activas_alumno, posiciones_alumno
+                                )
+
+                                st.success(
+                                    f"✅ Operación de **{matricula_monitoreo}** cerrada"
+                                    " correctamente."
+                                )
+                                st.rerun()
+                else:
+                    st.info(
+                        f"El alumno **{matricula_monitoreo}** no tiene operaciones"
+                        " activas."
+                    )
+            else:
+                st.warning(
+                    "No se pudo cargar la lista de alumnos desde la base de datos."
+                )
+
     # --- BITÁCORA ---
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -708,18 +813,28 @@ def render_simulador_alema_live():
             _, fmt_pos, _, _, _, _ = obtener_config_activo(
                 item.get("Símbolo", "EURUSD")
             )
+            columna_origen_html = ""
+            if es_admin:
+                es_cierre_admin = item.get("cerrado_por") == "ADMIN"
+                columna_origen_html = (
+                    '<td><span style="color:#f59e0b; font-weight:600;">👑 Admin</span></td>'
+                    if es_cierre_admin
+                    else "<td>Alumno</td>"
+                )
             filas_html.append(
                 f'<tr><td>{item.get("Tiempo Cierre")}</td><td'
                 f' class="{"mt5-buy" if item.get("Tipo")=="buy" else "mt5-sell"}">{item.get("Tipo")}</td>'
                 f'<td>{item.get("Volumen"):.2f}</td><td>{item.get("Símbolo")}</td><td>{fmt_pos % item.get("S / L")}</td>'
                 f'<td>{fmt_pos % item.get("T / P")}</td><td>{fmt_pos % item.get("Precio Cierre")}</td>'
                 f'<td'
-                f' class="{"mt5-profit" if item.get("Beneficio")>=0 else "mt5-loss"}">{item.get("Beneficio"):+.2f}</td></tr>'
+                f' class="{"mt5-profit" if item.get("Beneficio")>=0 else "mt5-loss"}">{item.get("Beneficio"):+.2f}</td>'
+                f'{columna_origen_html}</tr>'
             )
+        encabezado_origen = "<th>Origen</th>" if es_admin else ""
         st.markdown(
             '<div class="mt5-table-container"><table'
             ' class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Vol.</th><th>Símbolo</th><th>S/L</th><th>T/P</th><th>Precio'
-            ' Cierre</th><th>Beneficio</th></tr></thead><tbody>'
+            f' Cierre</th><th>Beneficio</th>{encabezado_origen}</tr></thead><tbody>'
             + "".join(filas_html)
             + "</tbody></table></div>",
             unsafe_allow_html=True,
