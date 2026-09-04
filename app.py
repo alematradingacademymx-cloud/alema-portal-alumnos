@@ -9,6 +9,18 @@ from datetime import datetime
 import yfinance as yf
 from PIL import Image
 
+# Configuración de página
+st.set_page_config(page_title="ALEMA Trading Academy - Portal de Alumnos", page_icon="📈", layout="centered")
+
+# Funciones de persistencia JSON auxiliares
+def cargar_datos_json(filepath, default_value):
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return default_value
+    return default_value
 # ==========================================
 # ⚙️ CONFIGURACIÓN DE PÁGINA Y LOGO OFICIAL
 # ==========================================
