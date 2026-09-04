@@ -9,18 +9,6 @@ from datetime import datetime
 import yfinance as yf
 from PIL import Image
 
-# Configuración de página
-st.set_page_config(page_title="ALEMA Trading Academy - Portal de Alumnos", page_icon="📈", layout="centered")
-
-# Funciones de persistencia JSON auxiliares
-def cargar_datos_json(filepath, default_value):
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return default_value
-    return default_value
 # ==========================================
 # ⚙️ CONFIGURACIÓN DE PÁGINA Y LOGO OFICIAL
 # ==========================================
@@ -340,6 +328,10 @@ if not st.session_state.autenticado:
                     st.session_state.tipo_usuario = user_info['tipo']
                     st.session_state.balance_pedagogico = float(user_info['capital_base'])
                     
+                    # 👈 NUEVO: CARGAR PERMISO DEL SIMULADOR SEGÚN LA BASE DE DATOS O SI ES ADMIN
+                    permiso_sim = user_info.get('simulador_habilitado', False)
+                    st.session_state.simulador_habilitado = permiso_sim or (user_info['tipo'] == 'ADMIN')
+                    
                     # BLINDAJE DE SESIÓN: Fijar rutas únicas directamente en st.session_state
                     st.session_state.archivo_pos = f"posiciones_{matricula_input}.json"
                     st.session_state.archivo_hist = f"historial_{matricula_input}.json"
@@ -427,7 +419,7 @@ if not st.session_state.autenticado:
 
     st.divider()
 
-  # --- SECCIÓN DE INSCRIPCIÓN Y WHATSAPP COORDINACIÓN ---
+    # --- SECCIÓN DE INSCRIPCIÓN Y WHATSAPP COORDINACIÓN ---
     st.markdown("<h3 style='text-align: center;'>💳 Cuota e Inscripciones</h3>", unsafe_allow_html=True)
     
     col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
