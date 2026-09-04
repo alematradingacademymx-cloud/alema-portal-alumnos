@@ -40,22 +40,29 @@ def parsear_fecha(valor_fecha):
 # PARTE 3: 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
 SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
-GDATA_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
+# Se añade &gid=0 para asegurar la lectura de la primera pestaña
+GDATA_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=30)
 def cargar_base_datos_sheets():
-    """Conecta con Google Sheets y normaliza los encabezados."""
+    """Conecta con Google Sheets, limpia espacios en encabezados y valores."""
     try:
         df = pd.read_csv(GDATA_URL)
-        df.columns = df.columns.str.strip()
-        df['Matricula'] = df['Matricula'].astype(str).str.strip()
-        df['Password'] = df['Password'].astype(str).str.strip()
+        # Limpieza estricta de nombres de columnas
+        df.columns = [str(c).strip() for c in df.columns]
+        
+        # Mapeo de columnas principales
+        if "Matricula" in df.columns:
+            df["Matricula"] = df["Matricula"].fillna("").astype(str).str.strip()
+        if "Password" in df.columns:
+            df["Password"] = df["Password"].fillna("").astype(str).str.strip()
+            
         return df
     except Exception as e:
         st.error(f"Error al conectar con Google Sheets: {e}")
         return pd.DataFrame()
 
-# Control de acceso y verificación contra la hoja de cálculo
+# Control de acceso y verificación
 if not st.session_state.get("autenticado", False):
     st.markdown("<style>[data-testid='stSidebar'] {display: none;}</style>", unsafe_allow_html=True)
     
@@ -72,8 +79,8 @@ if not st.session_state.get("autenticado", False):
             if btn_login:
                 df_usuarios = cargar_base_datos_sheets()
                 
-                if not df_usuarios.empty:
-                    # Búsqueda coincidente por Matrícula
+                if not df_usuarios.empty and "Matricula" in df_usuarios.columns:
+                    # Búsqueda coincidente sin distinguir mayúsculas/minúsculas
                     usuario_row = df_usuarios[df_usuarios["Matricula"].str.upper() == usr_input.upper()]
                     
                     if not usuario_row.empty:
@@ -82,13 +89,18 @@ if not st.session_state.get("autenticado", False):
                         if pwd_input == pass_real:
                             datos = usuario_row.iloc[0]
                             
-                            # Carga de variables del alumno para usar en Calculadoras, Challenge y Candados
                             st.session_state["autenticado"] = True
                             st.session_state["usuario_actual"] = str(datos["Matricula"])
                             st.session_state["tipo_usuario"] = str(datos.get("Tipo_Usuario", "ALUMNO")).upper()
-                            st.session_state["capital_inicial"] = float(datos["Capital"]) if pd.notna(datos.get("Capital")) else 0.0
+                            
+                            # Captura de variables financieras
+                            try:
+                                st.session_state["capital_inicial"] = float(datos.get("Capital", 0.0))
+                            except (ValueError, TypeError):
+                                st.session_state["capital_inicial"] = 0.0
+
                             st.session_state["challenge_nivel"] = str(datos.get("Challenge", "Nivel 1")) if pd.notna(datos.get("Challenge")) else "Nivel 1"
-                            st.session_state["simulador_habilitado"] = str(datos.get("Simulador_Habilitado", "NO")).upper() == "SI"
+                            st.session_state["simulador_habilitado"] = str(datos.get("Simulador_Habilitado", "NO")).strip().upper() == "SI"
                             st.session_state["fecha_vencimiento"] = parsear_fecha(datos.get("Fecha_Vencimiento"))
                             
                             st.rerun()
@@ -97,7 +109,7 @@ if not st.session_state.get("autenticado", False):
                     else:
                         st.error("❌ La matrícula ingresada no se encuentra registrada.")
                 else:
-                    st.error("❌ No se pudo conectar con la base de datos.")
+                    st.error("❌ No se pudo validar la estructura de la base de datos.")
 
     st.stop()
 
