@@ -1,22 +1,21 @@
-import requests
-import streamlit as st
-import streamlit.components.v1 as components
-import plotly.graph_objects as go
 import os
 import json
+import requests
 import pandas as pd
-from datetime import datetime
-import yfinance as yf
 from PIL import Image
+import yfinance as yf
+from datetime import datetime
+import plotly.graph_objects as go
+
+import streamlit as st
+import streamlit.components.v1 as components
 
 # ==========================================
 # ⚙️ CONFIGURACIÓN DE PÁGINA Y LOGO OFICIAL
 # ==========================================
-# Búsqueda del archivo de logo institucional
 archivo_logo = "alema trading academy.png"
 
 if not os.path.exists(archivo_logo):
-    # Detección de respaldo en caso de variación en la extensión (.png, .jpg, .jpeg)
     coincidencias = [f for f in os.listdir(".") if f.lower().startswith("alema trading academ")]
     if coincidencias:
         archivo_logo = coincidencias[0]
@@ -29,11 +28,14 @@ if os.path.exists(archivo_logo):
 else:
     icono_pagina = "📈"
 
+# Se cambia a layout="wide" para dar espacio a la barra lateral y tablas
 st.set_page_config(
     page_title="ALEMA Trading Academy - Portal de Alumnos", 
     page_icon=icono_pagina, 
-    layout="centered"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
 # ==========================================
 # 🛠️ FUNCIONES DE PERSISTENCIA JSON AUXILIARES
 # ==========================================
@@ -53,18 +55,19 @@ def guardar_datos_json(filepath, data):
     except Exception:
         pass
 
-# Estilos CSS personalizados con Fondo Azul Oscuro Elegante y Botón Verde
+# ==========================================
+# 🎨 ESTILOS CSS PERSONALIZADOS (CORREGIDOS)
+# ==========================================
 st.markdown("""
     <style>
-    /* 🙈 OCULTAR BARRA SUPERIOR, GITHUB Y MENÚS */
-    header[data-testid="stHeader"], 
-    [data-testid="stToolbar"], 
-    [data-testid="stHeaderActionElements"],
-    header, 
-    .stAppHeader {
-        display: none !important;
+    /* Ocultar únicamente marcas de Streamlit y menú de opciones de la derecha, preservando el botón del sidebar */
+    [data-testid="stToolbar"] {
         visibility: hidden !important;
         height: 0px !important;
+    }
+    
+    header[data-testid="stHeader"] {
+        background-color: transparent !important;
     }
 
     /* Fondo General Azul Oscuro */
@@ -477,37 +480,77 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         st.cache_data.clear()
         st.sidebar.success(f"Bitácora de '{alumno_seleccionado}' limpiada a 0.")
         st.rerun()
+import streamlit.components.v1 as components
+
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL (PARTE 5)
 # ==========================================
-import streamlit.components.v1 as components
 
 # Verificación de seguridad: solo se ejecuta si el usuario está autenticado
 if st.session_state.get("autenticado", False):
 
+    # 1. ENCABEZADO Y LOGO DE LA BARRA LATERAL
     st.sidebar.image("alema trading academy.png", width=180)
-
     st.sidebar.markdown("### 🎓 ALEMA PORTAL")
     st.sidebar.write(f"Usuario: **{st.session_state.get('usuario_actual', '')}**")
     st.sidebar.caption(f"Rol: {st.session_state.get('tipo_usuario', 'ALUMNO')}")
     st.sidebar.markdown("---")
 
+    # 2. OPCIONES DEL MENÚ SEGÚN EL ROL
     if st.session_state.get("tipo_usuario") in ["ADMIN", "ALUMNO"]:
-        opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📝 Evaluaciones", "📉 Alema Trade live", "📚 Biblioteca de Guías"]
+        opciones_disponibles = [
+            "📊 Mi Avance Académico", 
+            "🧮 Calculadoras de Lotes", 
+            "📓 Trading Journal", 
+            "📝 Evaluaciones", 
+            "📉 Alema Trade live", 
+            "📚 Biblioteca de Guías"
+        ]
     else:
-        opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
+        opciones_disponibles = [
+            "🧮 Calculadoras de Lotes", 
+            "📚 Biblioteca de Guías"
+        ]
 
+    # 3. SELECCIÓN DE NAVEGACIÓN
     opcion_menu = st.sidebar.radio(
         "Selecciona una sección:",
         opciones_disponibles,
         key="navegacion_principal"
     )
 
+    # 4. BOTÓN CERRAR SESIÓN
     if st.sidebar.button("🚪 Cerrar Sesión"):
         st.session_state.autenticado = False
         st.session_state.usuario_actual = ""
         st.session_state.tipo_usuario = "ALUMNO"
         st.rerun()
+
+    # ==========================================
+    # ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
+    # ==========================================
+    if st.session_state.get("tipo_usuario") == "ADMIN":
+        st.sidebar.divider()
+        st.sidebar.markdown("### ⚙️ Panel Coordinación Admin")
+        
+        lista_matriculas = list(USUARIOS_AUTORIZADOS.keys())
+        alumno_seleccionado = st.sidebar.selectbox("Gestionar Alumno", lista_matriculas, key="select_admin_alumno")
+        
+        # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL DESDE GOOGLE SHEETS ---
+        if st.sidebar.button("🔄 Sincronizar Capital (Sheets)", use_container_width=True):
+            st.cache_data.clear()
+            st.sidebar.success(f"Capital de '{alumno_seleccionado}' actualizado desde Google Sheets.")
+            st.rerun()
+            
+        # --- 2. BOTÓN PARA REINICIAR BITÁCORA HISTÓRICA DEL ALUMNO ---
+        if st.sidebar.button("🗑️ Reiniciar Bitácora de Alumno", use_container_width=True):
+            # Localiza el archivo JSON del alumno seleccionado y lo vacía
+            arch_bita_alumno = f"historial_cerradas_{alumno_seleccionado}.json"
+            guardar_datos_json(arch_bita_alumno, [])
+                
+            st.cache_data.clear()
+            st.sidebar.success(f"Bitácora de '{alumno_seleccionado}' limpiada a 0.")
+            st.rerun()
 
     # --- SCRIPT DE CIERRE TÁCTIL PARA SAFARI / ANDROID ---
     collapse_script = """
