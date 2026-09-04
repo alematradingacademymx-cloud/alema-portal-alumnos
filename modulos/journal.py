@@ -103,7 +103,7 @@ with st.form("form_journal_directo", clear_on_submit=True):
         
         try:
             res = requests.post(URL_FORM_RESPONSE, data=form_data)
-            if res.status_code in:
+            if res.status_code in [200, 201]:
                 st.success("✅ Operación registrada exitosamente en tu bitácora permanente.")
                 st.cache_data.clear()
                 st.rerun()
