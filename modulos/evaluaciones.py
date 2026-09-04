@@ -39,319 +39,189 @@ def guardar_json_local(filepath, data):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
+# ==========================================
+# CÓDIGO DEL MÓDULO RENDERIZADO DIRECTO
+# ==========================================
+st.markdown(
+    '<div class="main-title" style="text-align: left;">ALEMA TRADING'
+    ' ACADEMY</div>',
+    unsafe_allow_html=True,
+)
+st.markdown(
+    '<div class="sub-title" style="text-align: left;">Sistema Progresivo de'
+    " Evaluaciones y Certificaciones Oficiales</div>",
+    unsafe_allow_html=True,
+)
 
-    # Header del módulo
-    st.markdown(
-        '<div class="main-title" style="text-align: left;">ALEMA TRADING'
-        ' ACADEMY</div>',
-        unsafe_allow_html=True,
+usuario_actual = st.session_state.get("nombre_usuario", "DIRALEX")
+es_admin = usuario_actual.upper() == "DIRALEX"
+
+# Crear carpetas si no existen
+for folder in [FOLDER_EXCEL_UPLOADS, FOLDER_CERTIFICADOS]:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+banco_examenes = cargar_json_local(FILE_BANCO_EXAMENES, {})
+permisos_alumnos = cargar_json_local(FILE_DESBLOQUEOS, {})
+respuestas_evals = cargar_json_local(FILE_RESPUESTAS, [])
+
+# Permiso inicial por defecto para alumnos nuevos
+if usuario_actual not in permisos_alumnos:
+    permisos_alumnos[usuario_actual] = ["Básico"]
+    guardar_json_local(FILE_DESBLOQUEOS, permisos_alumnos)
+
+# --- PESTAÑAS DE NAVEGACIÓN AISLADAS SEGÚN ROL ---
+if es_admin:
+    (
+        tab_alumnos,
+        tab_historial,
+        tab_crear,
+        tab_permisos,
+        tab_coordinacion,
+        tab_archivos,
+    ) = st.tabs([
+        "📚 Ruta Académica",
+        "📊 Mis Resultados",
+        "➕ Cargar Exámenes (ADMIN)",
+        "🔓 Gestor Candados (ADMIN)",
+        "👑 Revisión / Dictamen (ADMIN)",
+        "📁 Archivos y Excel (ADMIN)",
+    ])
+else:
+    tab_alumnos, tab_historial = st.tabs(
+        ["📚 Ruta Académica", "📊 Mis Resultados y Certificados"]
     )
-    st.markdown(
-        '<div class="sub-title" style="text-align: left;">Sistema Progresivo de'
-        " Evaluaciones y Certificaciones Oficiales</div>",
-        unsafe_allow_html=True,
+
+# =============================================================
+# PESTAÑA 1: RUTA ACADÉMICA Y PRESENTACIÓN DE EXÁMENES
+# =============================================================
+with tab_alumnos:
+    st.subheader("🗺️ Ruta Institucional de Aprendizaje")
+    st.caption(
+        "Selecciona tu módulo actual para presentar tus exámenes"
+        " programados."
     )
 
-    usuario_actual = st.session_state.get("nombre_usuario", "DIRALEX")
-    es_admin = usuario_actual.upper() == "DIRALEX"
+    modulos_desbloqueados = permisos_alumnos.get(
+        usuario_actual, ["Básico"]
+    )
 
-    # Crear carpetas si no existen
-    for folder in [FOLDER_EXCEL_UPLOADS, FOLDER_CERTIFICADOS]:
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+    for modulo in LISTA_MODULOS:
+        esta_desbloqueado = modulo in modulos_desbloqueados
+        icono_modulo = "🔓" if esta_desbloqueado else "🔒"
 
-    banco_examenes = cargar_json_local(FILE_BANCO_EXAMENES, {})
-    permisos_alumnos = cargar_json_local(FILE_DESBLOQUEOS, {})
-    respuestas_evals = cargar_json_local(FILE_RESPUESTAS, [])
+        with st.expander(
+            f"{icono_modulo} Módulo: {modulo}", expanded=esta_desbloqueado
+        ):
+            if not esta_desbloqueado:
+                st.warning(
+                    "🔒 **Módulo Bloqueado.** Este nivel se activará cuando"
+                    " Dirección apruebe tu avance."
+                )
+            else:
+                st.markdown(f"#### Exámenes Disponibles - Nivel {modulo}")
 
-    # Permiso inicial por defecto para alumnos nuevos
-    if usuario_actual not in permisos_alumnos:
-        permisos_alumnos[usuario_actual] = ["Básico"]
-        guardar_json_local(FILE_DESBLOQUEOS, permisos_alumnos)
+                for num_ex in range(1, 4):
+                    key_examen = f"{modulo}_Examen_{num_ex}"
+                    examen_datos = banco_examenes.get(key_examen, None)
 
-    # --- PESTAÑAS DE NAVEGACIÓN AISLADAS SEGÚN ROL ---
-    if es_admin:
-        (
-            tab_alumnos,
-            tab_historial,
-            tab_crear,
-            tab_permisos,
-            tab_coordinacion,
-            tab_archivos,
-        ) = st.tabs([
-            "📚 Ruta Académica",
-            "📊 Mis Resultados",
-            "➕ Cargar Exámenes (ADMIN)",
-            "🔓 Gestor Candados (ADMIN)",
-            "👑 Revisión / Dictamen (ADMIN)",
-            "📁 Archivos y Excel (ADMIN)",
-        ])
-    else:
-        tab_alumnos, tab_historial = st.tabs(
-            ["📚 Ruta Académica", "📊 Mis Resultados y Certificados"]
-        )
-
-    # =============================================================
-    # PESTAÑA 1: RUTA ACADÉMICA Y PRESENTACIÓN DE EXÁMENES
-    # =============================================================
-    with tab_alumnos:
-        st.subheader("🗺️ Ruta Institucional de Aprendizaje")
-        st.caption(
-            "Selecciona tu módulo actual para presentar tus exámenes"
-            " programados."
-        )
-
-        modulos_desbloqueados = permisos_alumnos.get(
-            usuario_actual, ["Básico"]
-        )
-
-        for modulo in LISTA_MODULOS:
-            esta_desbloqueado = modulo in modulos_desbloqueados
-            icono_modulo = "🔓" if esta_desbloqueado else "🔒"
-
-            with st.expander(
-                f"{icono_modulo} Módulo: {modulo}", expanded=esta_desbloqueado
-            ):
-                if not esta_desbloqueado:
-                    st.warning(
-                        "🔒 **Módulo Bloqueado.** Este nivel se activará cuando"
-                        " Dirección apruebe tu avance."
-                    )
-                else:
-                    st.markdown(f"#### Exámenes Disponibles - Nivel {modulo}")
-
-                    for num_ex in range(1, 4):
-                        key_examen = f"{modulo}_Examen_{num_ex}"
-                        examen_datos = banco_examenes.get(key_examen, None)
-
-                        col_e1, col_e2 = st.columns([3, 1])
-                        with col_e1:
-                            st.markdown(
-                                f"**📝 Examen {num_ex}:**"
-                                f" {examen_datos['titulo'] if examen_datos else 'Sin examen cargado aún'}"
+                    col_e1, col_e2 = st.columns([3, 1])
+                    with col_e1:
+                        st.markdown(
+                            f"**📝 Examen {num_ex}:**"
+                            f" {examen_datos['titulo'] if examen_datos else 'Sin examen cargado aún'}"
+                        )
+                    with col_e2:
+                        if not examen_datos:
+                            st.caption("⏳ En preparación")
+                        else:
+                            ya_presento = any(
+                                r
+                                for r in respuestas_evals
+                                if r["matricula"].upper() == usuario_actual.upper()
+                                and r["key_examen"] == key_examen
                             )
-                        with col_e2:
-                            if not examen_datos:
-                                st.caption("⏳ En preparación")
+                            if ya_presento:
+                                st.success("✅ Presentado")
                             else:
-                                ya_presento = any(
-                                    r
-                                    for r in respuestas_evals
-                                    if r["matricula"].upper()
-                                    == usuario_actual.upper()
-                                    and r["key_examen"] == key_examen
-                                )
-                                if ya_presento:
-                                    st.success("✅ Presentado")
-                                else:
-                                    if st.button(
-                                        f"Presentar Examen {num_ex}",
-                                        key=f"btn_pres_{key_examen}",
-                                    ):
-                                        st.session_state[
-                                            f"modo_examen_{key_examen}"
-                                        ] = True
-
-                        # Despliegue aislado del formulario del examen
-                        if (
-                            st.session_state.get(
-                                f"modo_examen_{key_examen}", False
-                            )
-                            and examen_datos
-                        ):
-                            with st.form(f"form_responder_{key_examen}"):
-                                st.info(f"### {examen_datos['titulo']}")
-                                st.write(examen_datos["descripcion"])
-                                st.caption(
-                                    "Total de preguntas:"
-                                    f" {len(examen_datos['preguntas'])}"
-                                )
-                                st.divider()
-
-                                respuestas_alumno = {}
-                                for idx_q, q in enumerate(
-                                    examen_datos["preguntas"]
+                                if st.button(
+                                    f"Presentar Examen {num_ex}",
+                                    key=f"btn_pres_{key_examen}",
                                 ):
-                                    st.markdown(
-                                        f"**Pregunta {idx_q+1}:** {q['pregunta']}"
-                                    )
-                                    respuestas_alumno[f"p_{idx_q}"] = st.radio(
-                                        f"Selecciona tu respuesta ({idx_q+1}):",
-                                        q["opciones"],
-                                        key=f"radio_{key_examen}_{idx_q}",
-                                    )
-                                    st.markdown("---")
+                                    st.session_state[f"modo_examen_{key_examen}"] = True
 
-                                link_tv = st.text_input(
-                                    "Enlace de Evidencia en TradingView:",
-                                    placeholder="https://www.tradingview.com/x/...",
-                                )
-                                justificacion = st.text_area(
-                                    "Justificación Técnica de tu Análisis:",
-                                    placeholder=(
-                                        "Explica tu confirmación, zona POI y"
-                                        " gestión..."
-                                    ),
-                                )
-
-                                if st.form_submit_button(
-                                    "💾 Enviar Examen a Dirección",
-                                    use_container_width=True,
-                                ):
-                                    score = 0
-                                    total_p = len(examen_datos["preguntas"])
-                                    pts_por_p = (
-                                        100 / total_p if total_p > 0 else 100
-                                    )
-
-                                    for idx_q, q in enumerate(
-                                        examen_datos["preguntas"]
-                                    ):
-                                        if (
-                                            respuestas_alumno.get(f"p_{idx_q}")
-                                            == q["correcta"]
-                                        ):
-                                            score += pts_por_p
-
-                                    respuestas_evals.append({
-                                        "id": len(respuestas_evals) + 1,
-                                        "matricula": usuario_actual,
-                                        "key_examen": key_examen,
-                                        "modulo": modulo,
-                                        "num_examen": num_ex,
-                                        "titulo": examen_datos["titulo"],
-                                        "fecha": datetime.now().strftime(
-                                            "%d/%m/%Y %H:%M"
-                                        ),
-                                        "score_teorico": round(score, 1),
-                                        "link_tv": link_tv,
-                                        "justificacion": justificacion,
-                                        "estatus": (
-                                            "⏳ A la espera de calificación de"
-                                            " Dirección"
-                                        ),
-                                        "observaciones_director": (
-                                            "Aún no evaluado por Dirección."
-                                        ),
-                                        "archivo_certificados": None,
-                                    })
-                                    guardar_json_local(
-                                        FILE_RESPUESTAS, respuestas_evals
-                                    )
-                                    st.session_state[
-                                        f"modo_examen_{key_examen}"
-                                    ] = False
-                                    st.success(
-                                        "✅ Examen enviado con éxito a Dirección"
-                                        " General."
-                                    )
-                                    st.rerun()
-
-        st.divider()
-        sim_activo = "Simulador Institucional" in modulos_desbloqueados
-        if sim_activo:
-            st.success("🚀 **Simulador Institucional:** HABILITADO")
-        else:
-            st.info(
-                "🔒 **Simulador Institucional:** BLOQUEADO (Se activará conforme"
-                " avances de módulo)"
-            )
-
-    # =============================================================
-    # PESTAÑA 2: RESULTADOS Y DESCARGA DE CERTIFICADOS (ALUMNO)
-    # =============================================================
-    with tab_historial:
-        st.subheader("📊 Diagnóstico Académico y Certificados Oficiales")
-        mis_resp = [
-            r
-            for r in respuestas_evals
-            if r["matricula"].upper() == usuario_actual.upper()
-        ]
-
-        archivos_disponibles = os.listdir(FOLDER_EXCEL_UPLOADS)
-        if archivos_disponibles:
-            with st.expander(
-                "📥 Reportes y Hojas de Comentarios de Dirección General",
-                expanded=False,
-            ):
-                st.write("Consulta los documentos emitidos por la academia:")
-                for fname in archivos_disponibles:
-                    fpath = os.path.join(FOLDER_EXCEL_UPLOADS, fname)
-                    with open(fpath, "rb") as f_excel:
-                        st.download_button(
-                            label=f"📄 Descargar {fname}",
-                            data=f_excel,
-                            file_name=fname,
-                            mime=(
-                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            ),
-                            key=f"dl_reporte_{fname}",
-                        )
-
-        if mis_resp:
-            for item in reversed(mis_resp):
-                with st.expander(
-                    f"📌 {item['modulo']} - Examen {item['num_examen']}"
-                    f" ({item['fecha']})",
-                    expanded=True,
-                ):
-                    stus = item["estatus"]
-                    if "Aprobado" in stus and "No" not in stus:
-                        st.success(f"### Estatus: {stus}")
-                    elif "revisión" in stus.lower():
-                        st.warning(f"### Estatus: {stus}")
-                    elif "No aprobado" in stus:
-                        st.error(f"### Estatus: {stus}")
-                    else:
-                        st.info(f"### Estatus: {stus}")
-
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        st.metric(
-                            "Puntaje Teórico", f"{item['score_teorico']} / 100 PTS"
-                        )
-                        if item["link_tv"]:
-                            st.markdown(
-                                f"🔗 [Ver Gráfico TradingView]({item['link_tv']})"
-                            )
-                    with col_b:
-                        st.markdown("**📝 Retroalimentación de Dirección:**")
-                        st.info(item["observaciones_director"])
-
-                    archivo_cert = item.get("archivo_certificados", None)
-                    if archivo_cert and "Aprobado" in stus:
-                        path_cert = os.path.join(
-                            FOLDER_CERTIFICADOS, archivo_cert
-                        )
-                        if os.path.exists(path_cert):
+                    # Despliegue aislado del formulario del examen
+                    if (
+                        st.session_state.get(f"modo_examen_{key_examen}", False)
+                        and examen_datos
+                    ):
+                        with st.form(f"form_responder_{key_examen}"):
+                            st.info(f"### {examen_datos['titulo']}")
+                            st.write(examen_datos["descripcion"])
+                            st.caption(f"Total de preguntas: {len(examen_datos['preguntas'])}")
                             st.divider()
-                            with open(path_cert, "rb") as fc:
-                                bytes_cert = fc.read()
-                                ext = archivo_cert.split(".")[-1].lower()
-                                mime_type = (
-                                    "application/pdf"
-                                    if ext == "pdf"
-                                    else f"image/{ext}"
-                                )
 
-                                st.download_button(
-                                    label=(
-                                        "📜 Descargar Reconocimiento /"
-                                        " Certificado Oficial"
-                                    ),
-                                    data=bytes_cert,
-                                    file_name=(
-                                        "Reconocimiento_Oficial_"
-                                        f"{usuario_actual}_{item['modulo']}.{ext}"
-                                    ),
-                                    mime=mime_type,
-                                    use_container_width=True,
-                                    key=f"dl_cert_{item['id']}",
+                            respuestas_alumno = {}
+                            for idx_q, q in enumerate(examen_datos["preguntas"]):
+                                st.markdown(f"**Pregunta {idx_q+1}:** {q['pregunta']}")
+                                respuestas_alumno[f"p_{idx_q}"] = st.radio(
+                                    f"Selecciona tu respuesta ({idx_q+1}):",
+                                    q["opciones"],
+                                    key=f"radio_{key_examen}_{idx_q}",
                                 )
-        else:
-            st.info(
-                "💡 No has presentado ninguna evaluación hasta el momento."
-            )
+                                st.markdown("---")
+
+                            link_tv = st.text_input(
+                                "Enlace de Evidencia en TradingView:",
+                                placeholder="https://www.tradingview.com/x/...",
+                            )
+                            justificacion = st.text_area(
+                                "Justificación Técnica de tu Análisis:",
+                                placeholder="Explica tu confirmación, zona POI y gestión...",
+                            )
+
+                            if st.form_submit_button(
+                                "💾 Enviar Examen a Dirección",
+                                use_container_width=True,
+                            ):
+                                # Cálculo matemático reconstruido del examen
+                                total_preguntas = len(examen_datos["preguntas"])
+                                correctas = 0
+                                for idx_q, q in enumerate(examen_datos["preguntas"]):
+                                    if respuestas_alumno[f"p_{idx_q}"] == q.get("respuesta_correcta"):
+                                        correctas += 1
+                                
+                                calificacion = (correctas / total_preguntas) * 10.0 if total_preguntas > 0 else 0.0
+                                
+                                nueva_respuesta = {
+                                    "matricula": usuario_actual,
+                                    "key_examen": key_examen,
+                                    "modulo": modulo,
+                                    "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    "calificacion": round(calificacion, 2),
+                                    "evidencia_tv": link_tv,
+                                    "justificacion": justificacion,
+                                    "respuestas": respuestas_alumno
+                                }
+                                
+                                respuestas_evals.append(nueva_respuesta)
+                                guardar_json_local(FILE_RESPUESTAS, respuestas_evals)
+                                
+                                st.success(f"🎉 ¡Examen enviado con éxito! Tu calificación preliminar es: {calificacion:.2f}/10")
+                                st.session_state[f"modo_examen_{key_examen}"] = False
+                                st.rerun()
+
+# =============================================================
+# PESTAÑA 2: HISTORIAL Y MUESTRA DE RESULTADOS
+# =============================================================
+with tab_historial:
+    st.subheader("📊 Historial de Calificaciones")
+    mis_examenes = [r for r in respuestas_evals if r["matricula"].upper() == usuario_actual.upper()]
+    if mis_examenes:
+        df_historial = pd.DataFrame(mis_examenes)
+        st.dataframe(df_historial[["fecha", "modulo", "key_examen", "calificacion"]], use_container_width=True)
+    else:
+        st.info("💡 Aún no has presentado ninguna evaluación en esta cuenta.")
 
     # =============================================================
     # PESTAÑAS DE ADMINISTRADOR (DIRALEX)
