@@ -491,10 +491,6 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         # Localiza el archivo JSON del alumno seleccionado y lo vacía
         arch_bita_alumno = f"historial_cerradas_{alumno_seleccionado}.json"
         guardar_datos_json(arch_bita_alumno, [])
-        
-        # Si estás en tu propio perfil dentro del simulador, actualiza la sesión viva
-        if alumno_seleccionado == st.session_state.get("usuario_actual"):
-            st.session_state.historial_cerradas = []
             
         st.cache_data.clear()
         st.sidebar.success(f"Bitácora de '{alumno_seleccionado}' limpiada a 0.")
@@ -591,7 +587,6 @@ ticker_html = """
 </style>
 """
 components.html(ticker_html, height=78)
-
 # ==========================================
 # SECCIÓN: MI AVANCE ACADÉMICO (ALUMNOS/ADMIN)
 # ==========================================
