@@ -66,25 +66,6 @@ st.markdown("""
         visibility: hidden !important;
         height: 0px !important;
     }
-    
-    /* 🙈 OCULTAR FOOTER Y ÍCONOS FLOTANTES INFERIORES */
-    footer {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    [data-testid="stStatusWidget"] {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    [data-testid="stDecoration"] {
-        display: none !important;
-    }
-    div[class*="viewerBadge"] {
-        display: none !important;
-    }
-    #MainMenu {
-        display: none !important;
-    }
 
     /* Fondo General Azul Oscuro */
     .stApp {
@@ -182,9 +163,16 @@ def parsear_fecha(fecha_str):
             pass
     return datetime(2030, 12, 31).date()
 
+# ===# ==========================================
+# 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS) Y AUTENTICACIÓN
 # ==========================================
-# 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
-# ==========================================
+import os
+import base64
+import requests
+import pandas as pd
+import streamlit as st
+from datetime import datetime
+
 SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
 
 URL_USUARIOS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Usuarios"
@@ -270,11 +258,9 @@ if "archivo_pos" not in st.session_state:
 if "archivo_hist" not in st.session_state:
     st.session_state.archivo_hist = "historial_invitado.json"
 
-import base64
-
-# --- PANTALLA DE INICIO DE SESIÓN ---
+# --- PANTALLA DE INICIO DE SESIÓN Y PORTAL PÚBLICO ---
 if not st.session_state.autenticado:
-    # 🖼️ ISOTIPO BLANCO CENTRADO Y RESPONSIVO (DESKTOP Y MÓVIL)
+    # 🖼️ ISOTIPO BLANCO CENTRADO Y RESPONSIVO
     archivo_iso = "alema_iso.png"
     
     if not os.path.exists(archivo_iso):
@@ -292,6 +278,7 @@ if not st.session_state.autenticado:
             </div>
             ''',
             unsafe_allow_html=True)
+            
     st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">Portal Exclusivo para Alumnos Certificados y Suscriptores</div>', unsafe_allow_html=True)
     
@@ -328,10 +315,6 @@ if not st.session_state.autenticado:
                     st.session_state.tipo_usuario = user_info['tipo']
                     st.session_state.balance_pedagogico = float(user_info['capital_base'])
                     
-                    # 👈 NUEVO: CARGAR PERMISO DEL SIMULADOR SEGÚN LA BASE DE DATOS O SI ES ADMIN
-                    permiso_sim = user_info.get('simulador_habilitado', False)
-                    st.session_state.simulador_habilitado = permiso_sim or (user_info['tipo'] == 'ADMIN')
-                    
                     # BLINDAJE DE SESIÓN: Fijar rutas únicas directamente en st.session_state
                     st.session_state.archivo_pos = f"posiciones_{matricula_input}.json"
                     st.session_state.archivo_hist = f"historial_{matricula_input}.json"
@@ -347,13 +330,12 @@ if not st.session_state.autenticado:
                     else:
                         st.session_state.historial_cerradas = []
                     
-                    st.success("¡Acceso concedido!")
                     st.rerun()
             else:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
     
     st.markdown("---")
-    st.markdown("###  ¿Aún no tienes tu acceso al Portal?")
+    st.markdown("### ¿Aún no tienes tu acceso al Portal?")
     st.write(
         "Obtén acceso a las **Calculadoras Operativas**, **Biblioteca de Guías en PDF** "
         "y **Cápsulas de Psicotrading** por solo **$150 MXN / mes**."
@@ -365,9 +347,9 @@ if not st.session_state.autenticado:
         "a la Membresía Mensual Alema ($150 MXN/mes) para obtener mis credenciales de acceso."
     )
 
-    url_wa = f"https://wa.me/{num_whatsapp}?text={mensaje_preset.replace(' ', '%20')}"
+    url_wa = f"https://wa.me/{num_whatsapp}?text={requests.utils.quote(mensaje_preset)}"
+    st.link_button("📲 Solicitar Membresía por WhatsApp", url_wa, use_container_width=True)
     
-    # Botón estilo WhatsApp (Fondo verde #25D366, texto blanco centrado)
     st.markdown(
         f'''
         <a href="{url_wa}" target="_blank" style="text-decoration: none;">
@@ -496,97 +478,99 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         st.sidebar.success(f"Bitácora de '{alumno_seleccionado}' limpiada a 0.")
         st.rerun()
 # ==========================================
-# 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
+# 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL (PARTE 5)
 # ==========================================
 import streamlit.components.v1 as components
 
-st.sidebar.image("alema trading academy.png", width=180)
+# Verificación de seguridad: solo se ejecuta si el usuario está autenticado
+if st.session_state.get("autenticado", False):
 
-st.sidebar.markdown("### 🎓 ALEMA PORTAL")
-st.sidebar.write(f"Usuario: **{st.session_state.usuario_actual}**")
-st.sidebar.caption(f"Rol: {st.session_state.tipo_usuario}")
-st.sidebar.markdown("---")
+    st.sidebar.image("alema trading academy.png", width=180)
 
-if st.session_state.tipo_usuario in ["ADMIN", "ALUMNO"]:
-    opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📝 Evaluaciones", "📉 Alema Trade live", "📚 Biblioteca de Guías"]
-else:
-    opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
+    st.sidebar.markdown("### 🎓 ALEMA PORTAL")
+    st.sidebar.write(f"Usuario: **{st.session_state.get('usuario_actual', '')}**")
+    st.sidebar.caption(f"Rol: {st.session_state.get('tipo_usuario', 'ALUMNO')}")
+    st.sidebar.markdown("---")
 
-opcion_menu = st.sidebar.radio(
-    "Selecciona una sección:",
-    opciones_disponibles,
-    key="navegacion_principal"
-)
+    if st.session_state.get("tipo_usuario") in ["ADMIN", "ALUMNO"]:
+        opciones_disponibles = ["📊 Mi Avance Académico", "🧮 Calculadoras de Lotes", "📓 Trading Journal", "📝 Evaluaciones", "📉 Alema Trade live", "📚 Biblioteca de Guías"]
+    else:
+        opciones_disponibles = ["🧮 Calculadoras de Lotes", "📚 Biblioteca de Guías"]
 
-if st.sidebar.button("🚪 Cerrar Sesión"):
-    st.session_state.autenticado = False
-    st.session_state.usuario_actual = ""
-    st.session_state.tipo_usuario = "ALUMNO"
-    st.rerun()
+    opcion_menu = st.sidebar.radio(
+        "Selecciona una sección:",
+        opciones_disponibles,
+        key="navegacion_principal"
+    )
 
-# --- SCRIPT DE CIERRE TÁCTIL PARA SAFARI / ANDROID ---
-collapse_script = """
-<script>
-    (function() {
-        const doc = window.parent.document;
-        function closeMobileSidebar() {
-            if (window.parent.innerWidth < 768) {
-                const collapseBtn = doc.querySelector('button[data-testid="collapsedControl"]');
-                const sidebarExpanded = doc.querySelector('section[data-testid="stSidebar"][aria-expanded="true"]');
-                if (collapseBtn && sidebarExpanded) {
-                    collapseBtn.click();
+    if st.sidebar.button("🚪 Cerrar Sesión"):
+        st.session_state.autenticado = False
+        st.session_state.usuario_actual = ""
+        st.session_state.tipo_usuario = "ALUMNO"
+        st.rerun()
+
+    # --- SCRIPT DE CIERRE TÁCTIL PARA SAFARI / ANDROID ---
+    collapse_script = """
+    <script>
+        (function() {
+            const doc = window.parent.document;
+            function closeMobileSidebar() {
+                if (window.parent.innerWidth < 768) {
+                    const collapseBtn = doc.querySelector('button[data-testid="collapsedControl"]');
+                    const sidebarExpanded = doc.querySelector('section[data-testid="stSidebar"][aria-expanded="true"]');
+                    if (collapseBtn && sidebarExpanded) {
+                        collapseBtn.click();
+                    }
                 }
             }
-        }
-        
-        // Escuchador global de toque/clic en la barra lateral para móviles
-        setTimeout(() => {
-            const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-            if (sidebar) {
-                sidebar.addEventListener('touchend', function(e) {
-                    if (e.target.closest('label') || e.target.closest('div[role="radiogroup"]')) {
-                        setTimeout(closeMobileSidebar, 300);
-                    }
-                }, {passive: true});
-            }
-        }, 600);
-    })();
-</script>
-"""
-components.html(collapse_script, height=0, width=0)
+            
+            setTimeout(() => {
+                const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
+                if (sidebar) {
+                    sidebar.addEventListener('touchend', function(e) {
+                        if (e.target.closest('label') || e.target.closest('div[role="radiogroup"]')) {
+                            setTimeout(closeMobileSidebar, 300);
+                        }
+                    }, {passive: true});
+                }
+            }, 600);
+        })();
+    </script>
+    """
+    components.html(collapse_script, height=0, width=0)
 
-# --- TICKER DE TRADINGVIEW SUPERIOR ---
-ticker_html = """
-<div class="tradingview-widget-container">
-  <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
-  {
-  "symbols": [
-    {"proName": "FX_IDC:EURUSD", "title": "EUR/USD"},
-    {"proName": "FX_IDC:GBPUSD", "title": "GBP/USD"},
-    {"proName": "FX_IDC:USDJPY", "title": "USD/JPY"},
-    {"proName": "FX_IDC:AUDUSD", "title": "AUD/USD"},
-    {"proName": "FX_IDC:USDCAD", "title": "USD/CAD"},
-    {"proName": "FX_IDC:USDCHF", "title": "USD/CHF"},
-    {"proName": "BITSTAMP:BTCUSD", "title": "BTC/USD"}
-  ],
-  "showSymbolLogo": true,
-  "isTransparent": false,
-  "displayMode": "adaptive",
-  "colorTheme": "dark",
-  "locale": "es"
-}
-  </script>
-</div>
-<style>
-  .tradingview-widget-container {
-    background-color: #FF6B00 !important;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-</style>
-"""
-components.html(ticker_html, height=78)
+    # --- TICKER DE TRADINGVIEW SUPERIOR ---
+    ticker_html = """
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+      {
+      "symbols": [
+        {"proName": "FX_IDC:EURUSD", "title": "EUR/USD"},
+        {"proName": "FX_IDC:GBPUSD", "title": "GBP/USD"},
+        {"proName": "FX_IDC:USDJPY", "title": "USD/JPY"},
+        {"proName": "FX_IDC:AUDUSD", "title": "AUD/USD"},
+        {"proName": "FX_IDC:USDCAD", "title": "USD/CAD"},
+        {"proName": "FX_IDC:USDCHF", "title": "USD/CHF"},
+        {"proName": "BITSTAMP:BTCUSD", "title": "BTC/USD"}
+      ],
+      "showSymbolLogo": true,
+      "isTransparent": false,
+      "displayMode": "adaptive",
+      "colorTheme": "dark",
+      "locale": "es"
+    }
+      </script>
+    </div>
+    <style>
+      .tradingview-widget-container {
+        background-color: #FF6B00 !important;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+    </style>
+    """
+    components.html(ticker_html, height=78)
 # ==========================================
 # SECCIÓN: MI AVANCE ACADÉMICO (ALUMNOS/ADMIN)
 # ==========================================
