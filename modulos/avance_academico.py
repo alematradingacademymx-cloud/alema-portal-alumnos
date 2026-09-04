@@ -1,10 +1,4 @@
-import streamlit as st
-
-def render_avance_academico():
-    st.title("📈 Mi Avance Académico")
-    st.info("Resumen de trayectoria, estatus de beca y matrícula.")
-    
-  # modulos/avance_academico.py
+# modulos/avance_academico.py
 import streamlit as st
 import pandas as pd
 
