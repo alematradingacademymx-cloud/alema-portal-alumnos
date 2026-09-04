@@ -39,7 +39,7 @@ def guardar_json_local(filepath, data):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-def render_evaluaciones_control():
+
     # Header del módulo
     st.markdown(
         '<div class="main-title" style="text-align: left;">ALEMA TRADING'
