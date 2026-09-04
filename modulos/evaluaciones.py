@@ -40,9 +40,7 @@ def guardar_json_local(filepath, data):
 
 
 def render_evaluaciones_control():
-    # ==========================================
-    # SECCIÓN: EVALUACIONES Y CONTROL ACADÉMICO
-    # ==========================================
+    # Header del módulo
     st.markdown(
         '<div class="main-title" style="text-align: left;">ALEMA TRADING'
         ' ACADEMY</div>',
@@ -71,7 +69,7 @@ def render_evaluaciones_control():
         permisos_alumnos[usuario_actual] = ["Básico"]
         guardar_json_local(FILE_DESBLOQUEOS, permisos_alumnos)
 
-    # --- PESTAÑAS DE NAVEGACIÓN SEGÚN ROL ---
+    # --- PESTAÑAS DE NAVEGACIÓN AISLADAS SEGÚN ROL ---
     if es_admin:
         (
             tab_alumnos,
@@ -93,9 +91,9 @@ def render_evaluaciones_control():
             ["📚 Ruta Académica", "📊 Mis Resultados y Certificados"]
         )
 
-    # -------------------------------------------------------------
+    # =============================================================
     # PESTAÑA 1: RUTA ACADÉMICA Y PRESENTACIÓN DE EXÁMENES
-    # -------------------------------------------------------------
+    # =============================================================
     with tab_alumnos:
         st.subheader("🗺️ Ruta Institucional de Aprendizaje")
         st.caption(
@@ -154,7 +152,7 @@ def render_evaluaciones_control():
                                             f"modo_examen_{key_examen}"
                                         ] = True
 
-                        # Despliegue del formulario del examen
+                        # Despliegue aislado del formulario del examen
                         if (
                             st.session_state.get(
                                 f"modo_examen_{key_examen}", False
@@ -249,7 +247,6 @@ def render_evaluaciones_control():
                                     )
                                     st.rerun()
 
-        # Indicador de Estatus del Simulador Institucional
         st.divider()
         sim_activo = "Simulador Institucional" in modulos_desbloqueados
         if sim_activo:
@@ -260,9 +257,9 @@ def render_evaluaciones_control():
                 " avances de módulo)"
             )
 
-    # -------------------------------------------------------------
+    # =============================================================
     # PESTAÑA 2: RESULTADOS Y DESCARGA DE CERTIFICADOS (ALUMNO)
-    # -------------------------------------------------------------
+    # =============================================================
     with tab_historial:
         st.subheader("📊 Diagnóstico Académico y Certificados Oficiales")
         mis_resp = [
@@ -288,6 +285,7 @@ def render_evaluaciones_control():
                             mime=(
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                             ),
+                            key=f"dl_reporte_{fname}",
                         )
 
         if mis_resp:
@@ -348,23 +346,31 @@ def render_evaluaciones_control():
                                     ),
                                     mime=mime_type,
                                     use_container_width=True,
+                                    key=f"dl_cert_{item['id']}",
                                 )
         else:
             st.info(
                 "💡 No has presentado ninguna evaluación hasta el momento."
             )
 
-    # -------------------------------------------------------------
-    # PESTAÑA 3: CREADOR DINÁMICO DE EXÁMENES (ADMIN)
-    # -------------------------------------------------------------
+    # =============================================================
+    # PESTAÑAS DE ADMINISTRADOR (DIRALEX)
+    # =============================================================
     if es_admin:
+        # ---------------------------------------------------------
+        # PESTAÑA 3: CREADOR DINÁMICO DE EXÁMENES (ADMIN)
+        # ---------------------------------------------------------
         with tab_crear:
             st.subheader("➕ Cargar / Configurar Exámenes Dinámicos")
             col_c1, col_c2 = st.columns(2)
             with col_c1:
-                mod_target = st.selectbox("Módulo a Configurar:", LISTA_MODULOS)
+                mod_target = st.selectbox(
+                    "Módulo a Configurar:", LISTA_MODULOS, key="select_mod_target"
+                )
             with col_c2:
-                num_ex_target = st.selectbox("Número de Examen:", [1, 2, 3])
+                num_ex_target = st.selectbox(
+                    "Número de Examen:", [1, 2, 3], key="select_num_ex_target"
+                )
 
             key_target = f"{mod_target}_Examen_{num_ex_target}"
             ex_existente = banco_examenes.get(key_target, {})
@@ -374,6 +380,7 @@ def render_evaluaciones_control():
                 value=ex_existente.get(
                     "titulo", f"Evaluación {mod_target} #{num_ex_target}"
                 ),
+                key=f"input_tit_{key_target}",
             )
             desc_ex = st.text_area(
                 "Instrucciones:",
@@ -381,6 +388,7 @@ def render_evaluaciones_control():
                     "descripcion",
                     "Responde las preguntas y adjunta tu enlace de TradingView.",
                 ),
+                key=f"input_desc_{key_target}",
             )
 
             st.divider()
@@ -393,11 +401,11 @@ def render_evaluaciones_control():
 
             col_p_btn1, col_p_btn2, _ = st.columns([1, 1, 2])
             with col_p_btn1:
-                if st.button("➕ Agregar Pregunta"):
+                if st.button("➕ Agregar Pregunta", key=f"btn_add_p_{key_target}"):
                     st.session_state[f"num_preg_state_{key_target}"] += 1
             with col_p_btn2:
                 if (
-                    st.button("➖ Quitar Pregunta")
+                    st.button("➖ Quitar Pregunta", key=f"btn_del_p_{key_target}")
                     and st.session_state[f"num_preg_state_{key_target}"] > 1
                 ):
                     st.session_state[f"num_preg_state_{key_target}"] -= 1
@@ -441,7 +449,9 @@ def render_evaluaciones_control():
                         key=f"op3_{key_target}_{i}",
                     )
 
-                opciones_validas = [o for o in [op1, op2, op3] if o.strip() != ""]
+                opciones_validas = [
+                    o for o in [op1, op2, op3] if o.strip() != ""
+                ]
                 correcta = st.selectbox(
                     f"Respuesta Correcta Pregunta #{i+1}:",
                     (
@@ -460,7 +470,9 @@ def render_evaluaciones_control():
                 st.markdown("---")
 
             if st.button(
-                "💾 Guardar Examen Completo", use_container_width=True
+                "💾 Guardar Examen Completo",
+                use_container_width=True,
+                key=f"btn_save_ex_{key_target}",
             ):
                 banco_examenes[key_target] = {
                     "titulo": titulo_ex,
@@ -471,13 +483,19 @@ def render_evaluaciones_control():
                 st.success(f"✅ Examen **{key_target}** guardado con éxito.")
                 st.rerun()
 
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------
         # PESTAÑA 4: GESTOR DE CANDADOS (ADMIN)
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------
         with tab_permisos:
             st.subheader("🔓 Gestor de Candados por Alumno")
             alumno_mat_permiso = (
-                st.text_input("Matrícula del Alumno:", value="").strip().upper()
+                st.text_input(
+                    "Matrícula del Alumno:",
+                    value="",
+                    key="input_mat_permisos",
+                )
+                .strip()
+                .upper()
             )
 
             if alumno_mat_permiso:
@@ -489,13 +507,14 @@ def render_evaluaciones_control():
                     f" `{alumno_mat_permiso}`"
                 )
 
-                with st.form("form_permisos_alumno"):
+                with st.form(f"form_permisos_{alumno_mat_permiso}"):
                     nuevos_permisos = []
                     st.markdown("##### **1. Módulos Teóricos Académicos:**")
                     for m in LISTA_MODULOS:
                         check = st.checkbox(
                             f"🔓 Habilitar Módulo: {m}",
                             value=(m in permisos_actuales_alumno),
+                            key=f"chk_perm_{alumno_mat_permiso}_{m}",
                         )
                         if check:
                             nuevos_permisos.append(m)
@@ -508,6 +527,7 @@ def render_evaluaciones_control():
                             "Simulador Institucional"
                             in permisos_actuales_alumno
                         ),
+                        key=f"chk_sim_{alumno_mat_permiso}",
                     )
                     if check_sim:
                         nuevos_permisos.append("Simulador Institucional")
@@ -525,9 +545,9 @@ def render_evaluaciones_control():
                         )
                         st.rerun()
 
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------
         # PESTAÑA 5: REVISIÓN, DICTAMEN Y CARGA DE CERTIFICADO (ADMIN)
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------
         with tab_coordinacion:
             st.subheader(
                 "👑 Panel de Dictamen y Carga de Certificados (DIRALEX)"
@@ -540,7 +560,9 @@ def render_evaluaciones_control():
                     for r in respuestas_evals
                 ]
                 sel_dictamen = st.selectbox(
-                    "Selecciona Evaluación a Revisar:", lista_pendientes
+                    "Selecciona Evaluación a Revisar:",
+                    lista_pendientes,
+                    key="select_eval_dictamen",
                 )
 
                 id_target = int(
@@ -571,10 +593,11 @@ def render_evaluaciones_control():
                             "Justificación del Alumno:",
                             value=target_resp["justificacion"],
                             disabled=True,
+                            key=f"txt_just_admin_{id_target}",
                         )
 
                     with col_d2:
-                        with st.form("form_dictamen_admin"):
+                        with st.form(f"form_dictamen_admin_{id_target}"):
                             e_dictamen = st.selectbox(
                                 "Asignar Estatus Académico:",
                                 [
@@ -592,11 +615,13 @@ def render_evaluaciones_control():
                                         else 2
                                     )
                                 ),
+                                key=f"sel_estatus_admin_{id_target}",
                             )
 
                             obs_dictamen = st.text_area(
                                 "Observaciones del Mentor / Coordinación:",
                                 value=target_resp["observaciones_director"],
+                                key=f"txt_obs_admin_{id_target}",
                             )
 
                             st.markdown("---")
@@ -607,6 +632,7 @@ def render_evaluaciones_control():
                             up_cert = st.file_uploader(
                                 "Sube el certificado emitido para este alumno:",
                                 type=["pdf", "png", "jpg", "jpeg"],
+                                key=f"file_cert_admin_{id_target}",
                             )
 
                             if st.form_submit_button(
@@ -652,9 +678,9 @@ def render_evaluaciones_control():
             else:
                 st.info("💡 No hay evaluaciones pendientes registradas.")
 
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------
         # PESTAÑA 6: ARCHIVOS Y EXCEL (ADMIN)
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------
         with tab_archivos:
             st.subheader("📁 Archivos y Reportes Generales")
 
@@ -665,6 +691,7 @@ def render_evaluaciones_control():
                 "Selecciona un archivo Excel (.xlsx) para ponerlo a disposición"
                 " de los alumnos:",
                 type=["xlsx", "xls"],
+                key="uploader_excel_admin",
             )
             if uploaded_excel is not None:
                 save_path = os.path.join(
@@ -700,6 +727,7 @@ def render_evaluaciones_control():
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     ),
                     use_container_width=True,
+                    key="btn_export_excel_admin",
                 )
 
     st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
