@@ -22,23 +22,22 @@ def cargar_datos_estudiantes():
         return pd.DataFrame()
 
 
-    """Módulo 1: Mi Avance Académico conectado en tiempo real a Google Sheets."""
-    st.title("📈 Mi Avance Académico")
-    st.caption(
-        "Consulta el estado de tu matrícula, mantenimiento de beca y progreso"
-        " en tiempo real."
+# CÓDIGO CORREGIDO: Alineado al extremo izquierdo y sin 'return' sueltos
+st.title("📈 Mi Avance Académico")
+st.caption(
+    "Consulta el estado de tu matrícula, mantenimiento de beca y progreso"
+    " en tiempo real."
+)
+st.divider()
+
+df = cargar_datos_estudiantes()
+
+if df.empty:
+    st.warning(
+        "No se pudo obtener información de la base de datos en este"
+        " momento."
     )
-    st.divider()
-
-    df = cargar_datos_estudiantes()
-
-    if df.empty:
-        st.warning(
-            "No se pudo obtener información de la base de datos en este"
-            " momento."
-        )
-        return
-
+else:
     usuario_sesion = st.session_state.get("nombre_usuario", "")
 
     # Buscar al estudiante por coincidencia de Matrícula o Nombre con el usuario en sesión
