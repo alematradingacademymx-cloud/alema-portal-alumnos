@@ -534,7 +534,11 @@ if st.session_state.get("autenticado", False):
         st.sidebar.markdown("### ⚙️ Panel Coordinación Admin")
         
         lista_matriculas = list(USUARIOS_AUTORIZADOS.keys())
-        alumno_seleccionado = st.sidebar.selectbox("Gestionar Alumno", lista_matriculas, key="select_admin_alumno")
+        alumno_seleccionado = st.sidebar.selectbox(
+    "Gestionar Alumno", 
+    lista_matriculas, 
+    key=f"select_admin_alumno_{idx}"
+)
         
         # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL DESDE GOOGLE SHEETS ---
         if st.sidebar.button("🔄 Sincronizar Capital (Sheets)", use_container_width=True):
