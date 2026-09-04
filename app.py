@@ -902,8 +902,6 @@ elif opcion_menu == "📓 Trading Journal":
 # SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
 # (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
 # ==========================================
-elif opcion_menu == "📉 Alema Trade live":
-    
     import json
     import os
     import time
