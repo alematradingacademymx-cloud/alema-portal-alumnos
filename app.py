@@ -474,29 +474,19 @@ def render_trading_journal():
         st.info("💡 Aún no tienes trades guardados en tu historial permanente.")
 
 
-import os
-import json
-import time
-from datetime import datetime, timedelta
-import requests
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import streamlit as st
-from streamlit_autorefresh import st_autorefresh
 
-# ==============================================================================
-# CONFIGURACIÓN Y PERSISTENCIA DE DATOS MULTI-USUARIO
-# ==============================================================================
-DATA_DIR = "data_persistencia"
-os.makedirs(DATA_DIR, exist_ok=True)
+# ==========================================
+# PARTE 9: SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
+# ==========================================
+DATA_DIR_SIMULADOR = "data_persistencia"
+os.makedirs(DATA_DIR_SIMULADOR, exist_ok=True)
 
 def _get_user_filepaths(usuario: str):
     """Genera rutas de archivos aisladas por usuario para evitar colisiones."""
     usr_clean = str(usuario).strip().lower()
     return (
-        os.path.join(DATA_DIR, f"posiciones_activas_{usr_clean}.json"),
-        os.path.join(DATA_DIR, f"historial_cerradas_{usr_clean}.json")
+        os.path.join(DATA_DIR_SIMULADOR, f"posiciones_activas_{usr_clean}.json"),
+        os.path.join(DATA_DIR_SIMULADOR, f"historial_cerradas_{usr_clean}.json")
     )
 
 def cargar_datos_json(archivo: str, valor_defecto: list) -> list:
@@ -515,20 +505,16 @@ def guardar_datos_json(archivo: str, datos: list):
     except Exception:
         pass
 
-# ==============================================================================
-# CONEXIÓN BASE DE DATOS (GOOGLE SHEETS)
-# ==============================================================================
 @st.cache_data(ttl=10)
 def obtener_datos_usuario_desde_sheets(usuario_target: str):
-    capital_defecto = 300.00
-    nivel_defecto = "Nivel 1"
-    sheet_url = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0"
+    capital_defecto = float(st.session_state.get("capital_inicial", 300.00))
+    nivel_defecto = str(st.session_state.get("challenge_nivel", "Nivel 1"))
     
     try:
-        df = pd.read_csv(sheet_url)
+        df = pd.read_csv(GDATA_URL)
         df.columns = [str(c).strip() for c in df.columns]
         
-        col_user = next((c for c in df.columns if any(k in c.lower() for k in ["usuario", "matricula", "user"])), None)
+        col_user = next((c for c in df.columns if any(k in c.lower() for k in ["matricula", "usuario", "user"])), None)
         col_cap = next((c for c in df.columns if any(k in c.lower() for k in ["capital", "monto", "balance"])), None)
         col_challenge = next((c for c in df.columns if any(k in c.lower() for k in ["challenge", "nivel", "level"])), None)
         
@@ -547,9 +533,6 @@ def obtener_datos_usuario_desde_sheets(usuario_target: str):
         
     return capital_defecto, nivel_defecto
 
-# ==============================================================================
-# REGLAS DEL MERCADO Y CÁLCULOS INSTITUCIONALES
-# ==============================================================================
 def obtener_config_activo(simbolo: str):
     if "JPY" in simbolo: return 3, "%.3f", 0.001, 0.100, 0.200, 0.015
     elif "XAU" in simbolo: return 2, "%.2f", 0.10, 2.00, 4.00, 0.35
@@ -572,29 +555,22 @@ def calcular_pnl_institucional(activo: str, tipo: str, entrada: float, salida: f
     else:
         return diferencia * 100000.0 * lotes
 
-# ==============================================================================
-# COMPONENTE PRINCIPAL DEL SIMULADOR
-# ==============================================================================
 def render_simulador_alema_live():
     """Bloque totalmente aislado para la vista Alema Trade Live."""
     
     st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_live")
     
-    # Contexto de Usuario
     usuario = st.session_state.get("usuario_actual", "estudiante_demo")
     es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
     arch_activas, arch_historial = _get_user_filepaths(usuario)
 
-    # Carga de Persistencia
     posiciones_abiertas = cargar_datos_json(arch_activas, [])
     historial_cerradas = cargar_datos_json(arch_historial, [])
 
-    # Sincronización con Google Sheets
     capital_base, nivel_challenge = obtener_datos_usuario_desde_sheets(usuario)
     pnl_acumulado = sum(float(trade.get("Beneficio", 0.0)) for trade in historial_cerradas)
     balance_total = capital_base + pnl_acumulado
 
-    # Estructuras en Cache para Cotizaciones
     if 'cache_precios_forex' not in st.session_state: st.session_state.cache_precios_forex = {}
     if 'ultimo_tiempo_api' not in st.session_state: st.session_state.ultimo_tiempo_api = {}
     if 'mercado_forex_df' not in st.session_state: st.session_state.mercado_forex_df = {}
@@ -635,7 +611,6 @@ def render_simulador_alema_live():
             precios_ticks[simbolo] = obtener_cotizacion(simbolo)
         return precios_ticks[simbolo]
 
-    # --- ESTILOS DE INTERFAZ ---
     st.markdown("""
         <style>
             .mt5-terminal-card { background-color: #131722; border: 1px solid #2A2E39; padding: 10px 15px; border-radius: 4px; margin-bottom: 8px; font-family: sans-serif; }
@@ -656,9 +631,8 @@ def render_simulador_alema_live():
 
     bid_actual, ask_actual, precio_vivo = get_precio(par_activo)
 
-    # --- HISTÓRICO Y GRÁFICO ---
     if par_activo not in st.session_state.mercado_forex_df:
-        fechas = [datetime.now() - timedelta(minutes=15 * i) for i in range(50)][::-1]
+        fechas = [dt.now() - timedelta(minutes=15 * i) for i in range(50)][::-1]
         vol = precio_vivo * 0.0004
         closes = np.linspace(precio_vivo - (vol * 4), precio_vivo, 50) + np.random.normal(0, vol * 0.2, 50)
         opens = closes + np.random.normal(0, vol * 0.1, 50)
@@ -669,7 +643,6 @@ def render_simulador_alema_live():
     df_chart = st.session_state.mercado_forex_df[par_activo]
     df_chart.iloc[-1, df_chart.columns.get_loc('Close')] = precio_vivo
 
-    # --- MONITOREO DE MOTOR DE EJECUCIÓN TP / SL ---
     posiciones_conservadas = []
     hubo_cierre_auto = False
 
@@ -694,7 +667,7 @@ def render_simulador_alema_live():
             pnl_real = calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], p_salida, pos["lotes"])
             historial_cerradas.append({
                 "Tipo": pos['tipo'].lower(), "Volumen": pos['lotes'], "Símbolo": pos["activo"],
-                "S / L": sl_exacto, "T / P": tp_exacto, "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                "S / L": sl_exacto, "T / P": tp_exacto, "Tiempo Cierre": dt.now().strftime("%Y.%m.%d %H:%M:%S"),
                 "Precio Cierre": p_salida, "Beneficio": round(pnl_real, 2)
             })
             guardar_datos_json(arch_historial, historial_cerradas)
@@ -706,7 +679,6 @@ def render_simulador_alema_live():
         guardar_datos_json(arch_activas, posiciones_conservadas)
         st.rerun()
 
-    # --- DASHBOARD METRICS ---
     col1, col2, col3, col4, *col_admin = st.columns(5 if es_admin else 4)
     with col1: st.metric("Balance Base", f"${balance_total:,.2f}")
     with col2:
@@ -722,7 +694,6 @@ def render_simulador_alema_live():
 
     st.divider()
 
-    # --- GRAFICADOR Y PANEL DE ORDENES ---
     col_graf, col_pan = st.columns([2.4, 1.0])
     dec_p, fmt_p, step_p, dist_sl, dist_tp, spread_p = obtener_config_activo(par_activo)
 
@@ -750,8 +721,8 @@ def render_simulador_alema_live():
 
         if st.button("EJECUTAR ORDEN", use_container_width=True):
             nueva_orden = {
-                "id": int(datetime.now().timestamp()),
-                "tiempo_apertura": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                "id": int(dt.now().timestamp()),
+                "tiempo_apertura": dt.now().strftime("%Y.%m.%d %H:%M:%S"),
                 "activo": par_activo, "tipo": sim_tipo, "lotes": float(sim_lotes),
                 "entrada": float(p_ref), "sl": float(sim_sl), "tp": float(sim_tp)
             }
@@ -759,7 +730,6 @@ def render_simulador_alema_live():
             guardar_datos_json(arch_activas, posiciones_conservadas)
             st.rerun()
 
-    # --- POSICIONES ACTIVAS & HISTORIAL ---
     st.markdown("### Posiciones Abiertas")
     if posiciones_conservadas:
         for idx, pos in enumerate(posiciones_conservadas):
@@ -770,7 +740,7 @@ def render_simulador_alema_live():
             if st.button(f"Cerrar #{pos['id']}", key=f"close_{pos['id']}"):
                 historial_cerradas.append({
                     "Tipo": pos['tipo'].lower(), "Volumen": pos['lotes'], "Símbolo": pos['activo'],
-                    "S / L": pos['sl'], "T / P": pos['tp'], "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                    "S / L": pos['sl'], "T / P": pos['tp'], "Tiempo Cierre": dt.now().strftime("%Y.%m.%d %H:%M:%S"),
                     "Precio Cierre": p_salida, "Beneficio": round(pnl_card, 2)
                 })
                 posiciones_conservadas.pop(idx)
