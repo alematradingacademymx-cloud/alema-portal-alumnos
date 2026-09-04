@@ -526,7 +526,7 @@ if st.session_state.get("autenticado", False):
         st.session_state.tipo_usuario = "ALUMNO"
         st.rerun()
 
-    # ==========================================
+   # ==========================================
     # ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
     # ==========================================
     if st.session_state.get("tipo_usuario") == "ADMIN":
@@ -535,10 +535,10 @@ if st.session_state.get("autenticado", False):
         
         lista_matriculas = list(USUARIOS_AUTORIZADOS.keys())
         alumno_seleccionado = st.sidebar.selectbox(
-    "Gestionar Alumno", 
-    lista_matriculas, 
-    key=f"select_admin_alumno_{idx}"
-)
+            "Gestionar Alumno", 
+            lista_matriculas, 
+            key="select_admin_alumno_sidebar"
+        )
         
         # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL DESDE GOOGLE SHEETS ---
         if st.sidebar.button("🔄 Sincronizar Capital (Sheets)", use_container_width=True):
