@@ -32,7 +32,8 @@ else:
 st.set_page_config(
     page_title="ALEMA Trading Academy - Portal de Alumnos", 
     page_icon=icono_pagina, 
-    layout="centered")
+    layout="centered"
+)
 # ==========================================
 # 🛠️ FUNCIONES DE PERSISTENCIA JSON AUXILIARES
 # ==========================================
@@ -161,6 +162,7 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
 # ==========================================
 # 🔑 FUNCIÓN PARA CONVERTIR CUALQUIER FECHA
 # ==========================================
@@ -179,6 +181,7 @@ def parsear_fecha(fecha_str):
         except ValueError:
             pass
     return datetime(2030, 12, 31).date()
+
 # ==========================================
 # 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
@@ -463,7 +466,6 @@ if not st.session_state.autenticado:
     st.markdown("<br><p style='text-align: center; color: #718096;'>© ALEMA Trading Academy. Reservados todos los derechos.</p>", unsafe_allow_html=True)
     st.stop()
 
-
 # ==========================================
 # ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
 # ==========================================
@@ -474,16 +476,16 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
     lista_matriculas = list(USUARIOS_AUTORIZADOS.keys())
     alumno_seleccionado = st.sidebar.selectbox("Gestionar Alumno", lista_matriculas, key="select_admin_alumno")
     
-    # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL Y PERMISOS DESDE GOOGLE SHEETS ---
-    if st.sidebar.button("🔄 Sincronizar Datos (Sheets)", use_container_width=True):
+    # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL DESDE GOOGLE SHEETS ---
+    if st.sidebar.button("🔄 Sincronizar Capital (Sheets)", use_container_width=True):
         st.cache_data.clear()
-        st.sidebar.success(f"Datos de '{alumno_seleccionado}' actualizados desde Google Sheets.")
+        st.sidebar.success(f"Capital de '{alumno_seleccionado}' actualizado desde Google Sheets.")
         st.rerun()
         
     # --- 2. BOTÓN PARA REINICIAR BITÁCORA HISTÓRICA DEL ALUMNO ---
     if st.sidebar.button("🗑️ Reiniciar Bitácora de Alumno", use_container_width=True):
         # Localiza el archivo JSON del alumno seleccionado y lo vacía
-        arch_bita_alumno = f"historial_{alumno_seleccionado}.json"
+        arch_bita_alumno = f"historial_cerradas_{alumno_seleccionado}.json"
         guardar_datos_json(arch_bita_alumno, [])
         
         # Si estás en tu propio perfil dentro del simulador, actualiza la sesión viva
@@ -493,7 +495,6 @@ if st.session_state.get("tipo_usuario") == "ADMIN":
         st.cache_data.clear()
         st.sidebar.success(f"Bitácora de '{alumno_seleccionado}' limpiada a 0.")
         st.rerun()
-
 # ==========================================
 # 🚀 MENÚ LATERAL Y NAVEGACIÓN SEGÚN ROL
 # ==========================================
