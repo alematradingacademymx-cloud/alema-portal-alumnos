@@ -1,8 +1,22 @@
 import streamlit as st
 import pandas as pd
 import datetime
+from datetime import datetime as dt, timedelta
 import json
 import os
+import time
+import requests
+import numpy as np
+import plotly.graph_objects as go
+from streamlit_autorefresh import st_autorefresh
+
+# ==========================================
+# CONSTANTES DE CONEXIÓN GLOBAL
+# ==========================================
+SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
+GDATA_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
+URL_JOURNAL_CSV = GDATA_URL
+URL_FORM_RESPONSE = "https://docs.google.com/forms/d/e/1FAIpQLSc_EXAMPLE/formResponse"
 
 # ==========================================
 # PARTE 1: CONFIGURACIÓN DE PÁGINA
@@ -39,19 +53,13 @@ def parsear_fecha(valor_fecha):
 # ==========================================
 # PARTE 3: 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
-SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
-# Se añade &gid=0 para asegurar la lectura de la primera pestaña
-GDATA_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
-
 @st.cache_data(ttl=30)
 def cargar_base_datos_sheets():
     """Conecta con Google Sheets, limpia espacios en encabezados y valores."""
     try:
         df = pd.read_csv(GDATA_URL)
-        # Limpieza estricta de nombres de columnas
         df.columns = [str(c).strip() for c in df.columns]
         
-        # Mapeo de columnas principales
         if "Matricula" in df.columns:
             df["Matricula"] = df["Matricula"].fillna("").astype(str).str.strip()
         if "Password" in df.columns:
@@ -80,7 +88,6 @@ if not st.session_state.get("autenticado", False):
                 df_usuarios = cargar_base_datos_sheets()
                 
                 if not df_usuarios.empty and "Matricula" in df_usuarios.columns:
-                    # Búsqueda coincidente sin distinguir mayúsculas/minúsculas
                     usuario_row = df_usuarios[df_usuarios["Matricula"].str.upper() == usr_input.upper()]
                     
                     if not usuario_row.empty:
@@ -93,7 +100,6 @@ if not st.session_state.get("autenticado", False):
                             st.session_state["usuario_actual"] = str(datos["Matricula"])
                             st.session_state["tipo_usuario"] = str(datos.get("Tipo_Usuario", "ALUMNO")).upper()
                             
-                            # Captura de variables financieras
                             try:
                                 st.session_state["capital_inicial"] = float(datos.get("Capital", 0.0))
                             except (ValueError, TypeError):
@@ -152,22 +158,10 @@ with st.sidebar:
 
 
 # ==========================================
-# ENRUTADOR PRINCIPAL DE CONTENIDO
-# ==========================================
-
-# ------------------------------------------
-# PARTE 6: MI AVANCE ACADÉMICO
-# ------------------------------------------
-if seccion_activa == "Mi Avance Académico":
-    st.title("📈 Mi Avance Académico")
-    st.info("Resumen de trayectoria, estatus de beca y matrícula.")
-
-# ==========================================
 # MÓDULO 2: CALCULADORAS DE LOTES
 # ==========================================
 def render_calculadoras():
     """Módulo aislado para el cálculo de gestión de riesgo y lotaje."""
-    import plotly.graph_objects as go
 
     st.markdown("""
         <style>
@@ -356,14 +350,12 @@ def render_calculadoras():
         </div>
         """, unsafe_allow_html=True)
 
+
 # ==========================================
 # MÓDULO 3: TRADING JOURNAL
 # ==========================================
 def render_trading_journal():
     """Módulo aislado para la bitácora de operaciones y control psicotrading."""
-    import pandas as pd
-    import requests
-    from datetime import datetime
 
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Journal Institucional de Operaciones y Bitácora Psicológica</div>', unsafe_allow_html=True)
@@ -419,7 +411,7 @@ def render_trading_journal():
         col_j1, col_j2 = st.columns(2)
         
         with col_j1:
-            j_fecha = st.date_input("Fecha", value=datetime.now())
+            j_fecha = st.date_input("Fecha", value=dt.now())
             j_activo = st.text_input("Activo / Par", value="EUR/USD").strip().upper()
             j_tipo = st.selectbox("Tipo", ["BUY", "SELL"])
             j_lotes = st.number_input("Lotes Operados", value=0.10, step=0.01)
@@ -472,7 +464,6 @@ def render_trading_journal():
         st.dataframe(df_mostrar, use_container_width=True)
     else:
         st.info("💡 Aún no tienes trades guardados en tu historial permanente.")
-
 
 
 # ==========================================
@@ -760,20 +751,97 @@ def render_simulador_alema_live():
         st.dataframe(df_hist, use_container_width=True)
     else:
         st.info("Sin registros históricos.")
+
+
 # ==========================================
+# PARTE 10: SECCIÓN BIBLIOTECA DE GUÍAS (MÓDULO ISLADO)
+# ==========================================
+@st.cache_data
+def cargar_bytes_pdf(ruta):
+    """Carga archivos PDF en memoria de manera optimizada usando caché."""
+    with open(ruta, "rb") as f:
+        return f.read()
+
+def render_biblioteca_guias():
+    """Renderiza la biblioteca digital exclusiva de guías PDF."""
+    st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title" style="text-align: left;">Biblioteca Digital Exclusiva para Alumnos y Suscriptores</div>', unsafe_allow_html=True)
+
+    st.subheader("📖 Lectura y Consulta de Materiales")
+    
+    GUIAS_DISPONIBLES = {
+        "📙 Acción del Precio y Estructura": "Nueva guia Accion del precio.pdf",
+        "📗 Manual del Trader (Básico)": "Manual del Trader (Básico).pdf"
+    }
+    
+    guia_seleccionada = st.selectbox(
+        "Selecciona la guía que deseas consultar:",
+        list(GUIAS_DISPONIBLES.keys()),
+        key="selector_guias_pdf"
+    )
+    
+    archivo_pdf = GUIAS_DISPONIBLES[guia_seleccionada]
+    
+    if os.path.exists(archivo_pdf):
+        st.success(f"📄 Documento seleccionado: **{guia_seleccionada}**")
+        
+        pdf_bytes = cargar_bytes_pdf(archivo_pdf)
+
+        st.download_button(
+            label=f"📥 Abrir / Descargar Guía Completa ({guia_seleccionada})",
+            data=pdf_bytes,
+            file_name=archivo_pdf,
+            mime="application/pdf",
+            use_container_width=True,
+            key="btn_descarga_pdf"
+        )
+        
+        st.info("💡 **Recomendación para Celulares:** Presiona el botón naranja superior para abrir el manual directamente en tu teléfono.")
+    else:
+        st.warning(f"⚠️ El archivo `{archivo_pdf}` no se encuentra en el repositorio.")
+
+
+# ==========================================
+# ENRUTADOR PRINCIPAL DE CONTENIDO
+# ==========================================
+
+# ------------------------------------------
+# PARTE 6: MI AVANCE ACADÉMICO
+# ------------------------------------------
+if seccion_activa == "Mi Avance Académico":
+    st.title("📈 Mi Avance Académico")
+    st.info("Resumen de trayectoria, estatus de beca y matrícula.")
+
+# ------------------------------------------
+# PARTE 7: CALCULADORAS DE LOTES
+# ------------------------------------------
+elif seccion_activa == "Calculadoras de Lotes":
+    render_calculadoras()
+
+# ------------------------------------------
+# PARTE 8: TRADING JOURNAL
+# ------------------------------------------
+elif seccion_activa == "Trading Journal":
+    render_trading_journal()
+
+# ------------------------------------------
+# PARTE 9: SIMULADOR INSTITUCIONAL
+# ------------------------------------------
+elif seccion_activa == "Simulador Institucional":
+    render_simulador_alema_live()
+
+# ------------------------------------------
 # PARTE 10: SECCIÓN: BIBLIOTECA DE GUÍAS
-# ==========================================
+# ------------------------------------------
 elif seccion_activa == "Biblioteca de Guías":
-    st.title("📚 Biblioteca de Guías y Recursos")
+    render_biblioteca_guias()
 
-
-# ==========================================
+# ------------------------------------------
 # PARTE 11: SECCIÓN: EVALUACIONES Y CONTROL ACADÉMICO
-# ==========================================
+# ------------------------------------------
 elif seccion_activa == "Evaluaciones y Control Académico":
     st.title("🎓 Evaluaciones y Control Académico")
     
-    # Sub-pestanas de la sección de evaluaciones
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "Ruta & Exámenes",
         "Certificados",
