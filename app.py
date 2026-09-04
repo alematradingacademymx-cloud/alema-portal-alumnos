@@ -1046,11 +1046,75 @@ def obtener_dataframe_forex(simbolo, precio_actual):
     return df
 
 # ==========================================
-# MENÚ: SIMULADOR INSTITUCIONAL / ALEMA TRADE LIVE
+# SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
+# (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
 # ==========================================
-elif opcion_menu in ["📈 Alema Trade Live", "📊 Terminal Institucional", "📈 Simulador Institucional"]:
+elif opcion_menu == "📉 Alema Trade live":
+    
+    import json
+    import os
+    import time
+    from datetime import datetime, timedelta
+    import requests
+    import pandas as pd
+    import numpy as np
+    import plotly.graph_objects as go
+    from streamlit_autorefresh import st_autorefresh
+
     # Recarga automática de la pantalla cada 4 segundos
     st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_live")
+
+    # --- IDENTIFICADOR DE USUARIO Y RUTAS PERSISTENTES ---
+    usuario = st.session_state.get("usuario_actual", "alema")
+    ARCH_PERSISTENCIA_ACTIVAS = f"posiciones_activas_{usuario}.json"
+    ARCH_PERSISTENCIA_HISTORIAL = f"historial_cerradas_{usuario}.json"
+
+    def cargar_datos_json(archivo, valor_defecto):
+        if os.path.exists(archivo):
+            try:
+                with open(archivo, "r") as f:
+                    return json.load(f)
+            except Exception:
+                return valor_defecto
+        return valor_defecto
+
+    def guardar_datos_json(archivo, datos):
+        try:
+            with open(archivo, "w") as f:
+                json.dump(datos, f, indent=4)
+        except Exception:
+            pass
+
+    # --- FUNCIÓN DE CONEXIÓN Y LECTURA DE CAPITAL Y CHALLENGE DESDE GOOGLE SHEETS ---
+    @st.cache_data(ttl=10) # Se actualiza cada 10 segundos desde la base de datos
+    def obtener_datos_usuario_desde_sheets(usuario_target):
+        capital_defecto = 300.00
+        nivel_defecto = "Nivel 1"
+        try:
+            sheet_url = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0"
+            df = pd.read_csv(sheet_url)
+            df.columns = [str(c).strip() for c in df.columns]
+            
+            # Identificar columnas de Usuario, Capital y Challenge en la hoja
+            col_user = next((c for c in df.columns if any(k in c.lower() for k in ["usuario", "matricula", "user"])), None)
+            col_cap = next((c for c in df.columns if any(k in c.lower() for k in ["capital", "monto", "balance"])), None)
+            col_challenge = next((c for c in df.columns if any(k in c.lower() for k in ["challenge", "nivel", "level"])), None)
+            
+            if col_user:
+                filtro = df[df[col_user].astype(str).str.strip().str.lower() == str(usuario_target).strip().lower()]
+                if not filtro.empty:
+                    # Lectura de Capital
+                    if col_cap:
+                        val_str = str(filtro[col_cap].values[0]).replace("$", "").replace(",", "").strip()
+                        capital_defecto = float(val_str)
+                    # Lectura de Nivel de Challenge
+                    if col_challenge:
+                        val_chal = str(filtro[col_challenge].values[0]).strip()
+                        if val_chal and val_chal.lower() != "nan":
+                            nivel_defecto = val_chal
+        except Exception:
+            pass
+        return capital_defecto, nivel_defecto
 
     # Cargar operaciones activas e historial
     st.session_state.posiciones_abiertas = cargar_datos_json(ARCH_PERSISTENCIA_ACTIVAS, [])
@@ -1067,15 +1131,29 @@ elif opcion_menu in ["📈 Alema Trade Live", "📊 Terminal Institucional", "�
         st.session_state.cache_precios_forex = {}
     if 'ultimo_tiempo_api' not in st.session_state:
         st.session_state.ultimo_tiempo_api = {}
-    if 'mercado_forex_df' not in st.session_state:
-        st.session_state.mercado_forex_df = {}
 
-    precios_tick_actual = {}
+    def calcular_pnl_institucional(activo, tipo, entrada, salida, lotes):
+        diferencia = (salida - entrada) if tipo == "BUY" else (entrada - salida)
+        
+        if "XAU" in activo: return diferencia * 100.0 * lotes
+        elif "BTC" in activo: return diferencia * 1.0 * lotes
+        elif "WTI" in activo or "BRENT" in activo: return diferencia * 1000.0 * lotes
+        elif any(idx in activo for idx in ["US30", "SPX500", "NAS100", "GER40"]): return diferencia * 1.0 * lotes
+        elif "JPY" in activo:
+            valor_pip_usd_por_lote = 1000.0 / salida if salida != 0 else 6.80
+            pips = diferencia * 100.0
+            return pips * valor_pip_usd_por_lote * lotes
+        else:
+            return diferencia * 100000.0 * lotes
 
-    def get_precio_sincronizado(simbolo):
-        if simbolo not in precios_tick_actual:
-            precios_tick_actual[simbolo] = obtener_cotizacion_completa(simbolo)
-        return precios_tick_actual[simbolo]
+    def obtener_config_activo(simbolo):
+        if "JPY" in simbolo: return 3, "%.3f", 0.001, 0.100, 0.200, 0.015
+        elif "XAU" in simbolo: return 2, "%.2f", 0.10, 2.00, 4.00, 0.35
+        elif "WTI" in simbolo or "BRENT" in simbolo: return 2, "%.2f", 0.01, 0.30, 0.60, 0.04
+        elif "BTC" in simbolo: return 2, "%.2f", 1.0, 100.0, 200.0, 25.00
+        elif any(idx in simbolo for idx in ["US30", "NAS100", "GER40"]): return 2, "%.2f", 1.0, 20.0, 40.0, 2.00
+        elif "SPX" in simbolo: return 2, "%.2f", 0.10, 4.00, 8.00, 0.40
+        else: return 5, "%.5f", 0.00001, 0.00100, 0.00200, 0.00012
 
     # Estilos CSS
     st.markdown("""
@@ -1105,7 +1183,73 @@ elif opcion_menu in ["📈 Alema Trade Live", "📊 Terminal Institucional", "�
 
     par_activo = st.selectbox("Símbolo de Mercado", lista_activos, key="select_chart_asset_forex")
 
+    # --- NÚCLEO DE PRECIOS CON PROTECCIÓN DE API ---
+    def obtener_cotizacion_completa(simbolo):
+        dec, _, step_val, _, _, spread_val = obtener_config_activo(simbolo)
+        simbolos_map = { "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY", "EURJPY": "EUR/JPY", "AUDUSD": "AUD/USD", "USDCAD": "USD/CAD", "USDCHF": "USD/CHF", "GBPJPY": "GBP/JPY", "XAUUSD": "XAU/USD", "WTIUSD": "WTI/USD", "BRENTUSD": "BRENT/USD", "US30": "US30", "SPX500": "SPX", "NAS100": "NDX", "GER40": "DAX", "BTCUSD": "BTC/USD" }
+        simbolo_api = simbolos_map.get(simbolo, "EUR/USD")
+        api_key = "6223c6d78f7a43b2872fc3acbb3f578e"
+        ahora = time.time()
+        tiempo_ultimo = st.session_state.ultimo_tiempo_api.get(simbolo, 0)
+        
+        if ahora - tiempo_ultimo > 45:
+            try:
+                url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey={api_key}"
+                res = requests.get(url, timeout=3)
+                if res.status_code == 200:
+                    data = res.json()
+                    if "price" in data:
+                        st.session_state.cache_precios_forex[simbolo] = float(data["price"])
+            except Exception:
+                pass
+            finally:
+                st.session_state.ultimo_tiempo_api[simbolo] = ahora
+
+        if simbolo in st.session_state.cache_precios_forex:
+            precio_base = st.session_state.cache_precios_forex[simbolo]
+        else:
+            precios_fallback = { "EURUSD": 1.15919, "GBPUSD": 1.31210, "USDJPY": 146.850, "EURJPY": 162.450, "XAUUSD": 2512.30, "US30": 41200.00, "BTCUSD": 62500.00 }
+            precio_base = precios_fallback.get(simbolo, 1.0000)
+            st.session_state.cache_precios_forex[simbolo] = precio_base
+
+        ruido = np.random.normal(0, step_val * 1.2)
+        precio_vivo = round(precio_base + ruido, dec)
+        precio_bid = precio_vivo
+        precio_ask = round(precio_bid + spread_val, dec)
+
+        return precio_bid, precio_ask, precio_vivo
+
+    precios_tick_actual = {}
+    
+    def get_precio_sincronizado(simbolo):
+        if simbolo not in precios_tick_actual:
+            precios_tick_actual[simbolo] = obtener_cotizacion_completa(simbolo)
+        return precios_tick_actual[simbolo]
+
     bid_actual, ask_actual, precio_vivo_actual = get_precio_sincronizado(par_activo)
+
+    if 'mercado_forex_df' not in st.session_state:
+        st.session_state.mercado_forex_df = {}
+
+    def obtener_dataframe_forex(simbolo, precio_actual):
+        if simbolo not in st.session_state.mercado_forex_df:
+            fechas = [datetime.now() - timedelta(minutes=15 * i) for i in range(50)][::-1]
+            vol = precio_actual * 0.0004
+            np.random.seed(123)
+            closes = np.linspace(precio_actual - (vol * 4), precio_actual, 50) + np.random.normal(0, vol * 0.2, 50)
+            opens = closes + np.random.normal(0, vol * 0.1, 50)
+            highs = np.maximum(opens, closes) + abs(np.random.normal(0, vol * 0.2, 50))
+            lows = np.minimum(opens, closes) - abs(np.random.normal(0, vol * 0.2, 50))
+            
+            df_init = pd.DataFrame({'Open': opens, 'High': highs, 'Low': lows, 'Close': closes}, index=fechas)
+            st.session_state.mercado_forex_df[simbolo] = df_init
+            
+        df = st.session_state.mercado_forex_df[simbolo]
+        df.iloc[-1, df.columns.get_loc('Close')] = precio_actual
+        df.iloc[-1, df.columns.get_loc('High')] = max(df.iloc[-1]['Open'], max(df.iloc[-1]['High'], precio_actual))
+        df.iloc[-1, df.columns.get_loc('Low')] = min(df.iloc[-1]['Open'], min(df.iloc[-1]['Low'], precio_actual))
+        return df
+
     df_history = obtener_dataframe_forex(par_activo, bid_actual)
 
     # --- MONITOREO DE ORDENES ACTIVAS (CIERRE EXACTO ECN) ---
@@ -1170,6 +1314,8 @@ elif opcion_menu in ["📈 Alema Trade Live", "📊 Terminal Institucional", "�
             st.rerun()
 
     # --- DASHBOARD Y GRÁFICOS CON VISUALIZACIÓN DE CHALLENGE Y ROL ADMIN ---
+    es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
+
     if es_admin:
         col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
     else:
@@ -1286,7 +1432,7 @@ elif opcion_menu in ["📈 Alema Trade Live", "📊 Terminal Institucional", "�
     # --- BITÁCORA ---
     st.markdown("<br>", unsafe_allow_html=True)
 
-    if es_admin:
+    if st.session_state.get("tipo_usuario") == "ADMIN":
         col_tit_bita, col_btn_bita = st.columns([3.0, 1.0])
         with col_tit_bita: 
             st.markdown("### Bitácora Histórica")
@@ -1311,6 +1457,7 @@ elif opcion_menu in ["📈 Alema Trade Live", "📊 Terminal Institucional", "�
         st.markdown(f'<div class="mt5-table-container"><table class="mt5-table"><thead><tr><th>Tiempo</th><th>Tipo</th><th>Vol.</th><th>Símbolo</th><th>S/L</th><th>T/P</th><th>Precio Cierre</th><th>Beneficio</th></tr></thead><tbody>{"".join(filas_html)}</tbody></table></div>', unsafe_allow_html=True)
     else:
         st.info("Aún no hay operaciones cerradas.")
+
 
 # ==========================================
 # MENÚ: BIBLIOTECA DE GUÍAS
