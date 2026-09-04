@@ -1,21 +1,13 @@
-import streamlit as st
-
-def render_trading_journal():
-    st.title("📓 Trading Journal")
-    st.info("Registro y bitácora de operaciones.")
-   
 # modulos/journal.py
 import streamlit as st
 import pandas as pd
 import requests
 from datetime import datetime
 
-# URL para lectura CSV de la pestaña Journal en Google Sheets
-URL_JOURNAL_CSV = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0"
-
-# URL de envío del Google Form vinculado a la hoja Journal
-# Sustituye este enlace por la URL terminada en /formResponse de tu formulario
-URL_FORM_RESPONSE = "https://docs.google.com/forms/d/e/TU_FORM_ID_AQUI/formResponse"
+# Configuración de conexión a Google Sheets y Google Forms
+SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
+URL_JOURNAL_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Journal"
+URL_FORM_RESPONSE = "https://docs.google.com/forms/d/e/1FAIpQLSf9mOAhtFyAcjxJ2WK2mwCbPOtDa_9dSnsz9gHNPbOJ8M51cQ/formResponse"
 
 @st.cache_data(ttl=3)
 def cargar_journal_persiste(matricula_usuario):
