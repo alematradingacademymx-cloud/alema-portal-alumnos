@@ -9,7 +9,7 @@ def render_biblioteca_guias():
     # ==========================================
     st.markdown(
         '<div class="main-title" style="text-align: left;">ALEMA TRADING'
-        ' ACADEMY</div>',
+        " ACADEMY</div>",
         unsafe_allow_html=True,
     )
     st.markdown(
