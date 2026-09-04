@@ -1,19 +1,19 @@
-import streamlit as st
 import config
+import streamlit as st
 
 # Importamos las funciones de renderizado desde la carpeta modulos
 from modulos.avance_academico import render_avance_academico
+from modulos.biblioteca import render_biblioteca_guias
 from modulos.calculadoras import render_calculadoras
+from modulos.evaluaciones import render_evaluaciones_control
 from modulos.journal import render_trading_journal
 from modulos.simulador import render_simulador_alema_live
-from modulos.biblioteca import render_biblioteca_guias
-from modulos.evaluaciones import render_evaluaciones_control
 
 # 1. Configuración de pantalla y variables globales
 config.inicializar_configuracion()
 config.inicializar_session_state()
 
-# 2. Control de Login (Simulado / Módulo de Autenticación)
+# 2. Control de Autenticación con IF / ELSE Estricto
 if not st.session_state.get("usuario_autenticado", False):
     st.title("🔐 ALEMA Trading Academy - Acceso")
 
@@ -30,37 +30,40 @@ if not st.session_state.get("usuario_autenticado", False):
                 st.rerun()
             else:
                 st.error("Por favor, ingresa tu usuario y contraseña.")
-    st.stop()
 
-# 3. Menú Lateral (Sidebar)
-with st.sidebar:
-    st.title("🧭 Menú Principal")
-    st.caption(f"Usuario: **{st.session_state.get('nombre_usuario', 'Usuario')}**")
+else:
+    # 3. Menú Lateral (Sidebar) — Solo visible tras iniciar sesión
+    with st.sidebar:
+        st.title("🧭 Menú Principal")
+        st.caption(
+            f"Usuario: **{st.session_state.get('nombre_usuario', 'Usuario')}**"
+        )
 
-    opciones_menu = [
-        "Mi Avance Académico",
-        "Calculadoras de Lotes",
-        "Trading Journal",
-        "Simulador Institucional",
-        "Biblioteca de Guías",
-        "Evaluaciones y Control Académico"
-    ]
+        opciones_menu = [
+            "Mi Avance Académico",
+            "Calculadoras de Lotes",
+            "Trading Journal",
+            "Simulador Institucional",
+            "Biblioteca de Guías",
+            "Evaluaciones y Control Académico",
+        ]
 
-    seccion_activa = st.radio(
-        "Selecciona una sección:", 
-        opciones_menu, 
-        key="menu_navegacion_principal"
-    )
+        seccion_activa = st.radio(
+            "Selecciona una sección:",
+            opciones_menu,
+            key="menu_navegacion_principal",
+        )
 
-    st.sidebar.divider()
-    if st.sidebar.button("🚪 Cerrar Sesión", key="btn_logout_main", use_container_width=True):
-        st.session_state.clear()
-        st.rerun()
+        st.divider()
+        if st.button(
+            "🚪 Cerrar Sesión",
+            key="btn_logout_main",
+            use_container_width=True,
+        ):
+            st.session_state.clear()
+            st.rerun()
 
-# 4. Enrutador Principal Aislado (Contenedor Limpio)
-main_container = st.container()
-
-with main_container:
+    # 4. Enrutador Principal Aislado
     if seccion_activa == "Mi Avance Académico":
         render_avance_academico()
 
