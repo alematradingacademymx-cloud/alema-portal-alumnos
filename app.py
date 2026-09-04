@@ -27,8 +27,8 @@ if "tipo_usuario" not in st.session_state:
 # PARTE 2: 🔑 FUNCIÓN PARA CONVERTIR CUALQUIER FECHA
 # ==========================================
 def parsear_fecha(valor_fecha):
-    """Convierte cadenas o stamps a objetos datetime.date para evitar inconsistencias."""
-    if pd.isna(valor_fecha) or not valor_fecha:
+    """Convierte cadenas o marcas de tiempo a objetos datetime.date validos."""
+    if pd.isna(valor_fecha) or not valor_fecha or str(valor_fecha).strip() == "":
         return datetime.date.today()
     try:
         return pd.to_datetime(valor_fecha).date()
@@ -39,22 +39,24 @@ def parsear_fecha(valor_fecha):
 # ==========================================
 # PARTE 3: 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS)
 # ==========================================
-# ID de Google Sheets extraído de tu enlace
 SHEET_ID = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
 GDATA_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
 @st.cache_data(ttl=60)
 def cargar_base_datos_sheets():
-    """Lee la hoja de cálculo pública o mediante credenciales."""
+    """Conecta con Google Sheets y normaliza los encabezados."""
     try:
         df = pd.read_csv(GDATA_URL)
+        df.columns = df.columns.str.strip()
+        df['Matricula'] = df['Matricula'].astype(str).str.strip()
+        df['Password'] = df['Password'].astype(str).str.strip()
         return df
     except Exception as e:
         st.error(f"Error al conectar con Google Sheets: {e}")
         return pd.DataFrame()
 
-# Control de acceso (Login)
-if not st.session_state["autenticado"]:
+# Control de acceso y verificación contra la hoja de cálculo
+if not st.session_state.get("autenticado", False):
     st.markdown("<style>[data-testid='stSidebar'] {display: none;}</style>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -63,16 +65,41 @@ if not st.session_state["autenticado"]:
         st.caption("Portal Institucional de Alumnos y Coordinación")
         
         with st.form("form_login_principal"):
-            usr = st.text_input("Matrícula / Usuario", key="input_usr").strip()
-            pwd = st.text_input("Contraseña", type="password", key="input_pwd")
-            if st.form_submit_button("🔑 Iniciar Sesión", use_container_width=True):
-                # Validación de prueba (Se conectará con las columnas del Sheet)
-                if usr and pwd:
-                    st.session_state["autenticado"] = True
-                    st.session_state["usuario_actual"] = usr
-                    st.rerun()
-    st.stop()
+            usr_input = st.text_input("Matrícula / Usuario", key="input_usr").strip()
+            pwd_input = st.text_input("Contraseña", type="password", key="input_pwd").strip()
+            btn_login = st.form_submit_button("🔑 Iniciar Sesión", use_container_width=True)
+            
+            if btn_login:
+                df_usuarios = cargar_base_datos_sheets()
+                
+                if not df_usuarios.empty:
+                    # Búsqueda coincidente por Matrícula
+                    usuario_row = df_usuarios[df_usuarios["Matricula"].str.upper() == usr_input.upper()]
+                    
+                    if not usuario_row.empty:
+                        pass_real = str(usuario_row.iloc[0]["Password"])
+                        
+                        if pwd_input == pass_real:
+                            datos = usuario_row.iloc[0]
+                            
+                            # Carga de variables del alumno para usar en Calculadoras, Challenge y Candados
+                            st.session_state["autenticado"] = True
+                            st.session_state["usuario_actual"] = str(datos["Matricula"])
+                            st.session_state["tipo_usuario"] = str(datos.get("Tipo_Usuario", "ALUMNO")).upper()
+                            st.session_state["capital_inicial"] = float(datos["Capital"]) if pd.notna(datos.get("Capital")) else 0.0
+                            st.session_state["challenge_nivel"] = str(datos.get("Challenge", "Nivel 1")) if pd.notna(datos.get("Challenge")) else "Nivel 1"
+                            st.session_state["simulador_habilitado"] = str(datos.get("Simulador_Habilitado", "NO")).upper() == "SI"
+                            st.session_state["fecha_vencimiento"] = parsear_fecha(datos.get("Fecha_Vencimiento"))
+                            
+                            st.rerun()
+                        else:
+                            st.error("❌ Contraseña incorrecta.")
+                    else:
+                        st.error("❌ La matrícula ingresada no se encuentra registrada.")
+                else:
+                    st.error("❌ No se pudo conectar con la base de datos.")
 
+    st.stop()
 
 # ==========================================
 # PARTE 4: ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
