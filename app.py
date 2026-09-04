@@ -166,7 +166,7 @@ def parsear_fecha(fecha_str):
             pass
     return datetime(2030, 12, 31).date()
 
-# ===# ==========================================
+# ==========================================
 # 🔑 BASE DE DATOS DE USUARIOS (GOOGLE SHEETS) Y AUTENTICACIÓN
 # ==========================================
 import os
@@ -526,7 +526,7 @@ if st.session_state.get("autenticado", False):
         st.session_state.tipo_usuario = "ALUMNO"
         st.rerun()
 
-   # ==========================================
+    # ==========================================
     # ⚙️ PANEL DE CONTROL ADMIN (SOLO PARA ADMINS EN SIDEBAR)
     # ==========================================
     if st.session_state.get("tipo_usuario") == "ADMIN":
@@ -541,13 +541,13 @@ if st.session_state.get("autenticado", False):
         )
         
         # --- 1. BOTÓN PARA FORZAR LECTURA DE CAPITAL DESDE GOOGLE SHEETS ---
-        if st.sidebar.button("🔄 Sincronizar Capital (Sheets)", use_container_width=True):
+        if st.sidebar.button("🔄 Sincronizar Capital (Sheets)", use_container_width=True, key="btn_sync_sheets_admin"):
             st.cache_data.clear()
             st.sidebar.success(f"Capital de '{alumno_seleccionado}' actualizado desde Google Sheets.")
             st.rerun()
             
         # --- 2. BOTÓN PARA REINICIAR BITÁCORA HISTÓRICA DEL ALUMNO ---
-        if st.sidebar.button("🗑️ Reiniciar Bitácora de Alumno", use_container_width=True):
+        if st.sidebar.button("🗑️ Reiniciar Bitácora de Alumno", use_container_width=True, key="btn_reset_bitacora_admin"):
             # Localiza el archivo JSON del alumno seleccionado y lo vacía
             arch_bita_alumno = f"historial_cerradas_{alumno_seleccionado}.json"
             guardar_datos_json(arch_bita_alumno, [])
