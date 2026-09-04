@@ -33,7 +33,6 @@ def cargar_journal_persiste(matricula_usuario):
     except Exception:
         return pd.DataFrame()
 
-def render_trading_journal():
     """Módulo 3: Trading Journal Institucional & Bitácora Psicológica"""
     st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title" style="text-align: left;">Journal Institucional de Operaciones y Bitácora Psicológica</div>', unsafe_allow_html=True)
