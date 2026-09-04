@@ -2,7 +2,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 
-def render_calculadoras():
+
     """Módulo 2: Calculadoras de Lotes y Riesgo Institucional"""
     st.markdown(
         '<div class="main-title" style="text-align: left;">ALEMA TRADING'
