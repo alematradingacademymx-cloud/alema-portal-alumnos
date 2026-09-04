@@ -653,7 +653,29 @@ def render_simulador_alema_live():
                 st.rerun()
     else:
         st.info("No hay posiciones activas.")
+# --- PANEL ADMIN: REINICIAR BITÁCORA DE CUALQUIER ALUMNO ---
+if es_admin:
+    with st.expander("🛠️ Panel Admin: Reiniciar Bitácora de Alumno"):
+        try:
+            df_alumnos_sheet = pd.read_csv(GOOGLE_SHEET_CSV_URL := "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=2037302400")
+            df_alumnos_sheet.columns = df_alumnos_sheet.columns.str.strip()
+            lista_matriculas = df_alumnos_sheet["Matricula"].dropna().unique().tolist()
+        except Exception:
+            lista_matriculas = []
 
+        if lista_matriculas:
+            matricula_reset = st.selectbox(
+                "Selecciona el alumno:",
+                lista_matriculas,
+                key="select_reset_bitacora_admin",
+            )
+
+            if st.button("🗑️ Reiniciar Bitácora de este Alumno", key="btn_reset_bitacora_alumno"):
+                archivo_historial_alumno = f"historial_cerradas_{matricula_reset}.json"
+                guardar_datos_json(archivo_historial_alumno, [])
+                st.success(f"✅ Bitácora histórica de **{matricula_reset}** reiniciada correctamente.")
+        else:
+            st.warning("No se pudo cargar la lista de alumnos desde la base de datos.")
     # --- BITÁCORA ---
     st.markdown("<br>", unsafe_allow_html=True)
 
