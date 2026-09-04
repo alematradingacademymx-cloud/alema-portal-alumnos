@@ -601,7 +601,3 @@ with tab_historial:
                 )
 
     st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
-
-
-# Alias de compatibilidad
-render_evaluaciones = render_evaluaciones_control
