@@ -474,14 +474,322 @@ def render_trading_journal():
         st.info("💡 Aún no tienes trades guardados en tu historial permanente.")
 
 
-# ==========================================
-# PARTE 9: SIMULADOR INSTITUCIONAL ALEMA TRADING ACADEMY
-# (VERSIÓN CONECTADA A BASE DE DATOS GOOGLE SHEETS CON CHALLENGE)
-# ==========================================
-elif seccion_activa == "Simulador Institucional":
-    st.title("📊 Simulador Institucional & Challenge")
+import os
+import json
+import time
+from datetime import datetime, timedelta
+import requests
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
+# ==============================================================================
+# CONFIGURACIÓN Y PERSISTENCIA DE DATOS MULTI-USUARIO
+# ==============================================================================
+DATA_DIR = "data_persistencia"
+os.makedirs(DATA_DIR, exist_ok=True)
 
+def _get_user_filepaths(usuario: str):
+    """Genera rutas de archivos aisladas por usuario para evitar colisiones."""
+    usr_clean = str(usuario).strip().lower()
+    return (
+        os.path.join(DATA_DIR, f"posiciones_activas_{usr_clean}.json"),
+        os.path.join(DATA_DIR, f"historial_cerradas_{usr_clean}.json")
+    )
+
+def cargar_datos_json(archivo: str, valor_defecto: list) -> list:
+    if os.path.exists(archivo):
+        try:
+            with open(archivo, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return valor_defecto
+    return valor_defecto
+
+def guardar_datos_json(archivo: str, datos: list):
+    try:
+        with open(archivo, "w", encoding="utf-8") as f:
+            json.dump(datos, f, indent=4, ensure_ascii=False)
+    except Exception:
+        pass
+
+# ==============================================================================
+# CONEXIÓN BASE DE DATOS (GOOGLE SHEETS)
+# ==============================================================================
+@st.cache_data(ttl=10)
+def obtener_datos_usuario_desde_sheets(usuario_target: str):
+    capital_defecto = 300.00
+    nivel_defecto = "Nivel 1"
+    sheet_url = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0"
+    
+    try:
+        df = pd.read_csv(sheet_url)
+        df.columns = [str(c).strip() for c in df.columns]
+        
+        col_user = next((c for c in df.columns if any(k in c.lower() for k in ["usuario", "matricula", "user"])), None)
+        col_cap = next((c for c in df.columns if any(k in c.lower() for k in ["capital", "monto", "balance"])), None)
+        col_challenge = next((c for c in df.columns if any(k in c.lower() for k in ["challenge", "nivel", "level"])), None)
+        
+        if col_user:
+            filtro = df[df[col_user].astype(str).str.strip().str.lower() == str(usuario_target).strip().lower()]
+            if not filtro.empty:
+                if col_cap:
+                    val_str = str(filtro[col_cap].values[0]).replace("$", "").replace(",", "").strip()
+                    capital_defecto = float(val_str)
+                if col_challenge:
+                    val_chal = str(filtro[col_challenge].values[0]).strip()
+                    if val_chal and val_chal.lower() != "nan":
+                        nivel_defecto = val_chal
+    except Exception:
+        pass
+        
+    return capital_defecto, nivel_defecto
+
+# ==============================================================================
+# REGLAS DEL MERCADO Y CÁLCULOS INSTITUCIONALES
+# ==============================================================================
+def obtener_config_activo(simbolo: str):
+    if "JPY" in simbolo: return 3, "%.3f", 0.001, 0.100, 0.200, 0.015
+    elif "XAU" in simbolo: return 2, "%.2f", 0.10, 2.00, 4.00, 0.35
+    elif "WTI" in simbolo or "BRENT" in simbolo: return 2, "%.2f", 0.01, 0.30, 0.60, 0.04
+    elif "BTC" in simbolo: return 2, "%.2f", 1.0, 100.0, 200.0, 25.00
+    elif any(idx in simbolo for idx in ["US30", "NAS100", "GER40"]): return 2, "%.2f", 1.0, 20.0, 40.0, 2.00
+    elif "SPX" in simbolo: return 2, "%.2f", 0.10, 4.00, 8.00, 0.40
+    else: return 5, "%.5f", 0.00001, 0.00100, 0.00200, 0.00012
+
+def calcular_pnl_institucional(activo: str, tipo: str, entrada: float, salida: float, lotes: float) -> float:
+    diferencia = (salida - entrada) if tipo == "BUY" else (entrada - salida)
+    
+    if "XAU" in activo: return diferencia * 100.0 * lotes
+    elif "BTC" in activo: return diferencia * 1.0 * lotes
+    elif "WTI" in activo or "BRENT" in activo: return diferencia * 1000.0 * lotes
+    elif any(idx in activo for idx in ["US30", "SPX500", "NAS100", "GER40"]): return diferencia * 1.0 * lotes
+    elif "JPY" in activo:
+        valor_pip_usd = 1000.0 / salida if salida != 0 else 6.80
+        return diferencia * 100.0 * valor_pip_usd * lotes
+    else:
+        return diferencia * 100000.0 * lotes
+
+# ==============================================================================
+# COMPONENTE PRINCIPAL DEL SIMULADOR
+# ==============================================================================
+def render_simulador_alema_live():
+    """Bloque totalmente aislado para la vista Alema Trade Live."""
+    
+    st_autorefresh(interval=4000, key="auto_refresh_terminal_forex_live")
+    
+    # Contexto de Usuario
+    usuario = st.session_state.get("usuario_actual", "estudiante_demo")
+    es_admin = st.session_state.get("tipo_usuario") == "ADMIN"
+    arch_activas, arch_historial = _get_user_filepaths(usuario)
+
+    # Carga de Persistencia
+    posiciones_abiertas = cargar_datos_json(arch_activas, [])
+    historial_cerradas = cargar_datos_json(arch_historial, [])
+
+    # Sincronización con Google Sheets
+    capital_base, nivel_challenge = obtener_datos_usuario_desde_sheets(usuario)
+    pnl_acumulado = sum(float(trade.get("Beneficio", 0.0)) for trade in historial_cerradas)
+    balance_total = capital_base + pnl_acumulado
+
+    # Estructuras en Cache para Cotizaciones
+    if 'cache_precios_forex' not in st.session_state: st.session_state.cache_precios_forex = {}
+    if 'ultimo_tiempo_api' not in st.session_state: st.session_state.ultimo_tiempo_api = {}
+    if 'mercado_forex_df' not in st.session_state: st.session_state.mercado_forex_df = {}
+
+    def obtener_cotizacion(simbolo):
+        dec, _, step_val, _, _, spread_val = obtener_config_activo(simbolo)
+        simbolos_map = {
+            "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY", "EURJPY": "EUR/JPY",
+            "AUDUSD": "AUD/USD", "USDCAD": "USD/CAD", "USDCHF": "USD/CHF", "GBPJPY": "GBP/JPY",
+            "XAUUSD": "XAU/USD", "WTIUSD": "WTI/USD", "BRENTUSD": "BRENT/USD", "US30": "US30",
+            "SPX500": "SPX", "NAS100": "NDX", "GER40": "DAX", "BTCUSD": "BTC/USD"
+        }
+        simbolo_api = simbolos_map.get(simbolo, "EUR/USD")
+        ahora = time.time()
+        
+        if ahora - st.session_state.ultimo_tiempo_api.get(simbolo, 0) > 45:
+            try:
+                url = f"https://api.twelvedata.com/price?symbol={simbolo_api}&apikey=6223c6d78f7a43b2872fc3acbb3f578e"
+                res = requests.get(url, timeout=3)
+                if res.status_code == 200:
+                    data = res.json()
+                    if "price" in data:
+                        st.session_state.cache_precios_forex[simbolo] = float(data["price"])
+            except Exception:
+                pass
+            finally:
+                st.session_state.ultimo_tiempo_api[simbolo] = ahora
+
+        precio_base = st.session_state.cache_precios_forex.get(simbolo, 1.0000)
+        ruido = np.random.normal(0, step_val * 1.2)
+        precio_bid = round(precio_base + ruido, dec)
+        precio_ask = round(precio_bid + spread_val, dec)
+        return precio_bid, precio_ask, precio_bid
+
+    precios_ticks = {}
+    def get_precio(simbolo):
+        if simbolo not in precios_ticks:
+            precios_ticks[simbolo] = obtener_cotizacion(simbolo)
+        return precios_ticks[simbolo]
+
+    # --- ESTILOS DE INTERFAZ ---
+    st.markdown("""
+        <style>
+            .mt5-terminal-card { background-color: #131722; border: 1px solid #2A2E39; padding: 10px 15px; border-radius: 4px; margin-bottom: 8px; font-family: sans-serif; }
+            .live-ticker-price { color: #f59e0b; font-weight: 700; }
+            .live-ticker-bid { color: #ef5350; font-weight: 700; }
+            .live-ticker-ask { color: #26a69a; font-weight: 700; }
+            .mt5-table-container { overflow-x: auto; border: 1px solid #2A2E39; border-radius: 4px; }
+            .mt5-table { width: 100%; border-collapse: collapse; font-size: 13px; background-color: #131722; color: #d1d4dc; }
+            .mt5-table th { background-color: #1e222d; color: #848e9c; padding: 8px; text-align: left; }
+            .mt5-table td { padding: 7px 12px; border-bottom: 1px solid #1e222d; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div style="font-size: 22px; font-weight: 700; margin-bottom: 10px;">ALEMA TRADING ACADEMY | Terminal Institucional</div>', unsafe_allow_html=True)
+
+    lista_activos = ["EURUSD", "GBPUSD", "USDJPY", "EURJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", "XAUUSD", "WTIUSD", "BRENTUSD", "US30", "SPX500", "NAS100", "GER40", "BTCUSD"]
+    par_activo = st.selectbox("Símbolo de Mercado", lista_activos, key="select_chart_asset_forex")
+
+    bid_actual, ask_actual, precio_vivo = get_precio(par_activo)
+
+    # --- HISTÓRICO Y GRÁFICO ---
+    if par_activo not in st.session_state.mercado_forex_df:
+        fechas = [datetime.now() - timedelta(minutes=15 * i) for i in range(50)][::-1]
+        vol = precio_vivo * 0.0004
+        closes = np.linspace(precio_vivo - (vol * 4), precio_vivo, 50) + np.random.normal(0, vol * 0.2, 50)
+        opens = closes + np.random.normal(0, vol * 0.1, 50)
+        highs = np.maximum(opens, closes) + abs(np.random.normal(0, vol * 0.2, 50))
+        lows = np.minimum(opens, closes) - abs(np.random.normal(0, vol * 0.2, 50))
+        st.session_state.mercado_forex_df[par_activo] = pd.DataFrame({'Open': opens, 'High': highs, 'Low': lows, 'Close': closes}, index=fechas)
+
+    df_chart = st.session_state.mercado_forex_df[par_activo]
+    df_chart.iloc[-1, df_chart.columns.get_loc('Close')] = precio_vivo
+
+    # --- MONITOREO DE MOTOR DE EJECUCIÓN TP / SL ---
+    posiciones_conservadas = []
+    hubo_cierre_auto = False
+
+    for pos in posiciones_abiertas:
+        p_bid, p_ask, _ = get_precio(pos["activo"])
+        dec_pos, _, _, _, _, _ = obtener_config_activo(pos["activo"])
+        
+        pos["bid_vela_actual"], pos["ask_vela_actual"] = p_bid, p_ask
+        tp_exacto, sl_exacto = round(pos["tp"], dec_pos), round(pos["sl"], dec_pos)
+        
+        cierre_trigger = False
+        p_salida = p_bid if pos["tipo"] == "BUY" else p_ask
+
+        if pos["tipo"] == "BUY":
+            if p_bid >= tp_exacto: cierre_trigger, p_salida = True, tp_exacto
+            elif p_bid <= sl_exacto: cierre_trigger, p_salida = True, sl_exacto
+        else:
+            if p_ask <= tp_exacto: cierre_trigger, p_salida = True, tp_exacto
+            elif p_ask >= sl_exacto: cierre_trigger, p_salida = True, sl_exacto
+
+        if cierre_trigger:
+            pnl_real = calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], p_salida, pos["lotes"])
+            historial_cerradas.append({
+                "Tipo": pos['tipo'].lower(), "Volumen": pos['lotes'], "Símbolo": pos["activo"],
+                "S / L": sl_exacto, "T / P": tp_exacto, "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                "Precio Cierre": p_salida, "Beneficio": round(pnl_real, 2)
+            })
+            guardar_datos_json(arch_historial, historial_cerradas)
+            hubo_cierre_auto = True
+        else:
+            posiciones_conservadas.append(pos)
+
+    if hubo_cierre_auto:
+        guardar_datos_json(arch_activas, posiciones_conservadas)
+        st.rerun()
+
+    # --- DASHBOARD METRICS ---
+    col1, col2, col3, col4, *col_admin = st.columns(5 if es_admin else 4)
+    with col1: st.metric("Balance Base", f"${balance_total:,.2f}")
+    with col2:
+        flotante = sum(calcular_pnl_institucional(p["activo"], p["tipo"], p["entrada"], p.get("bid_vela_actual", p["entrada"]) if p["tipo"] == "BUY" else p.get("ask_vela_actual", p["entrada"]), p["lotes"]) for p in posiciones_conservadas)
+        st.metric("Beneficio Flotante", f"${flotante:,.2f}", delta=f"${flotante:,.2f}")
+    with col3: st.metric("Posiciones Activas", f"{len(posiciones_conservadas)}")
+    with col4: st.metric("Fase Challenge", nivel_challenge)
+    if es_admin and col_admin:
+        with col_admin[0]:
+            if st.button("🔄 Sincronizar Sheets"):
+                st.cache_data.clear()
+                st.rerun()
+
+    st.divider()
+
+    # --- GRAFICADOR Y PANEL DE ORDENES ---
+    col_graf, col_pan = st.columns([2.4, 1.0])
+    dec_p, fmt_p, step_p, dist_sl, dist_tp, spread_p = obtener_config_activo(par_activo)
+
+    with col_graf:
+        st.markdown(f"Gráfico **{par_activo}** | BID: <span class='live-ticker-bid'>{fmt_p % bid_actual}</span> | ASK: <span class='live-ticker-ask'>{fmt_p % ask_actual}</span>", unsafe_allow_html=True)
+        fig = go.Figure(data=[go.Candlestick(x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], name=par_activo)])
+        
+        for pos in posiciones_conservadas:
+            if pos["activo"] == par_activo:
+                fig.add_hline(y=pos["entrada"], line_dash="dash", line_color="#2962FF")
+                fig.add_hline(y=pos["tp"], line_dash="dot", line_color="#26a69a")
+                fig.add_hline(y=pos["sl"], line_dash="dot", line_color="#ef5350")
+
+        fig.update_layout(template="plotly_dark", paper_bgcolor="#131722", plot_bgcolor="#131722", height=400, margin=dict(l=5, r=5, t=5, b=5))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_pan:
+        st.markdown("### Nueva Orden")
+        sim_tipo = st.radio("Dirección", ["BUY", "SELL"], horizontal=True, key="sim_dir_forex")
+        sim_lotes = st.number_input("Volumen (Lotes)", value=0.10, min_value=0.01, step=0.01)
+        p_ref = ask_actual if sim_tipo == "BUY" else bid_actual
+
+        sim_sl = st.number_input("Stop Loss", value=float(round(p_ref - dist_sl if sim_tipo == "BUY" else p_ref + dist_sl, dec_p)), format=fmt_p, step=step_p)
+        sim_tp = st.number_input("Take Profit", value=float(round(p_ref + dist_tp if sim_tipo == "BUY" else p_ref - dist_tp, dec_p)), format=fmt_p, step=step_p)
+
+        if st.button("EJECUTAR ORDEN", use_container_width=True):
+            nueva_orden = {
+                "id": int(datetime.now().timestamp()),
+                "tiempo_apertura": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                "activo": par_activo, "tipo": sim_tipo, "lotes": float(sim_lotes),
+                "entrada": float(p_ref), "sl": float(sim_sl), "tp": float(sim_tp)
+            }
+            posiciones_conservadas.append(nueva_orden)
+            guardar_datos_json(arch_activas, posiciones_conservadas)
+            st.rerun()
+
+    # --- POSICIONES ACTIVAS & HISTORIAL ---
+    st.markdown("### Posiciones Abiertas")
+    if posiciones_conservadas:
+        for idx, pos in enumerate(posiciones_conservadas):
+            p_salida = pos.get("bid_vela_actual", pos["entrada"]) if pos["tipo"] == "BUY" else pos.get("ask_vela_actual", pos["entrada"])
+            pnl_card = calcular_pnl_institucional(pos["activo"], pos["tipo"], pos["entrada"], p_salida, pos["lotes"])
+            
+            st.markdown(f'<div class="mt5-terminal-card"><b>{pos["activo"]}</b> | {pos["tipo"]} | Entrada: {pos["entrada"]} | PnL: <b>${pnl_card:,.2f} USD</b></div>', unsafe_allow_html=True)
+            if st.button(f"Cerrar #{pos['id']}", key=f"close_{pos['id']}"):
+                historial_cerradas.append({
+                    "Tipo": pos['tipo'].lower(), "Volumen": pos['lotes'], "Símbolo": pos['activo'],
+                    "S / L": pos['sl'], "T / P": pos['tp'], "Tiempo Cierre": datetime.now().strftime("%Y.%m.%d %H:%M:%S"),
+                    "Precio Cierre": p_salida, "Beneficio": round(pnl_card, 2)
+                })
+                posiciones_conservadas.pop(idx)
+                guardar_datos_json(arch_historial, historial_cerradas)
+                guardar_datos_json(arch_activas, posiciones_conservadas)
+                st.rerun()
+    else:
+        st.info("No hay posiciones activas.")
+
+    st.markdown("### Bitácora Histórica")
+    if es_admin and st.button("🗑️ Limpiar Historial (Admin)"):
+        guardar_datos_json(arch_historial, [])
+        st.rerun()
+
+    if historial_cerradas:
+        df_hist = pd.DataFrame(historial_cerradas)
+        st.dataframe(df_hist, use_container_width=True)
+    else:
+        st.info("Sin registros históricos.")
 # ==========================================
 # PARTE 10: SECCIÓN: BIBLIOTECA DE GUÍAS
 # ==========================================
