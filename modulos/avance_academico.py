@@ -22,7 +22,6 @@ def cargar_datos_estudiantes():
         return pd.DataFrame()
 
 
-def render_avance_academico():
     """Módulo 1: Mi Avance Académico conectado en tiempo real a Google Sheets."""
     st.title("📈 Mi Avance Académico")
     st.caption(
