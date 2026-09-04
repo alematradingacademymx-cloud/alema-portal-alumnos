@@ -152,20 +152,22 @@ with st.sidebar:
 
 
 # ==========================================
-# PARTE 6: SECCIÓN: MI AVANCE ACADÉMICO (ALUMNOS/ADMIN)
+# ENRUTADOR PRINCIPAL DE CONTENIDO
 # ==========================================
+
+# ------------------------------------------
+# PARTE 6: MI AVANCE ACADÉMICO
+# ------------------------------------------
 if seccion_activa == "Mi Avance Académico":
     st.title("📈 Mi Avance Académico")
     st.info("Resumen de trayectoria, estatus de beca y matrícula.")
 
-
-# ==========================================
-# PARTE 7: SECCIÓN: CALCULADORAS DE LOTES
-# ==========================================
+# ------------------------------------------
+# PARTE 7: CALCULADORAS DE LOTES
+# ------------------------------------------
 elif seccion_activa == "Calculadoras de Lotes":
     import plotly.graph_objects as go
 
-    # Estilos visuales personalizados para tarjetas de copia y títulos
     st.markdown("""
         <style>
             .copy-box {
@@ -185,9 +187,6 @@ elif seccion_activa == "Calculadoras de Lotes":
 
     tab_operativa, tab_rapida = st.tabs(["⚡ Calculadora Operativa Completa", "🛡️ Calculadora de Lotes Rápidos (Riesgo)"])
 
-    # -------------------------------------------------------------
-    # TAB 1: CALCULADORA OPERATIVA COMPLETA
-    # -------------------------------------------------------------
     with tab_operativa:
         st.subheader("⚡ Calculadora Operativa & Multi-Activo")
         
@@ -228,7 +227,6 @@ elif seccion_activa == "Calculadoras de Lotes":
                     "• 📌 **Importante:** Verifica el **Precio de Entrada** actual en TradingView."
                 )
             
-            # Capital inicial jalado automáticamente desde Google Sheets
             capital_defecto = float(st.session_state.get("capital_inicial", 200.0))
             balance = st.number_input("Balance de la Cuenta ($)", value=max(10.0, capital_defecto), step=10.0, key="op_balance")
             riesgo_pct = st.number_input("Porcentaje de Riesgo (%)", value=2.0, step=0.5, key="op_riesgo")
@@ -252,7 +250,6 @@ elif seccion_activa == "Calculadoras de Lotes":
             valor_pip = st.number_input("Valor del Pip por Lote Estándar ($)", value=valor_pip_sugerido, step=0.5, key=f"op_val_pip_{es_jpy}")
             ratio = st.number_input("Ratio (Riesgo:Beneficio)", value=3.0, step=0.5, key="op_ratio")
 
-        # Cálculos de Gestión
         dinero_arriesgar = balance * (riesgo_pct / 100.0)
         lotaje = dinero_arriesgar / (sl_pips * valor_pip) if sl_pips > 0 and valor_pip > 0 else 0.0
         tp_pips = sl_pips * ratio
@@ -324,9 +321,6 @@ elif seccion_activa == "Calculadoras de Lotes":
 
         st.plotly_chart(fig, use_container_width=True)
 
-    # -------------------------------------------------------------
-    # TAB 2: CALCULADORA RÁPIDA
-    # -------------------------------------------------------------
     with tab_rapida:
         st.subheader("🛡️ Calculadora Rápida de Lotaje y Riesgo")
         st.write("Calcula de forma inmediata el lotaje exacto según tu capital y tolerancia de riesgo.")
@@ -361,11 +355,12 @@ elif seccion_activa == "Calculadoras de Lotes":
         </div>
         """, unsafe_allow_html=True)
 
-# ==========================================
-# PARTE 8: SECCIÓN: TRADING JOURNAL
-# ==========================================
+# ------------------------------------------
+# PARTE 8: TRADING JOURNAL
+# ------------------------------------------
 elif seccion_activa == "Trading Journal":
     st.title("📓 Bitácora de Operaciones (Trading Journal)")
+    st.info("Módulo de registro de trades en desarrollo.")
 
 
 # ==========================================
