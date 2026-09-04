@@ -1,13 +1,20 @@
-i# app.py
+# app.py
 import streamlit as st
 import config
+
+# Importamos las funciones de renderizado desde la carpeta modulos
+from modulos.avance_academico import render_avance_academico
+from modulos.calculadoras import render_calculadoras
+from modulos.journal import render_trading_journal
+from modulos.simulador import render_simulador_alema_live
+from modulos.biblioteca import render_biblioteca_guias
+from modulos.evaluaciones import render_evaluaciones_control
 
 # 1. Configuración de pantalla y variables globales
 config.inicializar_configuracion()
 config.inicializar_session_state()
 
 # 2. Control de Login (Simulado / Módulo de Autenticación)
-# Si no está autenticado, muestra pantalla de Login
 if not st.session_state.get("usuario_autenticado", False):
     st.title("🔐 ALEMA Trading Academy - Acceso")
     
@@ -17,7 +24,7 @@ if not st.session_state.get("usuario_autenticado", False):
         btn_ingresar = st.form_submit_button("Ingresar a la Plataforma")
         
         if btn_ingresar:
-            if usuario and password:  # Aquí se conecta con tu lógica de auth/Google Sheets
+            if usuario and password:
                 st.session_state["usuario_autenticado"] = True
                 st.session_state["nombre_usuario"] = usuario
                 st.success("¡Bienvenido!")
@@ -56,19 +63,19 @@ main_container = st.container()
 
 with main_container:
     if seccion_activa == "Mi Avance Académico":
-        st.info("📌 Módulo 'Mi Avance Académico' en proceso de migración...")
+        render_avance_academico()
 
     elif seccion_activa == "Calculadoras de Lotes":
-        st.info("📌 Módulo 'Calculadoras de Lotes' en proceso de migración...")
+        render_calculadoras()
 
     elif seccion_activa == "Trading Journal":
-        st.info("📌 Módulo 'Trading Journal' en proceso de migración...")
+        render_trading_journal()
 
     elif seccion_activa == "Simulador Institucional":
-        st.info("📌 Módulo 'Simulador Institucional' en proceso de migración...")
+        render_simulador_alema_live()
 
     elif seccion_activa == "Biblioteca de Guías":
-        st.info("📌 Módulo 'Biblioteca de Guías' en proceso de migración...")
+        render_biblioteca_guias()
 
     elif seccion_activa == "Evaluaciones y Control Académico":
-        st.info("📌 Módulo 'Evaluaciones' en proceso de migración...")
+        render_evaluaciones_control()
