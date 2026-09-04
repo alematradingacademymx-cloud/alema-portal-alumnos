@@ -3,7 +3,6 @@ import os
 import streamlit as st
 
 
-def render_biblioteca_guias():
     # ==========================================
     # SECCIÓN: BIBLIOTECA DE GUÍAS
     # ==========================================
