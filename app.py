@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import config
 
@@ -17,12 +16,12 @@ config.inicializar_session_state()
 # 2. Control de Login (Simulado / Módulo de Autenticación)
 if not st.session_state.get("usuario_autenticado", False):
     st.title("🔐 ALEMA Trading Academy - Acceso")
-    
+
     with st.form("form_login"):
         usuario = st.text_input("Usuario / Correo")
         password = st.text_input("Contraseña", type="password")
         btn_ingresar = st.form_submit_button("Ingresar a la Plataforma")
-        
+
         if btn_ingresar:
             if usuario and password:
                 st.session_state["usuario_autenticado"] = True
@@ -37,7 +36,7 @@ if not st.session_state.get("usuario_autenticado", False):
 with st.sidebar:
     st.title("🧭 Menú Principal")
     st.caption(f"Usuario: **{st.session_state.get('nombre_usuario', 'Usuario')}**")
-    
+
     opciones_menu = [
         "Mi Avance Académico",
         "Calculadoras de Lotes",
@@ -46,13 +45,13 @@ with st.sidebar:
         "Biblioteca de Guías",
         "Evaluaciones y Control Académico"
     ]
-    
+
     seccion_activa = st.radio(
         "Selecciona una sección:", 
         opciones_menu, 
         key="menu_navegacion_principal"
     )
-    
+
     st.sidebar.divider()
     if st.sidebar.button("🚪 Cerrar Sesión", key="btn_logout_main", use_container_width=True):
         st.session_state.clear()
