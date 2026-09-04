@@ -126,7 +126,7 @@ def obtener_config_activo(simbolo):
     else:
         return 5, "%.5f", 0.00001, 0.00100, 0.00200, 0.00012
 
-
+def render_simulador_alema_live():
     # --- IDENTIFICADOR DE USUARIO ---
     usuario = st.session_state.get(
         "nombre_usuario", st.session_state.get("usuario_actual", "DIRALEX")
@@ -698,3 +698,4 @@ def obtener_config_activo(simbolo):
 # Aliases de compatibilidad para evitar errores de importación
 render_simulador_live = render_simulador_alema_live
 render_simulador = render_simulador_alema_live
+render_simulador_alema_live()
