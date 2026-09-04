@@ -162,10 +162,11 @@ if seccion_activa == "Mi Avance Académico":
     st.title("📈 Mi Avance Académico")
     st.info("Resumen de trayectoria, estatus de beca y matrícula.")
 
-# ------------------------------------------
-# PARTE 7: CALCULADORAS DE LOTES
-# ------------------------------------------
-elif seccion_activa == "Calculadoras de Lotes":
+# ==========================================
+# MÓDULO 2: CALCULADORAS DE LOTES
+# ==========================================
+def render_calculadoras():
+    """Módulo aislado para el cálculo de gestión de riesgo y lotaje."""
     import plotly.graph_objects as go
 
     st.markdown("""
@@ -182,8 +183,8 @@ elif seccion_activa == "Calculadoras de Lotes":
         </style>
     """, unsafe_allow_html=True)
 
-    st.title("ALEMA TRADING ACADEMY")
-    st.caption("Módulo Institucional de Gestión de Riesgo y Lotajes")
+    st.markdown('<div class="main-title" style="text-align: left;">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title" style="text-align: left;">Módulo Institucional de Gestión de Riesgo y Lotajes</div>', unsafe_allow_html=True)
 
     tab_operativa, tab_rapida = st.tabs(["⚡ Calculadora Operativa Completa", "🛡️ Calculadora de Lotes Rápidos (Riesgo)"])
 
