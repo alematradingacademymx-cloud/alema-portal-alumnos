@@ -5,7 +5,7 @@ import os
 import pandas as pd
 import requests
 import streamlit as st
- 
+
 # Módulos oficiales de la academia
 LISTA_MODULOS = [
     "Básico",
@@ -15,19 +15,19 @@ LISTA_MODULOS = [
     "Avanzado",
     "Práctico",
 ]
- 
+
 # Rutas de almacenamiento local (solo para banco de exámenes y respuestas, no para permisos)
 FILE_BANCO_EXAMENES = "bd_banco_examenes.json"
 FILE_RESPUESTAS = "bd_respuestas_evaluaciones.json"
 FOLDER_EXCEL_UPLOADS = "archivos_excel_evaluaciones"
 FOLDER_CERTIFICADOS = "certificados_oficiales"
- 
+
 SHEET_ID_USUARIOS = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
 URL_USUARIOS_CSV = (
     f"https://docs.google.com/spreadsheets/d/{SHEET_ID_USUARIOS}/export?format=csv&gid=0"
 )
- 
- 
+
+
 # --- FUNCIONES DE PERSISTENCIA JSON (banco de exámenes / respuestas) ---
 def cargar_json_local(filepath, default):
     if os.path.exists(filepath):
@@ -37,13 +37,13 @@ def cargar_json_local(filepath, default):
         except Exception:
             return default
     return default
- 
- 
+
+
 def guardar_json_local(filepath, data):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
- 
- 
+
+
 # --- PERMISOS (CANDADOS): LECTURA DESDE GOOGLE SHEETS ---
 @st.cache_data(ttl=10)
 def cargar_permisos_sheet(matricula_target):
@@ -53,7 +53,7 @@ def cargar_permisos_sheet(matricula_target):
     try:
         df = pd.read_csv(URL_USUARIOS_CSV)
         df.columns = df.columns.str.strip()
- 
+
         filtro = df[
             df["Matricula"].astype(str).str.strip().str.upper()
             == str(matricula_target).strip().upper()
@@ -67,18 +67,18 @@ def cargar_permisos_sheet(matricula_target):
                     modulos_desbloqueados = [
                         m.strip() for m in val_mod.split(",") if m.strip()
                     ]
- 
+
             val_sim = str(filtro["Simulador_Habilitado"].values[0]).strip().upper()
             simulador_habilitado = val_sim == "SI"
     except Exception:
         pass
- 
+
     if not modulos_desbloqueados:
         modulos_desbloqueados = ["Básico"]
- 
+
     return modulos_desbloqueados, simulador_habilitado
- 
- 
+
+
 def actualizar_permisos_sheet(matricula, modulos_habilitados_str, simulador_habilitado_bool):
     """Envía la actualización de permisos al Apps Script (Web App) conectado al Sheet."""
     try:
@@ -93,8 +93,8 @@ def actualizar_permisos_sheet(matricula, modulos_habilitados_str, simulador_habi
         return data.get("success", False), data.get("error", "")
     except Exception as e:
         return False, str(e)
- 
- 
+
+
 # ==========================================
 # CÓDIGO DEL MÓDULO RENDERIZADO DIRECTO
 # ==========================================
@@ -108,21 +108,21 @@ st.markdown(
     " Evaluaciones y Certificaciones Oficiales</div>",
     unsafe_allow_html=True,
 )
- 
+
 usuario_actual = st.session_state.get("nombre_usuario", "DIRALEX")
 es_admin = (
     st.session_state.get("tipo_usuario", "").upper() == "ADMIN"
     or usuario_actual.upper() == "DIRALEX"
 )
- 
+
 # Crear carpetas si no existen
 for folder in [FOLDER_EXCEL_UPLOADS, FOLDER_CERTIFICADOS]:
     if not os.path.exists(folder):
         os.makedirs(folder)
- 
+
 banco_examenes = cargar_json_local(FILE_BANCO_EXAMENES, {})
 respuestas_evals = cargar_json_local(FILE_RESPUESTAS, [])
- 
+
 # --- PESTAÑAS DE NAVEGACIÓN AISLADAS SEGÚN ROL ---
 if es_admin:
     (
@@ -144,7 +144,7 @@ else:
     tab_alumnos, tab_historial = st.tabs(
         ["📚 Ruta Académica", "📊 Mis Resultados y Certificados"]
     )
- 
+
 # =============================================================
 # PESTAÑA 1: RUTA ACADÉMICA Y PRESENTACIÓN DE EXÁMENES
 # =============================================================
@@ -154,13 +154,13 @@ with tab_alumnos:
         "Selecciona tu módulo actual para presentar tus exámenes"
         " programados."
     )
- 
+
     modulos_desbloqueados, _ = cargar_permisos_sheet(usuario_actual)
- 
+
     for modulo in LISTA_MODULOS:
         esta_desbloqueado = modulo in modulos_desbloqueados
         icono_modulo = "🔓" if esta_desbloqueado else "🔒"
- 
+
         with st.expander(
             f"{icono_modulo} Módulo: {modulo}", expanded=esta_desbloqueado
         ):
@@ -171,11 +171,11 @@ with tab_alumnos:
                 )
             else:
                 st.markdown(f"#### Exámenes Disponibles - Nivel {modulo}")
- 
+
                 for num_ex in range(1, 4):
                     key_examen = f"{modulo}_Examen_{num_ex}"
                     examen_datos = banco_examenes.get(key_examen, None)
- 
+
                     col_e1, col_e2 = st.columns([3, 1])
                     with col_e1:
                         st.markdown(
@@ -200,7 +200,7 @@ with tab_alumnos:
                                     key=f"btn_pres_{key_examen}",
                                 ):
                                     st.session_state[f"modo_examen_{key_examen}"] = True
- 
+
                     # Despliegue aislado del formulario del examen
                     if (
                         st.session_state.get(f"modo_examen_{key_examen}", False)
@@ -211,7 +211,7 @@ with tab_alumnos:
                             st.write(examen_datos["descripcion"])
                             st.caption(f"Total de preguntas: {len(examen_datos['preguntas'])}")
                             st.divider()
- 
+
                             respuestas_alumno = {}
                             for idx_q, q in enumerate(examen_datos["preguntas"]):
                                 st.markdown(f"**Pregunta {idx_q+1}:** {q['pregunta']}")
@@ -221,7 +221,7 @@ with tab_alumnos:
                                     key=f"radio_{key_examen}_{idx_q}",
                                 )
                                 st.markdown("---")
- 
+
                             link_tv = st.text_input(
                                 "Enlace de Evidencia en TradingView:",
                                 placeholder="https://www.tradingview.com/x/...",
@@ -230,7 +230,7 @@ with tab_alumnos:
                                 "Justificación Técnica de tu Análisis:",
                                 placeholder="Explica tu confirmación, zona POI y gestión...",
                             )
- 
+
                             if st.form_submit_button(
                                 "💾 Enviar Examen a Dirección",
                                 use_container_width=True,
@@ -245,6 +245,7 @@ with tab_alumnos:
                                 calificacion = (correctas / total_preguntas) * 10.0 if total_preguntas > 0 else 0.0
                                 
                                 nueva_respuesta = {
+                                    "id": int(datetime.now().timestamp() * 1000),
                                     "matricula": usuario_actual,
                                     "key_examen": key_examen,
                                     "modulo": modulo,
@@ -261,7 +262,7 @@ with tab_alumnos:
                                 st.success(f"🎉 ¡Examen enviado con éxito! Tu calificación preliminar es: {calificacion:.2f}/10")
                                 st.session_state[f"modo_examen_{key_examen}"] = False
                                 st.rerun()
- 
+
 # =============================================================
 # PESTAÑA 2: HISTORIAL Y MUESTRA DE RESULTADOS
 # =============================================================
@@ -273,7 +274,7 @@ with tab_historial:
         st.dataframe(df_historial[["fecha", "modulo", "key_examen", "calificacion"]], use_container_width=True)
     else:
         st.info("💡 Aún no has presentado ninguna evaluación en esta cuenta.")
- 
+
     # =============================================================
     # PESTAÑAS DE ADMINISTRADOR (DIRALEX)
     # =============================================================
@@ -292,10 +293,10 @@ with tab_historial:
                 num_ex_target = st.selectbox(
                     "Número de Examen:", [1, 2, 3], key="select_num_ex_target"
                 )
- 
+
             key_target = f"{mod_target}_Examen_{num_ex_target}"
             ex_existente = banco_examenes.get(key_target, {})
- 
+
             titulo_ex = st.text_input(
                 "Título del Examen:",
                 value=ex_existente.get(
@@ -311,7 +312,7 @@ with tab_historial:
                 ),
                 key=f"input_desc_{key_target}",
             )
- 
+
             st.divider()
             if f"num_preg_state_{key_target}" not in st.session_state:
                 st.session_state[f"num_preg_state_{key_target}"] = (
@@ -319,7 +320,7 @@ with tab_historial:
                     if ex_existente.get("preguntas")
                     else 3
                 )
- 
+
             col_p_btn1, col_p_btn2, _ = st.columns([1, 1, 2])
             with col_p_btn1:
                 if st.button("➕ Agregar Pregunta", key=f"btn_add_p_{key_target}"):
@@ -330,10 +331,10 @@ with tab_historial:
                     and st.session_state[f"num_preg_state_{key_target}"] > 1
                 ):
                     st.session_state[f"num_preg_state_{key_target}"] -= 1
- 
+
             total_p = st.session_state[f"num_preg_state_{key_target}"]
             st.info(f"Total de preguntas para este examen: **{total_p}**")
- 
+
             preguntas_recopiladas = []
             for i in range(total_p):
                 st.markdown(f"##### **Pregunta #{i+1}**")
@@ -342,13 +343,13 @@ with tab_historial:
                     if i < len(ex_existente.get("preguntas", []))
                     else {}
                 )
- 
+
                 txt_p = st.text_input(
                     f"Enunciado Pregunta #{i+1}:",
                     value=p_prev.get("pregunta", ""),
                     key=f"input_p_{key_target}_{i}",
                 )
- 
+
                 c_op1, c_op2, c_op3 = st.columns(3)
                 opts = p_prev.get("opciones", ["", "", ""])
                 with c_op1:
@@ -369,7 +370,7 @@ with tab_historial:
                         value=opts[2] if len(opts) > 2 else "",
                         key=f"op3_{key_target}_{i}",
                     )
- 
+
                 opciones_validas = [
                     o for o in [op1, op2, op3] if o.strip() != ""
                 ]
@@ -382,14 +383,14 @@ with tab_historial:
                     ),
                     key=f"cor_{key_target}_{i}",
                 )
- 
+
                 preguntas_recopiladas.append({
                     "pregunta": txt_p,
                     "opciones": [op1, op2, op3],
                     "correcta": correcta,
                 })
                 st.markdown("---")
- 
+
             if st.button(
                 "💾 Guardar Examen Completo",
                 use_container_width=True,
@@ -403,7 +404,7 @@ with tab_historial:
                 guardar_json_local(FILE_BANCO_EXAMENES, banco_examenes)
                 st.success(f"✅ Examen **{key_target}** guardado con éxito.")
                 st.rerun()
- 
+
         # ---------------------------------------------------------
         # PESTAÑA 4: GESTOR DE CANDADOS (ADMIN) — CONECTADO A GOOGLE SHEETS
         # ---------------------------------------------------------
@@ -422,7 +423,7 @@ with tab_historial:
                 .strip()
                 .upper()
             )
- 
+
             if alumno_mat_permiso:
                 permisos_actuales_alumno, simulador_actual_bool = cargar_permisos_sheet(
                     alumno_mat_permiso
@@ -431,7 +432,7 @@ with tab_historial:
                     "#### Configurando Módulos y Herramientas para:"
                     f" `{alumno_mat_permiso}`"
                 )
- 
+
                 with st.form(f"form_permisos_{alumno_mat_permiso}"):
                     nuevos_permisos_modulos = []
                     st.markdown("##### **1. Módulos Teóricos Académicos:**")
@@ -443,7 +444,7 @@ with tab_historial:
                         )
                         if check:
                             nuevos_permisos_modulos.append(m)
- 
+
                     st.markdown("---")
                     st.markdown("##### **2. Herramientas Avanzadas:**")
                     check_sim = st.checkbox(
@@ -451,7 +452,7 @@ with tab_historial:
                         value=simulador_actual_bool,
                         key=f"chk_sim_{alumno_mat_permiso}",
                     )
- 
+
                     if st.form_submit_button(
                         "💾 Guardar Permisos", use_container_width=True
                     ):
@@ -472,7 +473,7 @@ with tab_historial:
                                 "⚠️ No se pudo guardar en Google Sheets:"
                                 f" {error_msg}"
                             )
- 
+
         # ---------------------------------------------------------
         # PESTAÑA 5: REVISIÓN, DICTAMEN Y CARGA DE CERTIFICADO (ADMIN)
         # ---------------------------------------------------------
@@ -480,89 +481,111 @@ with tab_historial:
             st.subheader(
                 "👑 Panel de Dictamen y Carga de Certificados (DIRALEX)"
             )
- 
-            if respuestas_evals:
-                lista_pendientes = [
-                    f"ID: {r['id']} | Alumno: {r['matricula']} | Examen:"
-                    f" {r['key_examen']}"
+
+            # Backfill: asigna un "id" estable a respuestas antiguas que no lo tengan
+            hubo_backfill_id = False
+            for idx_bf, r_bf in enumerate(respuestas_evals):
+                if "id" not in r_bf:
+                    r_bf["id"] = int(datetime.now().timestamp() * 1000) + idx_bf
+                    hubo_backfill_id = True
+            if hubo_backfill_id:
+                guardar_json_local(FILE_RESPUESTAS, respuestas_evals)
+
+            matricula_buscar_dictamen = (
+                st.text_input(
+                    "🔍 Buscar Alumno por Matrícula:",
+                    key="input_buscar_matricula_dictamen",
+                )
+                .strip()
+                .upper()
+            )
+
+            if matricula_buscar_dictamen:
+                examenes_alumno = [
+                    r
                     for r in respuestas_evals
+                    if r.get("matricula", "").upper() == matricula_buscar_dictamen
                 ]
-                sel_dictamen = st.selectbox(
-                    "Selecciona Evaluación a Revisar:",
-                    lista_pendientes,
-                    key="select_eval_dictamen",
-                )
- 
-                id_target = int(
-                    sel_dictamen.split("|")[0].replace("ID:", "").strip()
-                )
-                target_resp = next(
-                    (r for r in respuestas_evals if r["id"] == id_target), None
-                )
- 
-                if target_resp:
+
+                if not examenes_alumno:
+                    st.info(
+                        f"El alumno **{matricula_buscar_dictamen}** no ha"
+                        " presentado ningún examen todavía."
+                    )
+                else:
+                    opciones_examen = [
+                        f"{r.get('key_examen', 'Examen')} — {r.get('fecha', '')}"
+                        for r in examenes_alumno
+                    ]
+                    sel_idx = st.selectbox(
+                        "Selecciona el examen a revisar:",
+                        range(len(opciones_examen)),
+                        format_func=lambda i: opciones_examen[i],
+                        key="select_examen_dictamen",
+                    )
+                    target_resp = examenes_alumno[sel_idx]
+                    id_target = target_resp["id"]
+
                     st.divider()
                     col_d1, col_d2 = st.columns(2)
                     with col_d1:
+                        st.markdown(f"**Alumno:** `{target_resp.get('matricula', '')}`")
+                        st.markdown(f"**Módulo:** {target_resp.get('modulo', '')}")
+                        st.markdown(f"**Examen:** {target_resp.get('key_examen', '')}")
+                        st.markdown(f"**Fecha:** {target_resp.get('fecha', '')}")
                         st.markdown(
-                            f"**Alumno:** `{target_resp['matricula']}`"
+                            f"**Calificación:** {target_resp.get('calificacion', 0)} / 10"
                         )
-                        st.markdown(f"**Examen:** {target_resp['titulo']}")
-                        st.markdown(f"**Fecha:** {target_resp['fecha']}")
-                        st.markdown(
-                            "**Puntaje Teórico:**"
-                            f" {target_resp['score_teorico']} pts"
-                        )
-                        if target_resp["link_tv"]:
+                        if target_resp.get("evidencia_tv"):
                             st.markdown(
-                                f"🔗 [Abrir Gráfico TradingView]({target_resp['link_tv']})"
+                                "🔗"
+                                f" [Abrir Gráfico TradingView]({target_resp['evidencia_tv']})"
                             )
                         st.text_area(
                             "Justificación del Alumno:",
-                            value=target_resp["justificacion"],
+                            value=target_resp.get("justificacion", ""),
                             disabled=True,
                             key=f"txt_just_admin_{id_target}",
                         )
- 
+
                     with col_d2:
                         with st.form(f"form_dictamen_admin_{id_target}"):
+                            estatus_opciones = [
+                                "🟢 Aprobado",
+                                "🟡 A revisión en vivo",
+                                "🔴 No aprobado / No presentado",
+                            ]
+                            estatus_actual = target_resp.get("estatus", "")
+                            index_estatus = 0
+                            if "revisión" in estatus_actual:
+                                index_estatus = 1
+                            elif "No aprobado" in estatus_actual:
+                                index_estatus = 2
+
                             e_dictamen = st.selectbox(
                                 "Asignar Estatus Académico:",
-                                [
-                                    "🟢 Aprobado",
-                                    "🟡 A revisión en vivo",
-                                    "🔴 No aprobado / No presentado",
-                                ],
-                                index=(
-                                    0
-                                    if "Aprobado" in target_resp["estatus"]
-                                    else (
-                                        1
-                                        if "revisión"
-                                        in target_resp["estatus"]
-                                        else 2
-                                    )
-                                ),
+                                estatus_opciones,
+                                index=index_estatus,
                                 key=f"sel_estatus_admin_{id_target}",
                             )
- 
+
                             obs_dictamen = st.text_area(
                                 "Observaciones del Mentor / Coordinación:",
-                                value=target_resp["observaciones_director"],
+                                value=target_resp.get("observaciones_director", ""),
                                 key=f"txt_obs_admin_{id_target}",
                             )
- 
+
                             st.markdown("---")
                             st.markdown(
                                 "📜 **Adjuntar Reconocimiento Oficial (PDF, PNG,"
-                                " JPG):**"
+                                " JPG) — solo si el estatus es Aprobado:**"
                             )
                             up_cert = st.file_uploader(
                                 "Sube el certificado emitido para este alumno:",
                                 type=["pdf", "png", "jpg", "jpeg"],
                                 key=f"file_cert_admin_{id_target}",
                             )
- 
+
                             if st.form_submit_button(
                                 "💾 Guardar Dictamen y Certificado",
                                 use_container_width=True,
@@ -570,50 +593,105 @@ with tab_historial:
                                 file_cert_name = target_resp.get(
                                     "archivo_certificados", None
                                 )
- 
+
                                 if up_cert is not None:
                                     ext_cert = up_cert.name.split(".")[-1]
                                     file_cert_name = (
-                                        f"Certificado_{target_resp['matricula']}_{target_resp['key_examen']}.{ext_cert}"
+                                        f"Certificado_{target_resp.get('matricula','')}_{target_resp.get('key_examen','examen')}.{ext_cert}"
                                     )
                                     path_save_cert = os.path.join(
                                         FOLDER_CERTIFICADOS, file_cert_name
                                     )
                                     with open(path_save_cert, "wb") as f_out:
                                         f_out.write(up_cert.getbuffer())
- 
-                                for idx, r in enumerate(respuestas_evals):
-                                    if r["id"] == id_target:
-                                        respuestas_evals[idx]["estatus"] = (
-                                            e_dictamen
-                                        )
-                                        respuestas_evals[idx][
-                                            "observaciones_director"
-                                        ] = obs_dictamen
-                                        respuestas_evals[idx][
-                                            "archivo_certificados"
-                                        ] = file_cert_name
+
+                                for r in respuestas_evals:
+                                    if r.get("id") == id_target:
+                                        r["estatus"] = e_dictamen
+                                        r["observaciones_director"] = obs_dictamen
+                                        r["archivo_certificados"] = file_cert_name
                                         break
- 
+
                                 guardar_json_local(
                                     FILE_RESPUESTAS, respuestas_evals
                                 )
-                                st.success(
+                                st.toast(
                                     "✅ Dictamen y Reconocimiento Oficial"
-                                    " guardados exitosamente."
+                                    " guardados exitosamente.",
+                                    icon="✅",
                                 )
                                 st.rerun()
             else:
-                st.info("💡 No hay evaluaciones pendientes registradas.")
- 
+                st.info(
+                    "Escribe la matrícula de un alumno arriba para ver y"
+                    " calificar sus exámenes presentados."
+                )
+
         # ---------------------------------------------------------
         # PESTAÑA 6: ARCHIVOS Y EXCEL (ADMIN)
         # ---------------------------------------------------------
         with tab_archivos:
             st.subheader("📁 Archivos y Reportes Generales")
- 
+
+            st.markdown("#### **1. Subir Documento a un Alumno Específico**")
+            matricula_archivo = (
+                st.text_input(
+                    "🔍 Matrícula del Alumno:", key="input_matricula_archivo"
+                )
+                .strip()
+                .upper()
+            )
+
+            if matricula_archivo:
+                carpeta_alumno = os.path.join(
+                    FOLDER_EXCEL_UPLOADS, matricula_archivo
+                )
+                if not os.path.exists(carpeta_alumno):
+                    os.makedirs(carpeta_alumno)
+
+                archivo_alumno = st.file_uploader(
+                    f"Selecciona un archivo para **{matricula_archivo}** (Excel,"
+                    " PDF, Word, imagen):",
+                    type=["xlsx", "xls", "pdf", "docx", "png", "jpg", "jpeg"],
+                    key=f"uploader_archivo_alumno_{matricula_archivo}",
+                )
+                if archivo_alumno is not None:
+                    ruta_guardado = os.path.join(
+                        carpeta_alumno, archivo_alumno.name
+                    )
+                    with open(ruta_guardado, "wb") as f:
+                        f.write(archivo_alumno.getbuffer())
+                    st.success(
+                        f"✅ Archivo **{archivo_alumno.name}** subido para"
+                        f" **{matricula_archivo}**."
+                    )
+
+                archivos_existentes = (
+                    os.listdir(carpeta_alumno)
+                    if os.path.exists(carpeta_alumno)
+                    else []
+                )
+                if archivos_existentes:
+                    st.caption(f"Archivos actuales de {matricula_archivo}:")
+                    for nombre_archivo in archivos_existentes:
+                        ruta_archivo = os.path.join(carpeta_alumno, nombre_archivo)
+                        with open(ruta_archivo, "rb") as f_read:
+                            st.download_button(
+                                f"⬇️ {nombre_archivo}",
+                                data=f_read.read(),
+                                file_name=nombre_archivo,
+                                key=f"download_{matricula_archivo}_{nombre_archivo}",
+                            )
+            else:
+                st.info(
+                    "Escribe una matrícula arriba para subir o revisar los"
+                    " archivos de ese alumno."
+                )
+
+            st.divider()
             st.markdown(
-                "#### **1. Subir Archivo Excel / Hoja de Retroalimentación**"
+                "#### **2. Subir Archivo General (visible para todos los"
+                " alumnos)**"
             )
             uploaded_excel = st.file_uploader(
                 "Selecciona un archivo Excel (.xlsx) para ponerlo a disposición"
@@ -631,9 +709,9 @@ with tab_historial:
                     f"✅ Archivo **{uploaded_excel.name}** subido"
                     " correctamente."
                 )
- 
+
             st.divider()
-            st.markdown("#### **2. Exportar Respuestas de Exámenes a Excel**")
+            st.markdown("#### **3. Exportar Respuestas de Exámenes a Excel**")
             if respuestas_evals:
                 df_exp = pd.DataFrame(respuestas_evals)
                 buffer_excel = io.BytesIO()
@@ -643,7 +721,7 @@ with tab_historial:
                     df_exp.to_excel(
                         writer, index=False, sheet_name="Evaluaciones"
                     )
- 
+
                 st.download_button(
                     label="📊 Descargar Historial Completo (.xlsx)",
                     data=buffer_excel.getvalue(),
@@ -657,6 +735,5 @@ with tab_historial:
                     use_container_width=True,
                     key="btn_export_excel_admin",
                 )
- 
+
     st.caption("© ALEMA Trading Academy. Reservados todos los derechos.")
- 
