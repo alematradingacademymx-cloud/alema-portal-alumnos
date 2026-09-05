@@ -1,4 +1,5 @@
 from datetime import datetime
+import base64
 import io
 import json
 import os
@@ -16,16 +17,55 @@ LISTA_MODULOS = [
     "Práctico",
 ]
 
-# Rutas de almacenamiento local (solo para banco de exámenes y respuestas, no para permisos)
+# Rutas de almacenamiento local (solo para banco de exámenes, respuestas y subida general de excel)
 FILE_BANCO_EXAMENES = "bd_banco_examenes.json"
 FILE_RESPUESTAS = "bd_respuestas_evaluaciones.json"
 FOLDER_EXCEL_UPLOADS = "archivos_excel_evaluaciones"
-FOLDER_CERTIFICADOS = "certificados_oficiales"
 
 SHEET_ID_USUARIOS = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
 URL_USUARIOS_CSV = (
     f"https://docs.google.com/spreadsheets/d/{SHEET_ID_USUARIOS}/export?format=csv&gid=0"
 )
+URL_ARCHIVOS_ALUMNOS_CSV = (
+    f"https://docs.google.com/spreadsheets/d/{SHEET_ID_USUARIOS}/gviz/tq?tqx=out:csv&sheet=Archivos_Alumnos"
+)
+
+
+def subir_archivo_drive(matricula, nombre_archivo, contenido_bytes, tipo_mime, categoria="Documento"):
+    """Sube un archivo a Drive (vía Apps Script) y registra la referencia en Sheets."""
+    try:
+        contenido_b64 = base64.b64encode(contenido_bytes).decode("utf-8")
+        payload = {
+            "token": st.secrets["APPS_SCRIPT_TOKEN"],
+            "accion": "subir_archivo",
+            "matricula": matricula,
+            "nombre_archivo": nombre_archivo,
+            "tipo_mime": tipo_mime,
+            "categoria": categoria,
+            "archivo_base64": contenido_b64,
+        }
+        resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=30)
+        data = resp.json()
+        if data.get("success"):
+            return True, data.get("url", "")
+        return False, data.get("error", "Error desconocido")
+    except Exception as e:
+        return False, str(e)
+
+
+@st.cache_data(ttl=10)
+def cargar_archivos_alumno(matricula_target):
+    """Lee la pestaña Archivos_Alumnos y filtra por matrícula."""
+    try:
+        df = pd.read_csv(URL_ARCHIVOS_ALUMNOS_CSV, dtype=str)
+        df.columns = df.columns.str.strip()
+        filtro = df[
+            df["Matricula"].astype(str).str.strip().str.upper()
+            == str(matricula_target).strip().upper()
+        ]
+        return filtro.to_dict("records")
+    except Exception:
+        return []
 
 
 # --- FUNCIONES DE PERSISTENCIA JSON (banco de exámenes / respuestas) ---
@@ -116,9 +156,8 @@ es_admin = (
 )
 
 # Crear carpetas si no existen
-for folder in [FOLDER_EXCEL_UPLOADS, FOLDER_CERTIFICADOS]:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+if not os.path.exists(FOLDER_EXCEL_UPLOADS):
+    os.makedirs(FOLDER_EXCEL_UPLOADS)
 
 banco_examenes = cargar_json_local(FILE_BANCO_EXAMENES, {})
 respuestas_evals = cargar_json_local(FILE_RESPUESTAS, [])
@@ -547,6 +586,11 @@ with tab_historial:
                             disabled=True,
                             key=f"txt_just_admin_{id_target}",
                         )
+                        if target_resp.get("archivo_certificados"):
+                            st.markdown(
+                                "📜"
+                                f" [Ver certificado ya cargado]({target_resp['archivo_certificados']})"
+                            )
 
                     with col_d2:
                         with st.form(f"form_dictamen_admin_{id_target}"):
@@ -593,34 +637,50 @@ with tab_historial:
                                 file_cert_name = target_resp.get(
                                     "archivo_certificados", None
                                 )
+                                error_subida_cert = None
 
                                 if up_cert is not None:
                                     ext_cert = up_cert.name.split(".")[-1]
-                                    file_cert_name = (
+                                    nombre_cert = (
                                         f"Certificado_{target_resp.get('matricula','')}_{target_resp.get('key_examen','examen')}.{ext_cert}"
                                     )
-                                    path_save_cert = os.path.join(
-                                        FOLDER_CERTIFICADOS, file_cert_name
+                                    exito_cert, resultado_cert = subir_archivo_drive(
+                                        target_resp.get("matricula", ""),
+                                        nombre_cert,
+                                        up_cert.getbuffer(),
+                                        up_cert.type or "application/octet-stream",
+                                        categoria="Certificado",
                                     )
-                                    with open(path_save_cert, "wb") as f_out:
-                                        f_out.write(up_cert.getbuffer())
+                                    if exito_cert:
+                                        file_cert_name = resultado_cert
+                                    else:
+                                        error_subida_cert = resultado_cert
 
-                                for r in respuestas_evals:
-                                    if r.get("id") == id_target:
-                                        r["estatus"] = e_dictamen
-                                        r["observaciones_director"] = obs_dictamen
-                                        r["archivo_certificados"] = file_cert_name
-                                        break
+                                if error_subida_cert:
+                                    st.error(
+                                        "⚠️ No se pudo subir el certificado a"
+                                        f" Drive: {error_subida_cert}. El resto"
+                                        " del dictamen no se guardó, intenta de"
+                                        " nuevo."
+                                    )
+                                else:
+                                    for r in respuestas_evals:
+                                        if r.get("id") == id_target:
+                                            r["estatus"] = e_dictamen
+                                            r["observaciones_director"] = obs_dictamen
+                                            r["archivo_certificados"] = file_cert_name
+                                            break
 
-                                guardar_json_local(
-                                    FILE_RESPUESTAS, respuestas_evals
-                                )
-                                st.toast(
-                                    "✅ Dictamen y Reconocimiento Oficial"
-                                    " guardados exitosamente.",
-                                    icon="✅",
-                                )
-                                st.rerun()
+                                    guardar_json_local(
+                                        FILE_RESPUESTAS, respuestas_evals
+                                    )
+                                    st.cache_data.clear()
+                                    st.toast(
+                                        "✅ Dictamen y Reconocimiento Oficial"
+                                        " guardados exitosamente.",
+                                        icon="✅",
+                                    )
+                                    st.rerun()
             else:
                 st.info(
                     "Escribe la matrícula de un alumno arriba para ver y"
@@ -643,12 +703,6 @@ with tab_historial:
             )
 
             if matricula_archivo:
-                carpeta_alumno = os.path.join(
-                    FOLDER_EXCEL_UPLOADS, matricula_archivo
-                )
-                if not os.path.exists(carpeta_alumno):
-                    os.makedirs(carpeta_alumno)
-
                 archivo_alumno = st.file_uploader(
                     f"Selecciona un archivo para **{matricula_archivo}** (Excel,"
                     " PDF, Word, imagen):",
@@ -656,32 +710,37 @@ with tab_historial:
                     key=f"uploader_archivo_alumno_{matricula_archivo}",
                 )
                 if archivo_alumno is not None:
-                    ruta_guardado = os.path.join(
-                        carpeta_alumno, archivo_alumno.name
-                    )
-                    with open(ruta_guardado, "wb") as f:
-                        f.write(archivo_alumno.getbuffer())
-                    st.success(
-                        f"✅ Archivo **{archivo_alumno.name}** subido para"
-                        f" **{matricula_archivo}**."
-                    )
+                    if st.button(
+                        "⬆️ Subir a Drive",
+                        key=f"btn_subir_drive_{matricula_archivo}",
+                    ):
+                        exito_up, resultado_up = subir_archivo_drive(
+                            matricula_archivo,
+                            archivo_alumno.name,
+                            archivo_alumno.getbuffer(),
+                            archivo_alumno.type or "application/octet-stream",
+                            categoria="Documento",
+                        )
+                        if exito_up:
+                            st.cache_data.clear()
+                            st.toast(
+                                f"✅ Archivo subido para {matricula_archivo}.",
+                                icon="✅",
+                            )
+                            st.rerun()
+                        else:
+                            st.error(f"⚠️ No se pudo subir el archivo: {resultado_up}")
 
-                archivos_existentes = (
-                    os.listdir(carpeta_alumno)
-                    if os.path.exists(carpeta_alumno)
-                    else []
-                )
+                archivos_existentes = cargar_archivos_alumno(matricula_archivo)
                 if archivos_existentes:
                     st.caption(f"Archivos actuales de {matricula_archivo}:")
-                    for nombre_archivo in archivos_existentes:
-                        ruta_archivo = os.path.join(carpeta_alumno, nombre_archivo)
-                        with open(ruta_archivo, "rb") as f_read:
-                            st.download_button(
-                                f"⬇️ {nombre_archivo}",
-                                data=f_read.read(),
-                                file_name=nombre_archivo,
-                                key=f"download_{matricula_archivo}_{nombre_archivo}",
-                            )
+                    for archivo_reg in archivos_existentes:
+                        st.markdown(
+                            f"📄 [{archivo_reg.get('Nombre_Archivo', 'archivo')}]"
+                            f"({archivo_reg.get('URL_Drive', '#')}) —"
+                            f" _{archivo_reg.get('Categoria', '')}_,"
+                            f" {archivo_reg.get('Fecha', '')}"
+                        )
             else:
                 st.info(
                     "Escribe una matrícula arriba para subir o revisar los"
