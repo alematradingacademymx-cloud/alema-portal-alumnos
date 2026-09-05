@@ -3,6 +3,7 @@ import io
 import json
 import os
 import pandas as pd
+import requests
 import streamlit as st
 
 # Módulos oficiales de la academia
@@ -15,15 +16,19 @@ LISTA_MODULOS = [
     "Práctico",
 ]
 
-# Rutas de almacenamiento local
+# Rutas de almacenamiento local (solo para banco de exámenes y respuestas, no para permisos)
 FILE_BANCO_EXAMENES = "bd_banco_examenes.json"
-FILE_DESBLOQUEOS = "bd_desbloqueos_alumnos.json"
 FILE_RESPUESTAS = "bd_respuestas_evaluaciones.json"
 FOLDER_EXCEL_UPLOADS = "archivos_excel_evaluaciones"
 FOLDER_CERTIFICADOS = "certificados_oficiales"
 
+SHEET_ID_USUARIOS = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
+URL_USUARIOS_CSV = (
+    f"https://docs.google.com/spreadsheets/d/{SHEET_ID_USUARIOS}/export?format=csv&gid=0"
+)
 
-# --- FUNCIONES DE PERSISTENCIA JSON ---
+
+# --- FUNCIONES DE PERSISTENCIA JSON (banco de exámenes / respuestas) ---
 def cargar_json_local(filepath, default):
     if os.path.exists(filepath):
         try:
@@ -37,6 +42,57 @@ def cargar_json_local(filepath, default):
 def guardar_json_local(filepath, data):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+# --- PERMISOS (CANDADOS): LECTURA DESDE GOOGLE SHEETS ---
+@st.cache_data(ttl=10)
+def cargar_permisos_sheet(matricula_target):
+    """Lee Modulos_Habilitados y Simulador_Habilitado de la pestaña Usuarios."""
+    modulos_desbloqueados = []
+    simulador_habilitado = False
+    try:
+        df = pd.read_csv(URL_USUARIOS_CSV)
+        df.columns = df.columns.str.strip()
+
+        filtro = df[
+            df["Matricula"].astype(str).str.strip().str.upper()
+            == str(matricula_target).strip().upper()
+        ]
+        if not filtro.empty:
+            val_mod = str(filtro["Modulos_Habilitados"].values[0]).strip()
+            if val_mod and val_mod.lower() != "nan":
+                if val_mod == "Completo":
+                    modulos_desbloqueados = LISTA_MODULOS.copy()
+                else:
+                    modulos_desbloqueados = [
+                        m.strip() for m in val_mod.split(",") if m.strip()
+                    ]
+
+            val_sim = str(filtro["Simulador_Habilitado"].values[0]).strip().upper()
+            simulador_habilitado = val_sim == "SI"
+    except Exception:
+        pass
+
+    if not modulos_desbloqueados:
+        modulos_desbloqueados = ["Básico"]
+
+    return modulos_desbloqueados, simulador_habilitado
+
+
+def actualizar_permisos_sheet(matricula, modulos_habilitados_str, simulador_habilitado_bool):
+    """Envía la actualización de permisos al Apps Script (Web App) conectado al Sheet."""
+    try:
+        payload = {
+            "token": st.secrets["APPS_SCRIPT_TOKEN"],
+            "matricula": matricula,
+            "modulos_habilitados": modulos_habilitados_str,
+            "simulador_habilitado": "SI" if simulador_habilitado_bool else "NO",
+        }
+        resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=10)
+        data = resp.json()
+        return data.get("success", False), data.get("error", "")
+    except Exception as e:
+        return False, str(e)
 
 
 # ==========================================
@@ -62,13 +118,7 @@ for folder in [FOLDER_EXCEL_UPLOADS, FOLDER_CERTIFICADOS]:
         os.makedirs(folder)
 
 banco_examenes = cargar_json_local(FILE_BANCO_EXAMENES, {})
-permisos_alumnos = cargar_json_local(FILE_DESBLOQUEOS, {})
 respuestas_evals = cargar_json_local(FILE_RESPUESTAS, [])
-
-# Permiso inicial por defecto para alumnos nuevos
-if usuario_actual not in permisos_alumnos:
-    permisos_alumnos[usuario_actual] = ["Básico"]
-    guardar_json_local(FILE_DESBLOQUEOS, permisos_alumnos)
 
 # --- PESTAÑAS DE NAVEGACIÓN AISLADAS SEGÚN ROL ---
 if es_admin:
@@ -102,9 +152,7 @@ with tab_alumnos:
         " programados."
     )
 
-    modulos_desbloqueados = permisos_alumnos.get(
-        usuario_actual, ["Básico"]
-    )
+    modulos_desbloqueados, _ = cargar_permisos_sheet(usuario_actual)
 
     for modulo in LISTA_MODULOS:
         esta_desbloqueado = modulo in modulos_desbloqueados
@@ -354,10 +402,14 @@ with tab_historial:
                 st.rerun()
 
         # ---------------------------------------------------------
-        # PESTAÑA 4: GESTOR DE CANDADOS (ADMIN)
+        # PESTAÑA 4: GESTOR DE CANDADOS (ADMIN) — CONECTADO A GOOGLE SHEETS
         # ---------------------------------------------------------
         with tab_permisos:
             st.subheader("🔓 Gestor de Candados por Alumno")
+            st.caption(
+                "Los cambios se guardan directo en la base de datos de Google"
+                " Sheets — persisten aunque el servidor se reinicie."
+            )
             alumno_mat_permiso = (
                 st.text_input(
                     "Matrícula del Alumno:",
@@ -369,8 +421,8 @@ with tab_historial:
             )
 
             if alumno_mat_permiso:
-                permisos_actuales_alumno = permisos_alumnos.get(
-                    alumno_mat_permiso, ["Básico"]
+                permisos_actuales_alumno, simulador_actual_bool = cargar_permisos_sheet(
+                    alumno_mat_permiso
                 )
                 st.markdown(
                     "#### Configurando Módulos y Herramientas para:"
@@ -378,7 +430,7 @@ with tab_historial:
                 )
 
                 with st.form(f"form_permisos_{alumno_mat_permiso}"):
-                    nuevos_permisos = []
+                    nuevos_permisos_modulos = []
                     st.markdown("##### **1. Módulos Teóricos Académicos:**")
                     for m in LISTA_MODULOS:
                         check = st.checkbox(
@@ -387,33 +439,36 @@ with tab_historial:
                             key=f"chk_perm_{alumno_mat_permiso}_{m}",
                         )
                         if check:
-                            nuevos_permisos.append(m)
+                            nuevos_permisos_modulos.append(m)
 
                     st.markdown("---")
                     st.markdown("##### **2. Herramientas Avanzadas:**")
                     check_sim = st.checkbox(
                         "🚀 Habilitar Acceso al Simulador Institucional",
-                        value=(
-                            "Simulador Institucional"
-                            in permisos_actuales_alumno
-                        ),
+                        value=simulador_actual_bool,
                         key=f"chk_sim_{alumno_mat_permiso}",
                     )
-                    if check_sim:
-                        nuevos_permisos.append("Simulador Institucional")
 
                     if st.form_submit_button(
                         "💾 Guardar Permisos", use_container_width=True
                     ):
-                        permisos_alumnos[alumno_mat_permiso] = nuevos_permisos
-                        guardar_json_local(
-                            FILE_DESBLOQUEOS, permisos_alumnos
+                        exito, error_msg = actualizar_permisos_sheet(
+                            alumno_mat_permiso,
+                            ",".join(nuevos_permisos_modulos),
+                            check_sim,
                         )
-                        st.success(
-                            "✅ Permisos actualizados para"
-                            f" **{alumno_mat_permiso}**."
-                        )
-                        st.rerun()
+                        if exito:
+                            st.cache_data.clear()
+                            st.toast(
+                                f"✅ Permisos actualizados para {alumno_mat_permiso}.",
+                                icon="✅",
+                            )
+                            st.rerun()
+                        else:
+                            st.error(
+                                "⚠️ No se pudo guardar en Google Sheets:"
+                                f" {error_msg}"
+                            )
 
         # ---------------------------------------------------------
         # PESTAÑA 5: REVISIÓN, DICTAMEN Y CARGA DE CERTIFICADO (ADMIN)
