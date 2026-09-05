@@ -1,4 +1,5 @@
 import json
+import json
 import os
 import time
 from datetime import datetime, timedelta
@@ -38,6 +39,7 @@ def guardar_datos_json(archivo, datos):
 def obtener_datos_usuario_desde_sheets(usuario_target):
     capital_defecto = 300.00
     nivel_defecto = "Nivel 1"
+    simulador_habilitado = False
     try:
         sheet_url = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=0"
         df = pd.read_csv(sheet_url)
@@ -67,6 +69,9 @@ def obtener_datos_usuario_desde_sheets(usuario_target):
             ),
             None,
         )
+        col_simulador = next(
+            (c for c in df.columns if "simulador" in c.lower()), None
+        )
 
         if col_user:
             filtro = df[
@@ -86,9 +91,12 @@ def obtener_datos_usuario_desde_sheets(usuario_target):
                     val_chal = str(filtro[col_challenge].values[0]).strip()
                     if val_chal and val_chal.lower() != "nan":
                         nivel_defecto = val_chal
+                if col_simulador:
+                    val_sim = str(filtro[col_simulador].values[0]).strip().upper()
+                    simulador_habilitado = val_sim == "SI"
     except Exception:
         pass
-    return capital_defecto, nivel_defecto
+    return capital_defecto, nivel_defecto, simulador_habilitado
 
 
 def calcular_pnl_institucional(activo, tipo, entrada, salida, lotes):
@@ -132,14 +140,12 @@ def render_simulador_alema_live():
         "nombre_usuario", st.session_state.get("usuario_actual", "DIRALEX")
     )
 
-    # --- VERIFICACIÓN DE CANDADO / PERMISOS INSTITUCIONALES ---
-    bd_desbloqueos = cargar_datos_json("bd_desbloqueos_alumnos.json", {})
-    permisos_usuario = bd_desbloqueos.get(usuario, ["Básico"])
+    # --- VERIFICACIÓN DE CANDADO DESDE GOOGLE SHEETS (columna Simulador_Habilitado) ---
+    capital_base_sheets, nivel_challenge_sheets, simulador_habilitado_sheet = (
+        obtener_datos_usuario_desde_sheets(usuario)
+    )
 
-    if (
-        usuario.upper() != "DIRALEX"
-        and "Simulador Institucional" not in permisos_usuario
-    ):
+    if usuario.upper() != "DIRALEX" and not simulador_habilitado_sheet:
         st.warning("🔒 **Acceso Restringido al Simulador Institucional**")
         st.info(
             "Esta herramienta requiere autorización de Dirección General o"
@@ -162,10 +168,7 @@ def render_simulador_alema_live():
         ARCH_PERSISTENCIA_HISTORIAL, []
     )
 
-    # CÁLCULO DINÁMICO DEL BALANCE Y ASIGNACIÓN DE NIVEL DE CHALLENGE
-    capital_base_sheets, nivel_challenge_sheets = (
-        obtener_datos_usuario_desde_sheets(usuario)
-    )
+    # CÁLCULO DINÁMICO DEL BALANCE (capital_base_sheets y nivel_challenge_sheets ya obtenidos arriba)
     pnl_acumulado_historico = sum(
         float(trade.get("Beneficio", 0.0))
         for trade in st.session_state.historial_cerradas
