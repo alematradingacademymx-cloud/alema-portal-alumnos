@@ -78,6 +78,16 @@ def guardar_examen_sheet(key_examen, titulo, descripcion, preguntas):
         return False, str(e)
 
 
+def _limpiar_valor(val):
+    """Convierte NaN de pandas (celdas vacías) en cadena vacía real."""
+    try:
+        if val is None or pd.isna(val):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    return str(val).strip()
+
+
 @st.cache_data(ttl=10)
 def cargar_respuestas_examenes():
     """Lee la pestaña Respuestas_Examenes y arma la lista de respuestas."""
@@ -86,30 +96,32 @@ def cargar_respuestas_examenes():
         df = pd.read_csv(URL_RESPUESTAS_CSV, dtype=str)
         df.columns = df.columns.str.strip()
         for _, row in df.iterrows():
-            id_val = str(row.get("ID", "")).strip()
-            if not id_val or id_val.lower() == "nan":
+            id_val = _limpiar_valor(row.get("ID", ""))
+            if not id_val:
                 continue
             try:
-                respuestas_dict = json.loads(row.get("Respuestas_JSON", "{}") or "{}")
+                respuestas_dict = json.loads(
+                    _limpiar_valor(row.get("Respuestas_JSON", "")) or "{}"
+                )
             except Exception:
                 respuestas_dict = {}
             try:
-                calificacion_val = float(row.get("Calificacion", 0) or 0)
+                calificacion_val = float(_limpiar_valor(row.get("Calificacion", "0")) or 0)
             except Exception:
                 calificacion_val = 0.0
             respuestas.append({
                 "id": id_val,
-                "matricula": row.get("Matricula", ""),
-                "key_examen": row.get("Key_Examen", ""),
-                "modulo": row.get("Modulo", ""),
-                "fecha": row.get("Fecha", ""),
+                "matricula": _limpiar_valor(row.get("Matricula", "")),
+                "key_examen": _limpiar_valor(row.get("Key_Examen", "")),
+                "modulo": _limpiar_valor(row.get("Modulo", "")),
+                "fecha": _limpiar_valor(row.get("Fecha", "")),
                 "calificacion": calificacion_val,
-                "evidencia_tv": row.get("Evidencia_TV", ""),
-                "justificacion": row.get("Justificacion", ""),
+                "evidencia_tv": _limpiar_valor(row.get("Evidencia_TV", "")),
+                "justificacion": _limpiar_valor(row.get("Justificacion", "")),
                 "respuestas": respuestas_dict,
-                "estatus": row.get("Estatus", ""),
-                "observaciones_director": row.get("Observaciones_Director", ""),
-                "archivo_certificados": row.get("Archivo_Certificados", ""),
+                "estatus": _limpiar_valor(row.get("Estatus", "")),
+                "observaciones_director": _limpiar_valor(row.get("Observaciones_Director", "")),
+                "archivo_certificados": _limpiar_valor(row.get("Archivo_Certificados", "")),
             })
     except Exception:
         pass
@@ -450,7 +462,7 @@ with tab_historial:
                 )
                 st.markdown(
                     "**Estatus:**"
-                    f" {examen.get('estatus', '⏳ Pendiente de revisión')}"
+                    f" {examen.get('estatus') or '⏳ Pendiente de revisión'}"
                 )
                 if examen.get("observaciones_director"):
                     st.markdown(
