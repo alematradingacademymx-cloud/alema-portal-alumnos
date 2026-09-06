@@ -47,10 +47,17 @@ def subir_archivo_drive(matricula, nombre_archivo, contenido_bytes, tipo_mime, c
         resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=30)
         data = resp.json()
         if data.get("success"):
-            return True, data.get("url", "")
-        return False, data.get("error", "Error desconocido")
+            return True, construir_url_descarga(data.get("file_id", "")), None
+        return False, None, data.get("error", "Error desconocido")
     except Exception as e:
-        return False, str(e)
+        return False, None, str(e)
+
+
+def construir_url_descarga(file_id):
+    """Link que descarga el archivo vía el propio Apps Script, sin depender del sharing de Drive."""
+    if not file_id:
+        return None
+    return f"{st.secrets['APPS_SCRIPT_URL']}?file_id={file_id}"
 
 
 @st.cache_data(ttl=10)
@@ -307,10 +314,30 @@ with tab_alumnos:
 # =============================================================
 with tab_historial:
     st.subheader("📊 Historial de Calificaciones")
-    mis_examenes = [r for r in respuestas_evals if r["matricula"].upper() == usuario_actual.upper()]
+    mis_examenes = [r for r in respuestas_evals if r.get("matricula", "").upper() == usuario_actual.upper()]
     if mis_examenes:
-        df_historial = pd.DataFrame(mis_examenes)
-        st.dataframe(df_historial[["fecha", "modulo", "key_examen", "calificacion"]], use_container_width=True)
+        for examen in mis_examenes:
+            with st.expander(
+                f"{examen.get('key_examen', 'Examen')} —"
+                f" {examen.get('fecha', '')}"
+            ):
+                st.markdown(f"**Módulo:** {examen.get('modulo', '')}")
+                st.markdown(
+                    f"**Calificación:** {examen.get('calificacion', 0)} / 10"
+                )
+                st.markdown(
+                    "**Estatus:**"
+                    f" {examen.get('estatus', '⏳ Pendiente de revisión')}"
+                )
+                if examen.get("observaciones_director"):
+                    st.markdown(
+                        f"**Observaciones:** {examen['observaciones_director']}"
+                    )
+                if examen.get("archivo_certificados"):
+                    st.markdown(
+                        "📜"
+                        f" [Descargar tu Reconocimiento Oficial]({examen['archivo_certificados']})"
+                    )
     else:
         st.info("💡 Aún no has presentado ninguna evaluación en esta cuenta.")
 
@@ -644,7 +671,7 @@ with tab_historial:
                                     nombre_cert = (
                                         f"Certificado_{target_resp.get('matricula','')}_{target_resp.get('key_examen','examen')}.{ext_cert}"
                                     )
-                                    exito_cert, resultado_cert = subir_archivo_drive(
+                                    exito_cert, url_cert, error_cert = subir_archivo_drive(
                                         target_resp.get("matricula", ""),
                                         nombre_cert,
                                         up_cert.getbuffer(),
@@ -652,9 +679,9 @@ with tab_historial:
                                         categoria="Certificado",
                                     )
                                     if exito_cert:
-                                        file_cert_name = resultado_cert
+                                        file_cert_name = url_cert
                                     else:
-                                        error_subida_cert = resultado_cert
+                                        error_subida_cert = error_cert
 
                                 if error_subida_cert:
                                     st.error(
@@ -714,7 +741,7 @@ with tab_historial:
                         "⬆️ Subir a Drive",
                         key=f"btn_subir_drive_{matricula_archivo}",
                     ):
-                        exito_up, resultado_up = subir_archivo_drive(
+                        exito_up, url_up, error_up = subir_archivo_drive(
                             matricula_archivo,
                             archivo_alumno.name,
                             archivo_alumno.getbuffer(),
@@ -729,15 +756,18 @@ with tab_historial:
                             )
                             st.rerun()
                         else:
-                            st.error(f"⚠️ No se pudo subir el archivo: {resultado_up}")
+                            st.error(f"⚠️ No se pudo subir el archivo: {error_up}")
 
                 archivos_existentes = cargar_archivos_alumno(matricula_archivo)
                 if archivos_existentes:
                     st.caption(f"Archivos actuales de {matricula_archivo}:")
                     for archivo_reg in archivos_existentes:
+                        url_desc = construir_url_descarga(
+                            archivo_reg.get("File_ID")
+                        ) or archivo_reg.get("URL_Drive", "#")
                         st.markdown(
                             f"📄 [{archivo_reg.get('Nombre_Archivo', 'archivo')}]"
-                            f"({archivo_reg.get('URL_Drive', '#')}) —"
+                            f"({url_desc}) —"
                             f" _{archivo_reg.get('Categoria', '')}_,"
                             f" {archivo_reg.get('Fecha', '')}"
                         )
