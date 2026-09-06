@@ -109,6 +109,10 @@ def cargar_respuestas_examenes():
                 calificacion_val = float(_limpiar_valor(row.get("Calificacion", "0")) or 0)
             except Exception:
                 calificacion_val = 0.0
+            preguntas_evaluadas = [
+                _limpiar_valor(row.get(f"Pregunta_{p}", ""))
+                for p in range(1, 16)
+            ]
             respuestas.append({
                 "id": id_val,
                 "matricula": _limpiar_valor(row.get("Matricula", "")),
@@ -122,6 +126,8 @@ def cargar_respuestas_examenes():
                 "estatus": _limpiar_valor(row.get("Estatus", "")),
                 "observaciones_director": _limpiar_valor(row.get("Observaciones_Director", "")),
                 "archivo_certificados": _limpiar_valor(row.get("Archivo_Certificados", "")),
+                "archivo_comentarios": _limpiar_valor(row.get("Archivo_Comentarios", "")),
+                "preguntas_evaluadas": preguntas_evaluadas,
             })
     except Exception:
         pass
@@ -145,6 +151,7 @@ def guardar_respuesta_sheet(respuesta_dict):
             "respuestas_json": json.dumps(
                 respuesta_dict.get("respuestas", {}), ensure_ascii=False
             ),
+            "respuestas_evaluadas": respuesta_dict.get("respuestas_evaluadas", []),
         }
         resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=15)
         data = resp.json()
@@ -153,8 +160,8 @@ def guardar_respuesta_sheet(respuesta_dict):
         return False, str(e)
 
 
-def actualizar_dictamen_sheet(id_respuesta, estatus, observaciones, archivo_certificados):
-    """Actualiza estatus/observaciones/certificado de una respuesta ya existente."""
+def actualizar_dictamen_sheet(id_respuesta, estatus, observaciones, archivo_certificados, archivo_comentarios):
+    """Actualiza estatus/observaciones/certificado/comentarios de una respuesta ya existente."""
     try:
         payload = {
             "token": st.secrets["APPS_SCRIPT_TOKEN"],
@@ -163,6 +170,7 @@ def actualizar_dictamen_sheet(id_respuesta, estatus, observaciones, archivo_cert
             "estatus": estatus,
             "observaciones_director": observaciones,
             "archivo_certificados": archivo_certificados or "",
+            "archivo_comentarios": archivo_comentarios or "",
         }
         resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=15)
         data = resp.json()
@@ -187,17 +195,45 @@ def subir_archivo_drive(matricula, nombre_archivo, contenido_bytes, tipo_mime, c
         resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=30)
         data = resp.json()
         if data.get("success"):
-            return True, construir_url_descarga(data.get("file_id", "")), None
+            return True, data.get("file_id", ""), None
         return False, None, data.get("error", "Error desconocido")
     except Exception as e:
         return False, None, str(e)
 
 
-def construir_url_descarga(file_id):
-    """Link que descarga el archivo vía el propio Apps Script, sin depender del sharing de Drive."""
+def descargar_archivo_por_id(file_id):
+    """Descarga el archivo vía el doGet del Apps Script (devuelve bytes ya decodificados)."""
+    try:
+        resp = requests.get(
+            st.secrets["APPS_SCRIPT_URL"], params={"file_id": file_id}, timeout=30
+        )
+        data = resp.json()
+        if data.get("success"):
+            contenido = base64.b64decode(data["contenido_base64"])
+            return True, contenido, data.get("nombre_archivo", "archivo"), data.get(
+                "tipo_mime", "application/octet-stream"
+            )
+        return False, None, None, data.get("error", "Error desconocido")
+    except Exception as e:
+        return False, None, None, str(e)
+
+
+def boton_descarga_drive(file_id, etiqueta, key_sufijo):
+    """Botón de dos pasos: primero busca el archivo, luego ofrece el botón real de descarga."""
     if not file_id:
-        return None
-    return f"{st.secrets['APPS_SCRIPT_URL']}?file_id={file_id}"
+        return
+    if st.button(f"⬇️ {etiqueta}", key=f"btn_prep_{key_sufijo}"):
+        exito, contenido, nombre, mime_o_error = descargar_archivo_por_id(file_id)
+        if exito:
+            st.download_button(
+                f"💾 Guardar {nombre}",
+                data=contenido,
+                file_name=nombre,
+                mime=mime_o_error,
+                key=f"btn_dl_{key_sufijo}",
+            )
+        else:
+            st.error(f"⚠️ No se pudo descargar: {mime_o_error}")
 
 
 @st.cache_data(ttl=10)
@@ -408,9 +444,13 @@ with tab_alumnos:
                                 # Cálculo matemático reconstruido del examen
                                 total_preguntas = len(examen_datos["preguntas"])
                                 correctas = 0
+                                respuestas_evaluadas = []
                                 for idx_q, q in enumerate(examen_datos["preguntas"]):
                                     if respuestas_alumno[f"p_{idx_q}"] == q.get("respuesta_correcta"):
                                         correctas += 1
+                                        respuestas_evaluadas.append("Correcta")
+                                    else:
+                                        respuestas_evaluadas.append("Incorrecta")
                                 
                                 calificacion = (correctas / total_preguntas) * 10.0 if total_preguntas > 0 else 0.0
                                 
@@ -423,7 +463,8 @@ with tab_alumnos:
                                     "calificacion": round(calificacion, 2),
                                     "evidencia_tv": link_tv,
                                     "justificacion": justificacion,
-                                    "respuestas": respuestas_alumno
+                                    "respuestas": respuestas_alumno,
+                                    "respuestas_evaluadas": respuestas_evaluadas,
                                 }
                                 
                                 exito_resp, error_resp = guardar_respuesta_sheet(
@@ -469,9 +510,16 @@ with tab_historial:
                         f"**Observaciones:** {examen['observaciones_director']}"
                     )
                 if examen.get("archivo_certificados"):
-                    st.markdown(
-                        "📜"
-                        f" [Descargar tu Reconocimiento Oficial]({examen['archivo_certificados']})"
+                    boton_descarga_drive(
+                        examen["archivo_certificados"],
+                        "Descargar tu Reconocimiento Oficial",
+                        f"cert_alumno_{examen['id']}",
+                    )
+                if examen.get("archivo_comentarios"):
+                    boton_descarga_drive(
+                        examen["archivo_comentarios"],
+                        "Descargar comentarios (Excel)",
+                        f"coment_alumno_{examen['id']}",
                     )
     else:
         st.info("💡 Aún no has presentado ninguna evaluación en esta cuenta.")
@@ -741,9 +789,16 @@ with tab_historial:
                             key=f"txt_just_admin_{id_target}",
                         )
                         if target_resp.get("archivo_certificados"):
-                            st.markdown(
-                                "📜"
-                                f" [Ver certificado ya cargado]({target_resp['archivo_certificados']})"
+                            boton_descarga_drive(
+                                target_resp["archivo_certificados"],
+                                "Ver certificado ya cargado",
+                                f"cert_admin_ver_{id_target}",
+                            )
+                        if target_resp.get("archivo_comentarios"):
+                            boton_descarga_drive(
+                                target_resp["archivo_comentarios"],
+                                "Ver Excel de comentarios ya cargado",
+                                f"coment_admin_ver_{id_target}",
                             )
 
                     with col_d2:
@@ -775,6 +830,17 @@ with tab_historial:
 
                             st.markdown("---")
                             st.markdown(
+                                "📊 **Adjuntar Hoja de Excel con Retroalimentación"
+                                " Detallada (opcional):**"
+                            )
+                            up_excel_coment = st.file_uploader(
+                                "Sube el Excel con comentarios extra del resultado:",
+                                type=["xlsx", "xls"],
+                                key=f"file_excel_coment_admin_{id_target}",
+                            )
+
+                            st.markdown("---")
+                            st.markdown(
                                 "📜 **Adjuntar Reconocimiento Oficial (PDF, PNG,"
                                 " JPG) — solo si el estatus es Aprobado:**"
                             )
@@ -785,20 +851,23 @@ with tab_historial:
                             )
 
                             if st.form_submit_button(
-                                "💾 Guardar Dictamen y Certificado",
+                                "💾 Guardar Dictamen, Excel y Certificado",
                                 use_container_width=True,
                             ):
                                 file_cert_name = target_resp.get(
                                     "archivo_certificados", None
                                 )
-                                error_subida_cert = None
+                                file_coment_name = target_resp.get(
+                                    "archivo_comentarios", None
+                                )
+                                error_subida = None
 
                                 if up_cert is not None:
                                     ext_cert = up_cert.name.split(".")[-1]
                                     nombre_cert = (
                                         f"Certificado_{target_resp.get('matricula','')}_{target_resp.get('key_examen','examen')}.{ext_cert}"
                                     )
-                                    exito_cert, url_cert, error_cert = subir_archivo_drive(
+                                    exito_cert, id_cert, error_cert = subir_archivo_drive(
                                         target_resp.get("matricula", ""),
                                         nombre_cert,
                                         up_cert.getbuffer(),
@@ -806,16 +875,31 @@ with tab_historial:
                                         categoria="Certificado",
                                     )
                                     if exito_cert:
-                                        file_cert_name = url_cert
+                                        file_cert_name = id_cert
                                     else:
-                                        error_subida_cert = error_cert
+                                        error_subida = error_cert
 
-                                if error_subida_cert:
+                                if up_excel_coment is not None and not error_subida:
+                                    nombre_excel_coment = (
+                                        f"Comentarios_{target_resp.get('matricula','')}_{target_resp.get('key_examen','examen')}.xlsx"
+                                    )
+                                    exito_ex, id_ex, error_ex = subir_archivo_drive(
+                                        target_resp.get("matricula", ""),
+                                        nombre_excel_coment,
+                                        up_excel_coment.getbuffer(),
+                                        up_excel_coment.type or "application/octet-stream",
+                                        categoria="Comentarios_Excel",
+                                    )
+                                    if exito_ex:
+                                        file_coment_name = id_ex
+                                    else:
+                                        error_subida = error_ex
+
+                                if error_subida:
                                     st.error(
-                                        "⚠️ No se pudo subir el certificado a"
-                                        f" Drive: {error_subida_cert}. El resto"
-                                        " del dictamen no se guardó, intenta de"
-                                        " nuevo."
+                                        "⚠️ No se pudo subir un archivo a Drive:"
+                                        f" {error_subida}. El dictamen no se"
+                                        " guardó, intenta de nuevo."
                                     )
                                 else:
                                     exito_dict, error_dict = actualizar_dictamen_sheet(
@@ -823,11 +907,12 @@ with tab_historial:
                                         e_dictamen,
                                         obs_dictamen,
                                         file_cert_name,
+                                        file_coment_name,
                                     )
                                     if exito_dict:
                                         st.cache_data.clear()
                                         st.toast(
-                                            "✅ Dictamen y Reconocimiento Oficial"
+                                            "✅ Dictamen, Excel y Certificado"
                                             " guardados exitosamente.",
                                             icon="✅",
                                         )
@@ -890,15 +975,16 @@ with tab_historial:
                 archivos_existentes = cargar_archivos_alumno(matricula_archivo)
                 if archivos_existentes:
                     st.caption(f"Archivos actuales de {matricula_archivo}:")
-                    for archivo_reg in archivos_existentes:
-                        url_desc = construir_url_descarga(
-                            archivo_reg.get("File_ID")
-                        ) or archivo_reg.get("URL_Drive", "#")
+                    for idx_arch, archivo_reg in enumerate(archivos_existentes):
                         st.markdown(
-                            f"📄 [{archivo_reg.get('Nombre_Archivo', 'archivo')}]"
-                            f"({url_desc}) —"
-                            f" _{archivo_reg.get('Categoria', '')}_,"
+                            f"📄 **{archivo_reg.get('Nombre_Archivo', 'archivo')}**"
+                            f" — _{archivo_reg.get('Categoria', '')}_,"
                             f" {archivo_reg.get('Fecha', '')}"
+                        )
+                        boton_descarga_drive(
+                            archivo_reg.get("File_ID"),
+                            "Descargar",
+                            f"archadmin_{matricula_archivo}_{idx_arch}",
                         )
             else:
                 st.info(
