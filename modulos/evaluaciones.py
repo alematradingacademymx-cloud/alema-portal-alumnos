@@ -17,9 +17,7 @@ LISTA_MODULOS = [
     "Práctico",
 ]
 
-# Rutas de almacenamiento local (solo para banco de exámenes, respuestas y subida general de excel)
-FILE_BANCO_EXAMENES = "bd_banco_examenes.json"
-FILE_RESPUESTAS = "bd_respuestas_evaluaciones.json"
+# Carpeta local (solo para subida general de Excel, no crítica de migrar)
 FOLDER_EXCEL_UPLOADS = "archivos_excel_evaluaciones"
 
 SHEET_ID_USUARIOS = "1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA"
@@ -29,6 +27,136 @@ URL_USUARIOS_CSV = (
 URL_ARCHIVOS_ALUMNOS_CSV = (
     f"https://docs.google.com/spreadsheets/d/{SHEET_ID_USUARIOS}/gviz/tq?tqx=out:csv&sheet=Archivos_Alumnos"
 )
+URL_BANCO_EXAMENES_CSV = (
+    f"https://docs.google.com/spreadsheets/d/{SHEET_ID_USUARIOS}/gviz/tq?tqx=out:csv&sheet=Banco_Examenes"
+)
+URL_RESPUESTAS_CSV = (
+    f"https://docs.google.com/spreadsheets/d/{SHEET_ID_USUARIOS}/gviz/tq?tqx=out:csv&sheet=Respuestas_Examenes"
+)
+
+
+@st.cache_data(ttl=10)
+def cargar_banco_examenes():
+    """Lee la pestaña Banco_Examenes y arma el diccionario {key_examen: {...}}."""
+    banco = {}
+    try:
+        df = pd.read_csv(URL_BANCO_EXAMENES_CSV, dtype=str)
+        df.columns = df.columns.str.strip()
+        for _, row in df.iterrows():
+            key_examen = str(row.get("Key_Examen", "")).strip()
+            if not key_examen or key_examen.lower() == "nan":
+                continue
+            try:
+                preguntas = json.loads(row.get("Preguntas_JSON", "[]") or "[]")
+            except Exception:
+                preguntas = []
+            banco[key_examen] = {
+                "titulo": row.get("Titulo", ""),
+                "descripcion": row.get("Descripcion", ""),
+                "preguntas": preguntas,
+            }
+    except Exception:
+        pass
+    return banco
+
+
+def guardar_examen_sheet(key_examen, titulo, descripcion, preguntas):
+    """Crea o actualiza un examen en la pestaña Banco_Examenes vía Apps Script."""
+    try:
+        payload = {
+            "token": st.secrets["APPS_SCRIPT_TOKEN"],
+            "accion": "guardar_examen",
+            "key_examen": key_examen,
+            "titulo": titulo,
+            "descripcion": descripcion,
+            "preguntas_json": json.dumps(preguntas, ensure_ascii=False),
+        }
+        resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=15)
+        data = resp.json()
+        return data.get("success", False), data.get("error", "")
+    except Exception as e:
+        return False, str(e)
+
+
+@st.cache_data(ttl=10)
+def cargar_respuestas_examenes():
+    """Lee la pestaña Respuestas_Examenes y arma la lista de respuestas."""
+    respuestas = []
+    try:
+        df = pd.read_csv(URL_RESPUESTAS_CSV, dtype=str)
+        df.columns = df.columns.str.strip()
+        for _, row in df.iterrows():
+            id_val = str(row.get("ID", "")).strip()
+            if not id_val or id_val.lower() == "nan":
+                continue
+            try:
+                respuestas_dict = json.loads(row.get("Respuestas_JSON", "{}") or "{}")
+            except Exception:
+                respuestas_dict = {}
+            try:
+                calificacion_val = float(row.get("Calificacion", 0) or 0)
+            except Exception:
+                calificacion_val = 0.0
+            respuestas.append({
+                "id": id_val,
+                "matricula": row.get("Matricula", ""),
+                "key_examen": row.get("Key_Examen", ""),
+                "modulo": row.get("Modulo", ""),
+                "fecha": row.get("Fecha", ""),
+                "calificacion": calificacion_val,
+                "evidencia_tv": row.get("Evidencia_TV", ""),
+                "justificacion": row.get("Justificacion", ""),
+                "respuestas": respuestas_dict,
+                "estatus": row.get("Estatus", ""),
+                "observaciones_director": row.get("Observaciones_Director", ""),
+                "archivo_certificados": row.get("Archivo_Certificados", ""),
+            })
+    except Exception:
+        pass
+    return respuestas
+
+
+def guardar_respuesta_sheet(respuesta_dict):
+    """Agrega una nueva respuesta de examen en la pestaña Respuestas_Examenes vía Apps Script."""
+    try:
+        payload = {
+            "token": st.secrets["APPS_SCRIPT_TOKEN"],
+            "accion": "guardar_respuesta",
+            "id": respuesta_dict["id"],
+            "matricula": respuesta_dict["matricula"],
+            "key_examen": respuesta_dict["key_examen"],
+            "modulo": respuesta_dict["modulo"],
+            "fecha": respuesta_dict["fecha"],
+            "calificacion": respuesta_dict["calificacion"],
+            "evidencia_tv": respuesta_dict.get("evidencia_tv", ""),
+            "justificacion": respuesta_dict.get("justificacion", ""),
+            "respuestas_json": json.dumps(
+                respuesta_dict.get("respuestas", {}), ensure_ascii=False
+            ),
+        }
+        resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=15)
+        data = resp.json()
+        return data.get("success", False), data.get("error", "")
+    except Exception as e:
+        return False, str(e)
+
+
+def actualizar_dictamen_sheet(id_respuesta, estatus, observaciones, archivo_certificados):
+    """Actualiza estatus/observaciones/certificado de una respuesta ya existente."""
+    try:
+        payload = {
+            "token": st.secrets["APPS_SCRIPT_TOKEN"],
+            "accion": "actualizar_dictamen",
+            "id": id_respuesta,
+            "estatus": estatus,
+            "observaciones_director": observaciones,
+            "archivo_certificados": archivo_certificados or "",
+        }
+        resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=15)
+        data = resp.json()
+        return data.get("success", False), data.get("error", "")
+    except Exception as e:
+        return False, str(e)
 
 
 def subir_archivo_drive(matricula, nombre_archivo, contenido_bytes, tipo_mime, categoria="Documento"):
@@ -73,22 +201,6 @@ def cargar_archivos_alumno(matricula_target):
         return filtro.to_dict("records")
     except Exception:
         return []
-
-
-# --- FUNCIONES DE PERSISTENCIA JSON (banco de exámenes / respuestas) ---
-def cargar_json_local(filepath, default):
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return default
-    return default
-
-
-def guardar_json_local(filepath, data):
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
 
 
 # --- PERMISOS (CANDADOS): LECTURA DESDE GOOGLE SHEETS ---
@@ -166,8 +278,8 @@ es_admin = (
 if not os.path.exists(FOLDER_EXCEL_UPLOADS):
     os.makedirs(FOLDER_EXCEL_UPLOADS)
 
-banco_examenes = cargar_json_local(FILE_BANCO_EXAMENES, {})
-respuestas_evals = cargar_json_local(FILE_RESPUESTAS, [])
+banco_examenes = cargar_banco_examenes()
+respuestas_evals = cargar_respuestas_examenes()
 
 # --- PESTAÑAS DE NAVEGACIÓN AISLADAS SEGÚN ROL ---
 if es_admin:
@@ -302,12 +414,23 @@ with tab_alumnos:
                                     "respuestas": respuestas_alumno
                                 }
                                 
-                                respuestas_evals.append(nueva_respuesta)
-                                guardar_json_local(FILE_RESPUESTAS, respuestas_evals)
-                                
-                                st.success(f"🎉 ¡Examen enviado con éxito! Tu calificación preliminar es: {calificacion:.2f}/10")
-                                st.session_state[f"modo_examen_{key_examen}"] = False
-                                st.rerun()
+                                exito_resp, error_resp = guardar_respuesta_sheet(
+                                    nueva_respuesta
+                                )
+
+                                if exito_resp:
+                                    st.cache_data.clear()
+                                    st.success(
+                                        "🎉 ¡Examen enviado con éxito! Tu"
+                                        f" calificación preliminar es: {calificacion:.2f}/10"
+                                    )
+                                    st.session_state[f"modo_examen_{key_examen}"] = False
+                                    st.rerun()
+                                else:
+                                    st.error(
+                                        "⚠️ No se pudo guardar tu examen, intenta"
+                                        f" de nuevo: {error_resp}"
+                                    )
 
 # =============================================================
 # PESTAÑA 2: HISTORIAL Y MUESTRA DE RESULTADOS
@@ -453,7 +576,7 @@ with tab_historial:
                 preguntas_recopiladas.append({
                     "pregunta": txt_p,
                     "opciones": [op1, op2, op3],
-                    "correcta": correcta,
+                    "respuesta_correcta": correcta,
                 })
                 st.markdown("---")
 
@@ -462,14 +585,15 @@ with tab_historial:
                 use_container_width=True,
                 key=f"btn_save_ex_{key_target}",
             ):
-                banco_examenes[key_target] = {
-                    "titulo": titulo_ex,
-                    "descripcion": desc_ex,
-                    "preguntas": preguntas_recopiladas,
-                }
-                guardar_json_local(FILE_BANCO_EXAMENES, banco_examenes)
-                st.success(f"✅ Examen **{key_target}** guardado con éxito.")
-                st.rerun()
+                exito_ex, error_ex = guardar_examen_sheet(
+                    key_target, titulo_ex, desc_ex, preguntas_recopiladas
+                )
+                if exito_ex:
+                    st.cache_data.clear()
+                    st.toast(f"✅ Examen {key_target} guardado con éxito.", icon="✅")
+                    st.rerun()
+                else:
+                    st.error(f"⚠️ No se pudo guardar el examen: {error_ex}")
 
         # ---------------------------------------------------------
         # PESTAÑA 4: GESTOR DE CANDADOS (ADMIN) — CONECTADO A GOOGLE SHEETS
@@ -547,15 +671,6 @@ with tab_historial:
             st.subheader(
                 "👑 Panel de Dictamen y Carga de Certificados (DIRALEX)"
             )
-
-            # Backfill: asigna un "id" estable a respuestas antiguas que no lo tengan
-            hubo_backfill_id = False
-            for idx_bf, r_bf in enumerate(respuestas_evals):
-                if "id" not in r_bf:
-                    r_bf["id"] = int(datetime.now().timestamp() * 1000) + idx_bf
-                    hubo_backfill_id = True
-            if hubo_backfill_id:
-                guardar_json_local(FILE_RESPUESTAS, respuestas_evals)
 
             matricula_buscar_dictamen = (
                 st.text_input(
@@ -691,23 +806,25 @@ with tab_historial:
                                         " nuevo."
                                     )
                                 else:
-                                    for r in respuestas_evals:
-                                        if r.get("id") == id_target:
-                                            r["estatus"] = e_dictamen
-                                            r["observaciones_director"] = obs_dictamen
-                                            r["archivo_certificados"] = file_cert_name
-                                            break
-
-                                    guardar_json_local(
-                                        FILE_RESPUESTAS, respuestas_evals
+                                    exito_dict, error_dict = actualizar_dictamen_sheet(
+                                        id_target,
+                                        e_dictamen,
+                                        obs_dictamen,
+                                        file_cert_name,
                                     )
-                                    st.cache_data.clear()
-                                    st.toast(
-                                        "✅ Dictamen y Reconocimiento Oficial"
-                                        " guardados exitosamente.",
-                                        icon="✅",
-                                    )
-                                    st.rerun()
+                                    if exito_dict:
+                                        st.cache_data.clear()
+                                        st.toast(
+                                            "✅ Dictamen y Reconocimiento Oficial"
+                                            " guardados exitosamente.",
+                                            icon="✅",
+                                        )
+                                        st.rerun()
+                                    else:
+                                        st.error(
+                                            "⚠️ No se pudo guardar el dictamen:"
+                                            f" {error_dict}"
+                                        )
             else:
                 st.info(
                     "Escribe la matrícula de un alumno arriba para ver y"
