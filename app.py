@@ -2,6 +2,10 @@ import base64
 import os
 from datetime import datetime
 
+import base64
+import os
+from datetime import datetime
+
 import config
 import pandas as pd
 import requests
@@ -13,9 +17,20 @@ config.inicializar_configuracion()
 config.inicializar_session_state()
 
 # 🎛️ Forzar modo "embed" para ocultar la barra de Streamlit Cloud (Share/⭐/✏️/GitHub)
-if st.query_params.get("embed") != "true":
-    st.query_params["embed"] = "true"
-    st.rerun()
+components.html(
+    """
+    <script>
+    (function() {
+        var url = window.top.location.href;
+        if (url.indexOf('embed=true') === -1) {
+            var separador = url.indexOf('?') === -1 ? '?' : '&';
+            window.top.location.href = url + separador + 'embed=true';
+        }
+    })();
+    </script>
+    """,
+    height=0,
+)
 
 # ==========================================
 # 🔑 FUNCIÓN PARA CONVERTIR CUALQUIER FECHA
