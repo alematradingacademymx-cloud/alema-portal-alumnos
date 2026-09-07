@@ -253,6 +253,20 @@ def cargar_archivos_alumno(matricula_target):
 
 # --- PERMISOS (CANDADOS): LECTURA DESDE GOOGLE SHEETS ---
 @st.cache_data(ttl=10)
+def cargar_lista_matriculas():
+    """Lee todas las matrículas registradas en la pestaña Usuarios (para selectores)."""
+    try:
+        df = pd.read_csv(URL_USUARIOS_CSV, dtype=str)
+        df.columns = df.columns.str.strip()
+        matriculas = (
+            df["Matricula"].dropna().astype(str).str.strip().str.upper().unique()
+        )
+        return sorted([m for m in matriculas if m])
+    except Exception:
+        return []
+
+
+@st.cache_data(ttl=10)
 def cargar_permisos_sheet(matricula_target):
     """Lee Modulos_Habilitados y Simulador_Habilitado de la pestaña Usuarios."""
     modulos_desbloqueados = []
@@ -679,14 +693,18 @@ with tab_historial:
                 "Los cambios se guardan directo en la base de datos de Google"
                 " Sheets — persisten aunque el servidor se reinicie."
             )
+
+            lista_matriculas_permisos = cargar_lista_matriculas()
+            opciones_permisos = ["-- Selecciona una matrícula --"] + lista_matriculas_permisos
+            seleccion_permisos = st.selectbox(
+                "Matrícula del Alumno:",
+                opciones_permisos,
+                key="select_mat_permisos",
+            )
             alumno_mat_permiso = (
-                st.text_input(
-                    "Matrícula del Alumno:",
-                    value="",
-                    key="input_mat_permisos",
-                )
-                .strip()
-                .upper()
+                seleccion_permisos
+                if seleccion_permisos != "-- Selecciona una matrícula --"
+                else ""
             )
 
             if alumno_mat_permiso:
