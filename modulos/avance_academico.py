@@ -58,26 +58,38 @@ if df.empty:
     )
 else:
     usuario_sesion = st.session_state.get("nombre_usuario", "")
+    es_admin_avance = st.session_state.get("tipo_usuario", "").upper() == "ADMIN"
 
-    # Buscar al estudiante por coincidencia de Matrícula o Nombre con el usuario en sesión
-    estudiante_df = df[
-        (df["Matricula"].astype(str).str.upper() == str(usuario_sesion).upper())
-        | (
-            df["Nombre"]
-            .astype(str)
-            .str.contains(str(usuario_sesion), case=False, na=False)
+    if es_admin_avance:
+        st.info(
+            "👑 **Modo Admin:** selecciona el alumno que quieres consultar o"
+            " editar (no se te muestra tu propio perfil por defecto):"
         )
-    ]
-
-    # Si es Administrador/Director o no encuentra coincidencia directa, permite seleccionar alumno
-    if estudiante_df.empty:
-        st.info("ℹ️ Selecciona la matrícula o alumno para consultar los datos:")
         matricula_sel = st.selectbox(
-            "Buscar por Matrícula / Alumno:", df["Matricula"].unique()
+            "Buscar por Matrícula / Alumno:",
+            df["Matricula"].unique(),
+            key="selector_admin_avance",
         )
         estudiante_row = df[df["Matricula"] == matricula_sel].iloc[0]
     else:
-        estudiante_row = estudiante_df.iloc[0]
+        # Buscar al estudiante por coincidencia de Matrícula o Nombre con el usuario en sesión
+        estudiante_df = df[
+            (df["Matricula"].astype(str).str.upper() == str(usuario_sesion).upper())
+            | (
+                df["Nombre"]
+                .astype(str)
+                .str.contains(str(usuario_sesion), case=False, na=False)
+            )
+        ]
+
+        if estudiante_df.empty:
+            st.info("ℹ️ Selecciona la matrícula o alumno para consultar los datos:")
+            matricula_sel = st.selectbox(
+                "Buscar por Matrícula / Alumno:", df["Matricula"].unique()
+            )
+            estudiante_row = df[df["Matricula"] == matricula_sel].iloc[0]
+        else:
+            estudiante_row = estudiante_df.iloc[0]
 
     # Datos extraídos dinámicamente del Excel
     matricula = estudiante_row.get("Matricula", "N/A")
@@ -116,8 +128,6 @@ else:
         )
 
     st.info(f"📝 **Notas y Próximas Evaluaciones:** {notas}")
-
-    es_admin_avance = st.session_state.get("tipo_usuario", "").upper() == "ADMIN"
 
     st.markdown("#### 🗒️ Notas y Horario Personalizado")
     if es_admin_avance:
