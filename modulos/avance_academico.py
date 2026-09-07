@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 
+import estilos
+
 # URL de exportación a CSV de tu hoja de Google Sheets (GID: 2037302400)
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=2037302400"
 
@@ -22,11 +24,11 @@ def cargar_datos_estudiantes():
         return pd.DataFrame()
 
 
-# CÓDIGO CORREGIDO: Alineado al extremo izquierdo y sin 'return' sueltos
-st.title("📈 Mi Avance Académico")
-st.caption(
-    "Consulta el estado de tu matrícula, mantenimiento de beca y progreso"
-    " en tiempo real."
+st.markdown('<div class="main-title">📈 Mi Avance Académico</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="sub-title">Consulta el estado de tu matrícula, mantenimiento de'
+    " beca y progreso en tiempo real.</div>",
+    unsafe_allow_html=True,
 )
 st.divider()
 
@@ -70,16 +72,28 @@ else:
 
     st.subheader(f"Alumno: {nombre}")
 
-    # 1. Tarjetas con datos reales desde Google Sheets
+    # 1. Tarjetas con datos reales desde Google Sheets (nuevo estilo unificado .app-card)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric(label="🎓 Matrícula", value=str(matricula))
+        st.markdown(
+            estilos.tarjeta("🎓 Matrícula", str(matricula)),
+            unsafe_allow_html=True,
+        )
     with col2:
-        st.metric(label="⭐ Estatus de Beca", value=str(estatus_beca))
+        st.markdown(
+            estilos.tarjeta("⭐ Estatus de Beca", str(estatus_beca)),
+            unsafe_allow_html=True,
+        )
     with col3:
-        st.metric(label="📊 Progreso General", value=str(porcentaje))
+        st.markdown(
+            estilos.tarjeta("📊 Progreso General", str(porcentaje)),
+            unsafe_allow_html=True,
+        )
     with col4:
-        st.metric(label="📚 Módulo Actual", value=str(modulo_actual))
+        st.markdown(
+            estilos.tarjeta("📚 Módulo Actual", str(modulo_actual)),
+            unsafe_allow_html=True,
+        )
 
     st.info(f"📝 **Notas y Próximas Evaluaciones:** {notas}")
     st.divider()
