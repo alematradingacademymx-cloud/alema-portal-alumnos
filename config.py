@@ -5,9 +5,10 @@ import estilos
 
 def inicializar_configuracion():
     autenticado = st.session_state.get("usuario_autenticado", False)
+    icono = estilos.resolver_archivo_logo() or "📈"
     st.set_page_config(
         page_title="ALEMA Trading Academy",
-        page_icon="📈",
+        page_icon=icono,
         layout="wide" if autenticado else "centered",
         initial_sidebar_state="expanded" if autenticado else "collapsed",
     )
