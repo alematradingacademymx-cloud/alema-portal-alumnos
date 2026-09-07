@@ -392,6 +392,12 @@ else:
         cerrar_sesion_usuario()
         st.rerun()
 
+    # 🔁 Reafirmar el token en la URL en cada carga — la navegación entre
+    # páginas (st.Page) puede limpiar los query params, así que lo volvemos
+    # a poner siempre para que un refresh nunca lo pierda.
+    st.query_params["u"] = nombre_usuario_sesion
+    st.query_params["t"] = generar_token_sesion(nombre_usuario_sesion, version_actual_sesion)
+
     page_avance = st.Page("modulos/avance_academico.py", title="Mi Avance Académico", icon="🎓")
     page_calculadoras = st.Page("modulos/calculadoras.py", title="Calculadoras de Lotes", icon="🧮")
     page_journal = st.Page("modulos/journal.py", title="Trading Journal", icon="✍️")
