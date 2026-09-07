@@ -1,137 +1,106 @@
-import pandas as pd
 import streamlit as st
 
-import estilos
 
-# URL de exportación a CSV de tu hoja de Google Sheets (GID: 2037302400)
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1v5qXHn1cA-nEJoRMi1txDjXnRurYVhxEd-47Y1oAjNA/export?format=csv&gid=2037302400"
+def inyectar_estilos():
+    """Inyecta una sola vez el sistema de diseño global de ALEMA Trading Academy."""
+    st.markdown(
+        """
+        <style>
+        /* ============================================
+           TIPOGRAFÍA MODERNA (Inter, vía Google Fonts)
+           ============================================ */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-
-@st.cache_data(ttl=30)
-def cargar_datos_estudiantes():
-    """Conecta con Google Sheets y descarga los registros actualizados."""
-    try:
-        df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        df.columns = (
-            df.columns.str.strip()
-        )  # Limpia espacios extra en los nombres de columnas
-        return df
-    except Exception as e:
-        st.error(
-            "Error de conexión con la base de datos de Google Sheets:"
-            f" {e}"
-        )
-        return pd.DataFrame()
-
-
-st.markdown('<div class="main-title">📈 Mi Avance Académico</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="sub-title">Consulta el estado de tu matrícula, mantenimiento de'
-    " beca y progreso en tiempo real.</div>",
-    unsafe_allow_html=True,
-)
-st.divider()
-
-df = cargar_datos_estudiantes()
-
-if df.empty:
-    st.warning(
-        "No se pudo obtener información de la base de datos en este"
-        " momento."
-    )
-else:
-    usuario_sesion = st.session_state.get("nombre_usuario", "")
-
-    # Buscar al estudiante por coincidencia de Matrícula o Nombre con el usuario en sesión
-    estudiante_df = df[
-        (df["Matricula"].astype(str).str.upper() == str(usuario_sesion).upper())
-        | (
-            df["Nombre"]
-            .astype(str)
-            .str.contains(str(usuario_sesion), case=False, na=False)
-        )
-    ]
-
-    # Si es Administrador/Director o no encuentra coincidencia directa, permite seleccionar alumno
-    if estudiante_df.empty:
-        st.info("ℹ️ Selecciona la matrícula o alumno para consultar los datos:")
-        matricula_sel = st.selectbox(
-            "Buscar por Matrícula / Alumno:", df["Matricula"].unique()
-        )
-        estudiante_row = df[df["Matricula"] == matricula_sel].iloc[0]
-    else:
-        estudiante_row = estudiante_df.iloc[0]
-
-    # Datos extraídos dinámicamente del Excel
-    matricula = estudiante_row.get("Matricula", "N/A")
-    nombre = estudiante_row.get("Nombre", "N/A")
-    modulo_actual = estudiante_row.get("Modulo_Actual", "N/A")
-    porcentaje = estudiante_row.get("Porcentaje", "0%")
-    estatus_beca = estudiante_row.get("Estatus_Beca", "N/A")
-    notas = estudiante_row.get("Notas", "Sin observaciones registradas.")
-
-    st.subheader(f"Alumno: {nombre}")
-
-    # 1. Tarjetas con datos reales desde Google Sheets (nuevo estilo unificado .app-card)
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(
-            estilos.tarjeta("🎓 Matrícula", str(matricula)),
-            unsafe_allow_html=True,
-        )
-    with col2:
-        st.markdown(
-            estilos.tarjeta("⭐ Estatus de Beca", str(estatus_beca)),
-            unsafe_allow_html=True,
-        )
-    with col3:
-        st.markdown(
-            estilos.tarjeta("📊 Progreso General", str(porcentaje)),
-            unsafe_allow_html=True,
-        )
-    with col4:
-        st.markdown(
-            estilos.tarjeta("📚 Módulo Actual", str(modulo_actual)),
-            unsafe_allow_html=True,
-        )
-
-    st.info(f"📝 **Notas y Próximas Evaluaciones:** {notas}")
-    st.divider()
-
-    # 2. Pestañas de soporte
-    tab_reglamento, tab_horario = st.tabs([
-        "📜 Términos & Mantenimiento de Beca",
-        "📅 Horario de Clases",
-    ])
-
-    with tab_reglamento:
-        st.markdown("""
-            * **Asistencia a Clases:** Asistir al menos al 80% de las másterclass en vivo o revisar grabaciones en un plazo no mayor a 72 horas.
-            * **Calificación Mínima:** Mantener un promedio ponderado igual o superior a **8.5 / 10** en las evaluaciones.
-            * **Cumplimiento de Trading Journal:** Entregar semanalmente la bitácora de riesgo y análisis técnico revisada por coordinación.
-            * **Puntualidad de Matrícula:** Mantener al día la cuota de mantenimiento de plataforma.
-            """)
-
-    with tab_horario:
-        horario_data = {
-            "Día": ["Lunes", "Miércoles", "Jueves", "Viernes"],
-            "Horario (CDMX)": [
-                "20:00 - 21:30",
-                "20:00 - 21:30",
-                "20:00 - 21:30",
-                "19:00 - 20:30",
-            ],
-            "Sesión / Materia": [
-                "Estructura de Mercado & Wyckoff",
-                "Gestión de Riesgo & Lotaje Práctico",
-                "Másterclass de Puntos Pivote & Fibonacci",
-                "Revisión de Bitácora & Q&A",
-            ],
-            "Instructor": [
-                "Alex Marroquín",
-                "Alex Marroquín",
-                "Alex Marroquín",
-                "Coordinación Académica",
-            ],
+        html, body, [class*="css"], .stApp {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         }
-        st.table(horario_data)
+
+        /* ============================================
+           OCULTAR BARRA SUPERIOR, GITHUB Y MENÚS
+           ============================================ */
+        header[data-testid="stHeader"],
+        [data-testid="stToolbar"],
+        [data-testid="stHeaderActionElements"],
+        header,
+        .stAppHeader {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0px !important;
+        }
+
+        /* ============================================
+           TÍTULOS UNIFICADOS
+           ============================================ */
+        .main-title {
+            font-size: 1.9rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #F1F5F9;
+            margin-bottom: 0.1rem;
+        }
+        .sub-title {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #94A3B8;
+            margin-bottom: 1rem;
+        }
+
+        /* ============================================
+           TARJETAS UNIFICADAS (.app-card)
+           ============================================ */
+        .app-card {
+            background: linear-gradient(155deg, #16213A 0%, #131C30 100%);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 18px 22px;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+            margin-bottom: 12px;
+        }
+        .app-card-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #94A3B8;
+            margin-bottom: 4px;
+        }
+        .app-card-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #F1F5F9;
+            line-height: 1.2;
+        }
+        .app-card-delta-up { color: #26A69A; font-size: 0.85rem; font-weight: 600; }
+        .app-card-delta-down { color: #EF5350; font-size: 0.85rem; font-weight: 600; }
+
+        /* Botones con esquinas un poco más suaves y consistentes */
+        .stButton > button, .stDownloadButton > button {
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+        }
+
+        /* Separadores más discretos */
+        hr {
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def tarjeta(label, value, delta=None, delta_positivo=True):
+    """Genera el HTML de una tarjeta de métrica con el estilo unificado (.app-card)."""
+    delta_html = ""
+    if delta is not None:
+        clase = "app-card-delta-up" if delta_positivo else "app-card-delta-down"
+        signo = "▲" if delta_positivo else "▼"
+        delta_html = f'<div class="{clase}">{signo} {delta}</div>'
+
+    return f"""
+        <div class="app-card">
+            <div class="app-card-label">{label}</div>
+            <div class="app-card-value">{value}</div>
+            {delta_html}
+        </div>
+    """
