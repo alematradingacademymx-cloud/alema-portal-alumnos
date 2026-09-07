@@ -18,26 +18,24 @@ def inyectar_estilos():
         }
 
         /* ============================================
-           OCULTAR SOLO BOTONES DE STREAMLIT CLOUD
-           (Share/⭐/✏️/GitHub/menú) SIN TAPAR EL
-           CONTROL DE ABRIR/CERRAR EL SIDEBAR
+           OCULTAR BOTONES SECUNDARIOS DE STREAMLIT CLOUD
+           MANTENIENDO EL BOTÓN/FLECHA DEL SIDEBAR VISIBLE
            ============================================ */
         [data-testid="stToolbarActions"],
-        [data-testid="stToolbar"] button,
         #MainMenu,
         footer,
         .stAppDeployButton {
             display: none !important;
         }
+        
         header[data-testid="stHeader"] {
             background: transparent !important;
             box-shadow: none !important;
         }
 
-        /* Logo del sidebar (st.logo) centrado horizontalmente */
+        /* Ocultar el logo nativo de Streamlit si está activo para evitar duplicados en la izquierda */
         [data-testid="stLogo"] {
-            display: block;
-            margin: 0 auto;
+            display: none !important;
         }
 
         /* ============================================
