@@ -1,7 +1,6 @@
 import base64
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 
 def inyectar_estilos():
@@ -18,10 +17,20 @@ def inyectar_estilos():
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         }
 
-        /* Logo del sidebar centrado horizontalmente */
-        [data-testid="stSidebarUserContent"] img {
-            display: block;
-            margin: 0 auto;
+        /* ============================================
+           OCULTAR BOTONES SECUNDARIOS DE STREAMLIT CLOUD
+           MANTENIENDO EL BOTÓN/FLECHA DEL SIDEBAR VISIBLE
+           ============================================ */
+        [data-testid="stToolbarActions"],
+        #MainMenu,
+        footer,
+        .stAppDeployButton {
+            display: none !important;
+        }
+        
+        header[data-testid="stHeader"] {
+            background: transparent !important;
+            box-shadow: none !important;
         }
 
         /* ============================================
@@ -125,65 +134,8 @@ def cargar_imagen_base64(nombre_archivo, alternativas_prefijo=None):
 
 
 def logo_esquina_superior_derecha(nombre_archivo="alema_iso.png", alto_px=42):
-    """Coloca el logo fijo en la esquina superior derecha de la página."""
-    img_b64 = cargar_imagen_base64(nombre_archivo, alternativas_prefijo=["alema_iso", "alema_a"])
-    if not img_b64:
-        return
-    st.markdown(
-        f"""
-        <style>
-        .logo-esquina-superior {{
-            position: fixed;
-            top: 12px;
-            right: 20px;
-            z-index: 999999;
-        }}
-        .logo-esquina-superior img {{
-            height: {alto_px}px;
-            width: auto;
-        }}
-        </style>
-        <div class="logo-esquina-superior">
-            <img src="data:image/png;base64,{img_b64}" />
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def ticker_tradingview(altura=78):
-    """Muestra el ticker superior de cotizaciones en vivo de TradingView."""
-    ticker_html = """
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
-      {
-      "symbols": [
-        {"proName": "FX_IDC:EURUSD", "title": "EUR/USD"},
-        {"proName": "FX_IDC:GBPUSD", "title": "GBP/USD"},
-        {"proName": "FX_IDC:USDJPY", "title": "USD/JPY"},
-        {"proName": "FX_IDC:AUDUSD", "title": "AUD/USD"},
-        {"proName": "FX_IDC:USDCAD", "title": "USD/CAD"},
-        {"proName": "FX_IDC:USDCHF", "title": "USD/CHF"},
-        {"proName": "BITSTAMP:BTCUSD", "title": "BTC/USD"}
-      ],
-      "showSymbolLogo": true,
-      "isTransparent": false,
-      "displayMode": "adaptive",
-      "colorTheme": "dark",
-      "locale": "es"
-    }
-      </script>
-    </div>
-    <style>
-      .tradingview-widget-container {
-        background-color: #FF6B00 !important;
-        border-radius: 8px;
-        overflow: hidden;
-      }
-    </style>
-    """
-    components.html(ticker_html, height=altura)
+    """Función deshabilitada para evitar la presencia del logo en la esquina derecha."""
+    pass
 
 
 def tarjeta(label, value, delta=None, delta_positivo=True):
