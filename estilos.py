@@ -1,3 +1,5 @@
+import base64
+
 import streamlit as st
 
 
@@ -16,16 +18,26 @@ def inyectar_estilos():
         }
 
         /* ============================================
-           OCULTAR BARRA SUPERIOR, GITHUB Y MENÚS
+           OCULTAR SOLO BOTONES DE STREAMLIT CLOUD
+           (Share/⭐/✏️/GitHub/menú) SIN TAPAR EL
+           CONTROL DE ABRIR/CERRAR EL SIDEBAR
            ============================================ */
-        header[data-testid="stHeader"],
-        [data-testid="stToolbar"],
-        [data-testid="stHeaderActionElements"],
-        header,
-        .stAppHeader {
+        [data-testid="stToolbarActions"],
+        [data-testid="stToolbar"] button,
+        #MainMenu,
+        footer,
+        .stAppDeployButton {
             display: none !important;
-            visibility: hidden !important;
-            height: 0px !important;
+        }
+        header[data-testid="stHeader"] {
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+
+        /* Logo del sidebar (st.logo) centrado horizontalmente */
+        [data-testid="stLogo"] {
+            display: block;
+            margin: 0 auto;
         }
 
         /* ============================================
@@ -39,6 +51,23 @@ def inyectar_estilos():
             margin-bottom: 0.1rem;
         }
         .sub-title {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #94A3B8;
+            margin-bottom: 1rem;
+        }
+
+        /* Título de marca en la pantalla de login: centrado, naranja oscuro */
+        .login-brand-title {
+            text-align: center;
+            font-size: 1.9rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #C2410C;
+            margin-bottom: 0.1rem;
+        }
+        .login-brand-subtitle {
+            text-align: center;
             font-size: 0.95rem;
             font-weight: 500;
             color: #94A3B8;
@@ -89,7 +118,53 @@ def inyectar_estilos():
     )
 
 
-def tarjeta(label, value, delta=None, delta_positivo=True):
+def cargar_imagen_base64(nombre_archivo, alternativas_prefijo=None):
+    """Busca y codifica una imagen en base64. Si no existe el nombre exacto,
+    intenta con archivos que empiecen igual (por si el nombre real difiere un poco)."""
+    import os
+
+    ruta = nombre_archivo
+    if not os.path.exists(ruta) and alternativas_prefijo:
+        coincidencias = [
+            f
+            for f in os.listdir(".")
+            if any(f.lower().startswith(p) for p in alternativas_prefijo)
+        ]
+        if coincidencias:
+            ruta = coincidencias[0]
+
+    if not os.path.exists(ruta):
+        return None
+
+    with open(ruta, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+
+def logo_esquina_superior_derecha(nombre_archivo="alema_iso.png", alto_px=42):
+    """Coloca el logo fijo en la esquina superior derecha de la página."""
+    img_b64 = cargar_imagen_base64(nombre_archivo, alternativas_prefijo=["alema_iso", "alema_a"])
+    if not img_b64:
+        return
+    st.markdown(
+        f"""
+        <style>
+        .logo-esquina-superior {{
+            position: fixed;
+            top: 12px;
+            right: 20px;
+            z-index: 999999;
+        }}
+        .logo-esquina-superior img {{
+            height: {alto_px}px;
+            width: auto;
+        }}
+        </style>
+        <div class="logo-esquina-superior">
+            <img src="data:image/png;base64,{img_b64}" />
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     """Genera el HTML de una tarjeta de métrica con el estilo unificado (.app-card)."""
     delta_html = ""
     if delta is not None:
