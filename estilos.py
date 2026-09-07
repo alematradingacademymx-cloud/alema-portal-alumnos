@@ -165,6 +165,9 @@ def logo_esquina_superior_derecha(nombre_archivo="alema_iso.png", alto_px=42):
         """,
         unsafe_allow_html=True,
     )
+
+
+def tarjeta(label, value, delta=None, delta_positivo=True):
     """Genera el HTML de una tarjeta de métrica con el estilo unificado (.app-card)."""
     delta_html = ""
     if delta is not None:
