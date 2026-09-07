@@ -2,10 +2,6 @@ import base64
 import os
 from datetime import datetime
 
-import base64
-import os
-from datetime import datetime
-
 import config
 import pandas as pd
 import requests
@@ -15,22 +11,6 @@ import streamlit.components.v1 as components
 # 1. Configuración de pantalla y variables globales
 config.inicializar_configuracion()
 config.inicializar_session_state()
-
-# 🎛️ Forzar modo "embed" para ocultar la barra de Streamlit Cloud (Share/⭐/✏️/GitHub)
-components.html(
-    """
-    <script>
-    (function() {
-        var url = window.top.location.href;
-        if (url.indexOf('embed=true') === -1) {
-            var separador = url.indexOf('?') === -1 ? '?' : '&';
-            window.top.location.href = url + separador + 'embed=true';
-        }
-    })();
-    </script>
-    """,
-    height=0,
-)
 
 # ==========================================
 # 🔑 FUNCIÓN PARA CONVERTIR CUALQUIER FECHA
