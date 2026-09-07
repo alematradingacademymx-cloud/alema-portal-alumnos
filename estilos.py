@@ -112,6 +112,21 @@ def inyectar_estilos():
     )
 
 
+def resolver_archivo_logo(nombre_archivo="alema_iso.png"):
+    """Encuentra el archivo del logo aunque el nombre exacto varíe un poco."""
+    import os
+
+    if not os.path.exists(nombre_archivo):
+        coincidencias = [
+            f
+            for f in os.listdir(".")
+            if f.lower().startswith("alema_iso") or f.lower().startswith("alema_a")
+        ]
+        if coincidencias:
+            nombre_archivo = coincidencias[0]
+    return nombre_archivo if os.path.exists(nombre_archivo) else None
+
+
 def cargar_imagen_base64(nombre_archivo, alternativas_prefijo=None):
     """Busca y codifica una imagen en base64. Si no existe el nombre exacto,
     intenta con archivos que empiecen igual (por si el nombre real difiere un poco)."""
