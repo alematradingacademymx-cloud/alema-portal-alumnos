@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import os
 from datetime import datetime
 
@@ -51,6 +52,10 @@ def cargar_usuarios_desde_sheets():
         df["Tipo_Usuario"] = df["Tipo_Usuario"].fillna("ALUMNO").str.strip().str.upper()
         df["Fecha_Vencimiento"] = df["Fecha_Vencimiento"].fillna("2030-12-31").str.strip()
         df["Capital"] = pd.to_numeric(df["Capital"].fillna("300"), errors="coerce").fillna(300.0)
+        if "Sesion_Version" in df.columns:
+            df["Sesion_Version"] = df["Sesion_Version"].fillna("1").str.strip()
+        else:
+            df["Sesion_Version"] = "1"
 
         dict_usuarios = {}
         for _, row in df.iterrows():
@@ -60,6 +65,7 @@ def cargar_usuarios_desde_sheets():
                     "tipo": row["Tipo_Usuario"],
                     "vencimiento": row["Fecha_Vencimiento"],
                     "capital_base": float(row["Capital"]),
+                    "sesion_version": row["Sesion_Version"] or "1",
                 }
         return dict_usuarios
     except Exception:
@@ -104,6 +110,33 @@ def migrar_password_a_hash(matricula, password_en_texto_plano):
         pass  # Si falla la migración, no interrumpe el login; se reintentará en el próximo inicio de sesión
 
 
+def generar_token_sesion(matricula, sesion_version):
+    """Genera un token firmado. Si sesion_version cambia, todos los tokens viejos dejan de ser válidos."""
+    secreto = st.secrets.get("SESSION_SECRET", "alema_cambia_este_secreto_por_defecto")
+    base = f"{matricula}:{sesion_version}:{secreto}"
+    return hashlib.sha256(base.encode("utf-8")).hexdigest()[:24]
+
+
+def iniciar_sesion_usuario(matricula, user_info):
+    """Deja al usuario autenticado en session_state y persiste el login en la URL."""
+    st.session_state["usuario_autenticado"] = True
+    st.session_state["nombre_usuario"] = matricula
+    st.session_state["usuario_actual"] = matricula
+    st.session_state["tipo_usuario"] = user_info["tipo"]
+    st.session_state["balance_pedagogico"] = float(user_info["capital_base"])
+    st.session_state["sesion_version_usada"] = user_info["sesion_version"]
+
+    token = generar_token_sesion(matricula, user_info["sesion_version"])
+    st.query_params["u"] = matricula
+    st.query_params["t"] = token
+
+
+def cerrar_sesion_usuario():
+    """Limpia la sesión y la URL."""
+    st.session_state.clear()
+    st.query_params.clear()
+
+
 def resolver_archivo_logo():
     """Encuentra el archivo del logo aunque el nombre exacto varíe un poco."""
     archivo_iso = "alema_iso.png"
@@ -118,6 +151,19 @@ def resolver_archivo_logo():
     return archivo_iso if os.path.exists(archivo_iso) else None
 
 # 2. Control de Autenticación con IF / ELSE Estricto
+
+# 🔁 Intento de auto-login vía token en la URL (para que un refresh no cierre la sesión)
+if not st.session_state.get("usuario_autenticado", False):
+    qp_matricula = st.query_params.get("u")
+    qp_token = st.query_params.get("t")
+    if qp_matricula and qp_token and qp_matricula in USUARIOS_AUTORIZADOS:
+        info_qp = USUARIOS_AUTORIZADOS[qp_matricula]
+        token_esperado = generar_token_sesion(qp_matricula, info_qp["sesion_version"])
+        if qp_token == token_esperado:
+            fecha_venc_qp = parsear_fecha(info_qp["vencimiento"])
+            if datetime.now().date() <= fecha_venc_qp:
+                iniciar_sesion_usuario(qp_matricula, info_qp)
+
 if not st.session_state.get("usuario_autenticado", False):
     # 🖼️ ISOTIPO CENTRADO
     archivo_iso = resolver_archivo_logo()
@@ -184,11 +230,7 @@ if not st.session_state.get("usuario_autenticado", False):
                         " suscripción para volver a ingresar."
                     )
                 else:
-                    st.session_state["usuario_autenticado"] = True
-                    st.session_state["nombre_usuario"] = matricula_input
-                    st.session_state["usuario_actual"] = matricula_input
-                    st.session_state["tipo_usuario"] = user_info["tipo"]
-                    st.session_state["balance_pedagogico"] = float(user_info["capital_base"])
+                    iniciar_sesion_usuario(matricula_input, user_info)
                     st.success("¡Acceso concedido!")
                     st.rerun()
             else:
@@ -319,6 +361,37 @@ if not st.session_state.get("usuario_autenticado", False):
 
 else:
     # 3. SISTEMA NATIVO DE NAVEGACIÓN (Solo visible tras iniciar sesión)
+
+    # 🔄 Verificación periódica: vencimiento de suscripción o sesión revocada por el admin
+    try:
+        from streamlit_autorefresh import st_autorefresh
+    except ImportError:
+        def st_autorefresh(interval=60000, key=None):
+            pass
+
+    st_autorefresh(interval=60000, key="chequeo_sesion_activa")
+
+    nombre_usuario_sesion = st.session_state.get("nombre_usuario", "")
+    info_usuario_sesion = USUARIOS_AUTORIZADOS.get(nombre_usuario_sesion)
+
+    if info_usuario_sesion is None:
+        # El usuario ya no existe en el Sheet
+        cerrar_sesion_usuario()
+        st.rerun()
+
+    fecha_venc_sesion = parsear_fecha(info_usuario_sesion["vencimiento"])
+    version_actual_sesion = info_usuario_sesion["sesion_version"]
+    version_usada_sesion = st.session_state.get("sesion_version_usada")
+
+    if datetime.now().date() > fecha_venc_sesion:
+        cerrar_sesion_usuario()
+        st.rerun()
+
+    if version_usada_sesion != version_actual_sesion:
+        # El admin reinició la sesión de este alumno desde el panel
+        cerrar_sesion_usuario()
+        st.rerun()
+
     page_avance = st.Page("modulos/avance_academico.py", title="Mi Avance Académico", icon="🎓")
     page_calculadoras = st.Page("modulos/calculadoras.py", title="Calculadoras de Lotes", icon="🧮")
     page_journal = st.Page("modulos/journal.py", title="Trading Journal", icon="✍️")
@@ -358,6 +431,6 @@ else:
     with st.sidebar:
         st.divider()
         if st.button("🚪 Cerrar Sesión", key="btn_logout_main", use_container_width=True):
-            st.session_state.clear()
+            cerrar_sesion_usuario()
             components.html("<script>window.parent.location.reload();</script>", height=0)
             st.stop()
