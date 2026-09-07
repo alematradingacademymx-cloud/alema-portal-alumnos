@@ -1,6 +1,7 @@
 import base64
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 
 def inyectar_estilos():
@@ -136,6 +137,41 @@ def cargar_imagen_base64(nombre_archivo, alternativas_prefijo=None):
 def logo_esquina_superior_derecha(nombre_archivo="alema_iso.png", alto_px=42):
     """Función deshabilitada para evitar la presencia del logo en la esquina derecha."""
     pass
+
+
+def ticker_tradingview(altura=78):
+    """Muestra el ticker superior de cotizaciones en vivo de TradingView."""
+    ticker_html = """
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+      {
+      "symbols": [
+        {"proName": "FX_IDC:EURUSD", "title": "EUR/USD"},
+        {"proName": "FX_IDC:GBPUSD", "title": "GBP/USD"},
+        {"proName": "FX_IDC:USDJPY", "title": "USD/JPY"},
+        {"proName": "FX_IDC:AUDUSD", "title": "AUD/USD"},
+        {"proName": "FX_IDC:USDCAD", "title": "USD/CAD"},
+        {"proName": "FX_IDC:USDCHF", "title": "USD/CHF"},
+        {"proName": "BITSTAMP:BTCUSD", "title": "BTC/USD"}
+      ],
+      "showSymbolLogo": true,
+      "isTransparent": false,
+      "displayMode": "adaptive",
+      "colorTheme": "dark",
+      "locale": "es"
+    }
+      </script>
+    </div>
+    <style>
+      .tradingview-widget-container {
+        background-color: #FF6B00 !important;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+    </style>
+    """
+    components.html(ticker_html, height=altura)
 
 
 def tarjeta(label, value, delta=None, delta_positivo=True):
