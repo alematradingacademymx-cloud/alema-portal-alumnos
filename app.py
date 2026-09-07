@@ -2,6 +2,7 @@ import base64
 import os
 from datetime import datetime
 
+import bcrypt
 import config
 import estilos
 import pandas as pd
@@ -68,6 +69,41 @@ def cargar_usuarios_desde_sheets():
 USUARIOS_AUTORIZADOS = cargar_usuarios_desde_sheets()
 
 
+def _es_hash_bcrypt(valor):
+    """Detecta si un valor ya es un hash bcrypt (empieza con $2a$, $2b$ o $2y$)."""
+    return isinstance(valor, str) and valor.startswith(("$2a$", "$2b$", "$2y$"))
+
+
+def verificar_password(password_ingresado, password_almacenado):
+    """Verifica la contraseña. Soporta hashes bcrypt y contraseñas antiguas en texto plano."""
+    if _es_hash_bcrypt(password_almacenado):
+        try:
+            return bcrypt.checkpw(
+                password_ingresado.encode("utf-8"), password_almacenado.encode("utf-8")
+            )
+        except Exception:
+            return False
+    # Contraseña antigua en texto plano
+    return password_almacenado == password_ingresado
+
+
+def migrar_password_a_hash(matricula, password_en_texto_plano):
+    """Convierte una contraseña en texto plano a hash bcrypt y la guarda en el Sheet."""
+    try:
+        nuevo_hash = bcrypt.hashpw(
+            password_en_texto_plano.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
+        payload = {
+            "token": st.secrets["APPS_SCRIPT_TOKEN"],
+            "accion": "actualizar_password",
+            "matricula": matricula,
+            "nuevo_hash": nuevo_hash,
+        }
+        requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=15)
+    except Exception:
+        pass  # Si falla la migración, no interrumpe el login; se reintentará en el próximo inicio de sesión
+
+
 def resolver_archivo_logo():
     """Encuentra el archivo del logo aunque el nombre exacto varíe un poco."""
     archivo_iso = "alema_iso.png"
@@ -121,10 +157,22 @@ if not st.session_state.get("usuario_autenticado", False):
     col_btn, _ = st.columns([1, 1])
     with col_btn:
         if st.button("🔑 Iniciar Sesión", use_container_width=True):
-            if (
-                matricula_input in USUARIOS_AUTORIZADOS
-                and USUARIOS_AUTORIZADOS[matricula_input]["password"] == password_input
-            ):
+            usuario_encontrado = matricula_input in USUARIOS_AUTORIZADOS
+            password_almacenado = (
+                USUARIOS_AUTORIZADOS[matricula_input]["password"]
+                if usuario_encontrado
+                else None
+            )
+            password_correcto = usuario_encontrado and verificar_password(
+                password_input, password_almacenado
+            )
+
+            if usuario_encontrado and password_correcto:
+                # Migración transparente: si la contraseña aún estaba en texto
+                # plano, se convierte a hash bcrypt en este mismo inicio de sesión.
+                if not _es_hash_bcrypt(password_almacenado):
+                    migrar_password_a_hash(matricula_input, password_input)
+
                 user_info = USUARIOS_AUTORIZADOS[matricula_input]
                 fecha_venc = parsear_fecha(user_info["vencimiento"])
                 hoy = datetime.now().date()
