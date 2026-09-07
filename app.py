@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 
 import config
+import estilos
 import pandas as pd
 import requests
 import streamlit as st
@@ -66,9 +67,9 @@ def cargar_usuarios_desde_sheets():
 
 USUARIOS_AUTORIZADOS = cargar_usuarios_desde_sheets()
 
-# 2. Control de Autenticación con IF / ELSE Estricto
-if not st.session_state.get("usuario_autenticado", False):
-    # 🖼️ ISOTIPO CENTRADO
+
+def resolver_archivo_logo():
+    """Encuentra el archivo del logo aunque el nombre exacto varíe un poco."""
     archivo_iso = "alema_iso.png"
     if not os.path.exists(archivo_iso):
         coincidencias = [
@@ -78,8 +79,14 @@ if not st.session_state.get("usuario_autenticado", False):
         ]
         if coincidencias:
             archivo_iso = coincidencias[0]
+    return archivo_iso if os.path.exists(archivo_iso) else None
 
-    if os.path.exists(archivo_iso):
+# 2. Control de Autenticación con IF / ELSE Estricto
+if not st.session_state.get("usuario_autenticado", False):
+    # 🖼️ ISOTIPO CENTRADO
+    archivo_iso = resolver_archivo_logo()
+
+    if archivo_iso:
         with open(archivo_iso, "rb") as img_file:
             img_b64 = base64.b64encode(img_file.read()).decode()
         st.markdown(
@@ -91,9 +98,9 @@ if not st.session_state.get("usuario_autenticado", False):
             unsafe_allow_html=True,
         )
 
-    st.markdown('<div class="main-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-brand-title">ALEMA TRADING ACADEMY</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="sub-title">Portal Exclusivo para Alumnos Certificados y'
+        '<div class="login-brand-subtitle">Portal Exclusivo para Alumnos Certificados y'
         " Suscriptores</div>",
         unsafe_allow_html=True,
     )
@@ -286,6 +293,11 @@ else:
         paginas_disponibles = [page_calculadoras, page_biblioteca]
 
     pg = st.navigation(paginas_disponibles)
+
+    archivo_logo_sidebar = resolver_archivo_logo()
+    if archivo_logo_sidebar:
+        st.logo(archivo_logo_sidebar, size="large")
+        estilos.logo_esquina_superior_derecha(archivo_logo_sidebar, alto_px=42)
 
     with st.sidebar:
         st.title("🧭 Menú Principal")
