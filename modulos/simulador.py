@@ -8,6 +8,8 @@ import plotly.graph_objects as go
 import requests
 import streamlit as st
 
+import estilos
+
 try:
     from streamlit_autorefresh import st_autorefresh
 except ImportError:
@@ -210,6 +212,8 @@ def render_simulador_alema_live():
         ' Institucional</div>',
         unsafe_allow_html=True,
     )
+
+    estilos.ticker_tradingview()
 
     lista_activos = [
         "EURUSD",
