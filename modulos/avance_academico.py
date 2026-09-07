@@ -101,15 +101,15 @@ else:
     # 2. Pestañas de soporte
     tab_reglamento, tab_horario = st.tabs([
         "📜 Términos & Mantenimiento de Beca",
-        "📅 Horario de Clases",
+        "📅 Proximos eventos",
     ])
 
     with tab_reglamento:
         st.markdown("""
-            * **Asistencia a Clases:** Asistir al menos al 80% de las másterclass en vivo o revisar grabaciones en un plazo no mayor a 72 horas.
-            * **Calificación Mínima:** Mantener un promedio ponderado igual o superior a **8.5 / 10** en las evaluaciones.
+            * **Asistencia a Clases:** Asistir al menos al 80% de las másterclass en vivo o presentar evaluaciones en un plazo no mayor a 24 horas.
+            * **Calificación Mínima:** Mantener un promedio ponderado igual o superior a **85% / 100%** en las evaluaciones.
             * **Cumplimiento de Trading Journal:** Entregar semanalmente la bitácora de riesgo y análisis técnico revisada por coordinación.
-            * **Puntualidad de Matrícula:** Mantener al día la cuota de mantenimiento de plataforma.
+            * **Puntualidad de Matrícula:** Mantener al día la cuota de pago de tu inscripción.
             """)
 
     with tab_horario:
@@ -122,15 +122,15 @@ else:
                 "19:00 - 20:30",
             ],
             "Sesión / Materia": [
-                "Estructura de Mercado & Wyckoff",
+                "Seminario operativo",
                 "Gestión de Riesgo & Lotaje Práctico",
                 "Másterclass de Puntos Pivote & Fibonacci",
                 "Revisión de Bitácora & Q&A",
             ],
             "Instructor": [
-                "Alex Marroquín",
-                "Alex Marroquín",
-                "Alex Marroquín",
+                "Nicolas Esquivel",
+                "Daniela Lara",
+                "Samanta Estrada",
                 "Coordinación Académica",
             ],
         }
