@@ -302,6 +302,21 @@ def actualizar_permisos_sheet(matricula, modulos_habilitados_str, simulador_habi
         return False, str(e)
 
 
+def reiniciar_sesion_sheet(matricula):
+    """Revoca los tokens de sesión activos de un alumno (fuerza a que vuelva a iniciar sesión)."""
+    try:
+        payload = {
+            "token": st.secrets["APPS_SCRIPT_TOKEN"],
+            "accion": "reiniciar_sesion",
+            "matricula": matricula,
+        }
+        resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=10)
+        data = resp.json()
+        return data.get("success", False), data.get("error", "")
+    except Exception as e:
+        return False, str(e)
+
+
 # ==========================================
 # CÓDIGO DEL MÓDULO RENDERIZADO DIRECTO
 # ==========================================
@@ -682,6 +697,30 @@ with tab_historial:
                     "#### Configurando Módulos y Herramientas para:"
                     f" `{alumno_mat_permiso}`"
                 )
+
+                col_sesion_1, col_sesion_2 = st.columns([3, 1])
+                with col_sesion_1:
+                    st.caption(
+                        "🔒 Si sospechas que el link de acceso de este alumno se"
+                        " compartió con alguien más, ciérrale la sesión de golpe:"
+                    )
+                with col_sesion_2:
+                    if st.button(
+                        "🔄 Reiniciar Sesión",
+                        key=f"btn_reiniciar_sesion_{alumno_mat_permiso}",
+                        use_container_width=True,
+                    ):
+                        exito_rs, error_rs = reiniciar_sesion_sheet(alumno_mat_permiso)
+                        if exito_rs:
+                            st.toast(
+                                f"✅ Sesión de {alumno_mat_permiso} reiniciada."
+                                " Tendrá que volver a iniciar sesión.",
+                                icon="✅",
+                            )
+                        else:
+                            st.error(f"⚠️ No se pudo reiniciar la sesión: {error_rs}")
+
+                st.divider()
 
                 with st.form(f"form_permisos_{alumno_mat_permiso}"):
                     nuevos_permisos_modulos = []
