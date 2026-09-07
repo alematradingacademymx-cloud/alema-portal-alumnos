@@ -1,6 +1,8 @@
 import plotly.graph_objects as go
 import streamlit as st
 
+import estilos
+
 # =========================================================
 # Módulo 2: Calculadoras de Lotes y Riesgo Institucional
 # =========================================================
@@ -14,6 +16,8 @@ st.markdown(
     " de Gestión de Riesgo y Lotajes</div>",
     unsafe_allow_html=True,
 )
+
+estilos.ticker_tradingview()
 
 tab_operativa, tab_rapida = st.tabs([
     "⚡ Calculadora Operativa Completa",
