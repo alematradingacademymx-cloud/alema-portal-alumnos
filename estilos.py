@@ -33,11 +33,6 @@ def inyectar_estilos():
             box-shadow: none !important;
         }
 
-        /* Ocultar el logo nativo de Streamlit si está activo para evitar duplicados en la izquierda */
-        [data-testid="stLogo"] {
-            display: none !important;
-        }
-
         /* ============================================
            TÍTULOS UNIFICADOS
            ============================================ */
@@ -139,30 +134,8 @@ def cargar_imagen_base64(nombre_archivo, alternativas_prefijo=None):
 
 
 def logo_esquina_superior_derecha(nombre_archivo="alema_iso.png", alto_px=42):
-    """Coloca el logo fijo en la esquina superior derecha de la página."""
-    img_b64 = cargar_imagen_base64(nombre_archivo, alternativas_prefijo=["alema_iso", "alema_a"])
-    if not img_b64:
-        return
-    st.markdown(
-        f"""
-        <style>
-        .logo-esquina-superior {{
-            position: fixed;
-            top: 12px;
-            right: 20px;
-            z-index: 999999;
-        }}
-        .logo-esquina-superior img {{
-            height: {alto_px}px;
-            width: auto;
-        }}
-        </style>
-        <div class="logo-esquina-superior">
-            <img src="data:image/png;base64,{img_b64}" />
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """Función deshabilitada para evitar la presencia del logo en la esquina derecha."""
+    pass
 
 
 def tarjeta(label, value, delta=None, delta_positivo=True):
