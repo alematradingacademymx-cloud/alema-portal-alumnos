@@ -147,7 +147,7 @@ def render_simulador_alema_live():
     )
 
     if usuario.upper() != "DIRALEX" and not simulador_habilitado_sheet:
-        st.warning("🔒 **Acceso Restringido al Simulador Institucional**")
+        st.warning("🔒 **Acceso Restringido a la Terminal ALEMA**")
         st.info(
             "Esta herramienta requiere autorización de Dirección General o"
             " desbloqueo progresivo según tu avance de módulos."
@@ -208,8 +208,7 @@ def render_simulador_alema_live():
 
     st.markdown(
         '<div class="main-title" style="text-align: left; font-size: 24px;'
-        ' font-weight: 700;">ALEMA TRADING ACADEMY | Terminal'
-        ' Institucional</div>',
+        ' font-weight: 700;">Terminal ALEMA</div>',
         unsafe_allow_html=True,
     )
 
