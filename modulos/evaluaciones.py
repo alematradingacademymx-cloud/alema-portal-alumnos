@@ -755,7 +755,7 @@ with tab_historial:
                     st.markdown("---")
                     st.markdown("##### **2. Herramientas Avanzadas:**")
                     check_sim = st.checkbox(
-                        "🚀 Habilitar Acceso al Simulador Institucional",
+                        "🚀 Habilitar Acceso a la Terminal ALEMA",
                         value=simulador_actual_bool,
                         key=f"chk_sim_{alumno_mat_permiso}",
                     )
