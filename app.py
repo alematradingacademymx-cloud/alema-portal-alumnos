@@ -467,7 +467,7 @@ else:
     page_avance = st.Page("modulos/avance_academico.py", title="Mi Avance Académico", icon="🎓")
     page_calculadoras = st.Page("modulos/calculadoras.py", title="Calculadoras de Lotes", icon="🧮")
     page_journal = st.Page("modulos/journal.py", title="Trading Journal", icon="✍️")
-    page_simulador = st.Page("modulos/simulador.py", title="Simulador Institucional", icon="📊")
+    page_simulador = st.Page("modulos/simulador.py", title="Terminal ALEMA", icon="📊")
     page_biblioteca = st.Page("modulos/biblioteca.py", title="Biblioteca de Guías", icon="📚")
     page_evaluaciones = st.Page("modulos/evaluaciones.py", title="Evaluaciones y Control Académico", icon="📝")
 
