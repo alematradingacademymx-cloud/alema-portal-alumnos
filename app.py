@@ -184,7 +184,9 @@ def iniciar_sesion_usuario(matricula, user_info):
     token = generar_token_sesion(matricula, user_info["sesion_version"])
     st.query_params["u"] = matricula
     st.query_params["t"] = token
-    guardar_sesion_local_storage(matricula, token)
+    # Nota: no escribimos localStorage aquí — el bloque de "reafirmación" que
+    # corre justo después (en el mismo rerun, o en el siguiente si hay
+    # st.rerun() de por medio) ya se encarga de eso una sola vez.
 
 
 def cerrar_sesion_usuario():
