@@ -110,6 +110,61 @@ def migrar_password_a_hash(matricula, password_en_texto_plano):
         pass  # Si falla la migración, no interrumpe el login; se reintentará en el próximo inicio de sesión
 
 
+def guardar_sesion_local_storage(matricula, token):
+    """Guarda el token también en localStorage del navegador (sobrevive refresh en cualquier sub-página)."""
+    components.html(
+        f"""
+        <script>
+        try {{
+            window.localStorage.setItem('alema_u', {matricula!r});
+            window.localStorage.setItem('alema_t', {token!r});
+        }} catch (e) {{}}
+        </script>
+        """,
+        height=0,
+    )
+
+
+def limpiar_sesion_local_storage():
+    """Borra el token guardado en localStorage al cerrar sesión."""
+    components.html(
+        """
+        <script>
+        try {
+            window.localStorage.removeItem('alema_u');
+            window.localStorage.removeItem('alema_t');
+        } catch (e) {}
+        </script>
+        """,
+        height=0,
+    )
+
+
+def restaurar_sesion_desde_local_storage():
+    """Si la URL no trae el token pero localStorage sí, redirige agregándolo a la URL.
+    Esto evita que un refresh en cualquier sub-página pierda la sesión."""
+    components.html(
+        """
+        <script>
+        try {
+            var params = new URLSearchParams(window.top.location.search);
+            if (!params.has('u') || !params.has('t')) {
+                var storedU = window.localStorage.getItem('alema_u');
+                var storedT = window.localStorage.getItem('alema_t');
+                if (storedU && storedT) {
+                    params.set('u', storedU);
+                    params.set('t', storedT);
+                    var nuevaUrl = window.top.location.pathname + '?' + params.toString();
+                    window.top.location.replace(nuevaUrl);
+                }
+            }
+        } catch (e) {}
+        </script>
+        """,
+        height=0,
+    )
+
+
 def generar_token_sesion(matricula, sesion_version):
     """Genera un token firmado. Si sesion_version cambia, todos los tokens viejos dejan de ser válidos."""
     secreto = st.secrets.get("SESSION_SECRET", "alema_cambia_este_secreto_por_defecto")
@@ -118,7 +173,7 @@ def generar_token_sesion(matricula, sesion_version):
 
 
 def iniciar_sesion_usuario(matricula, user_info):
-    """Deja al usuario autenticado en session_state y persiste el login en la URL."""
+    """Deja al usuario autenticado en session_state y persiste el login en la URL + localStorage."""
     st.session_state["usuario_autenticado"] = True
     st.session_state["nombre_usuario"] = matricula
     st.session_state["usuario_actual"] = matricula
@@ -129,12 +184,14 @@ def iniciar_sesion_usuario(matricula, user_info):
     token = generar_token_sesion(matricula, user_info["sesion_version"])
     st.query_params["u"] = matricula
     st.query_params["t"] = token
+    guardar_sesion_local_storage(matricula, token)
 
 
 def cerrar_sesion_usuario():
-    """Limpia la sesión y la URL."""
+    """Limpia la sesión, la URL y localStorage."""
     st.session_state.clear()
     st.query_params.clear()
+    limpiar_sesion_local_storage()
 
 
 def resolver_archivo_logo():
@@ -151,6 +208,11 @@ def resolver_archivo_logo():
     return archivo_iso if os.path.exists(archivo_iso) else None
 
 # 2. Control de Autenticación con IF / ELSE Estricto
+
+# 🔁 Si la URL no trae el token, intenta restaurarlo desde localStorage
+if not st.session_state.get("usuario_autenticado", False):
+    if not (st.query_params.get("u") and st.query_params.get("t")):
+        restaurar_sesion_desde_local_storage()
 
 # 🔁 Intento de auto-login vía token en la URL (para que un refresh no cierre la sesión)
 if not st.session_state.get("usuario_autenticado", False):
@@ -392,11 +454,13 @@ else:
         cerrar_sesion_usuario()
         st.rerun()
 
-    # 🔁 Reafirmar el token en la URL en cada carga — la navegación entre
-    # páginas (st.Page) puede limpiar los query params, así que lo volvemos
-    # a poner siempre para que un refresh nunca lo pierda.
+    # 🔁 Reafirmar el token en la URL y localStorage en cada carga — la
+    # navegación entre páginas (st.Page) puede limpiar los query params,
+    # así que lo volvemos a poner siempre para que un refresh nunca lo pierda.
+    token_reafirmado = generar_token_sesion(nombre_usuario_sesion, version_actual_sesion)
     st.query_params["u"] = nombre_usuario_sesion
-    st.query_params["t"] = generar_token_sesion(nombre_usuario_sesion, version_actual_sesion)
+    st.query_params["t"] = token_reafirmado
+    guardar_sesion_local_storage(nombre_usuario_sesion, token_reafirmado)
 
     page_avance = st.Page("modulos/avance_academico.py", title="Mi Avance Académico", icon="🎓")
     page_calculadoras = st.Page("modulos/calculadoras.py", title="Calculadoras de Lotes", icon="🧮")
