@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import requests
 import streamlit as st
 
@@ -20,6 +18,16 @@ SIMBOLOS_MAP = {
     "USDCHF": "USD/CHF", "GBPJPY": "GBP/JPY", "XAUUSD": "XAU/USD",
     "WTIUSD": "WTI/USD", "BRENTUSD": "BRENT/USD", "US30": "US30",
     "SPX500": "SPX", "NAS100": "NDX", "GER40": "DAX", "BTCUSD": "BTC/USD",
+}
+
+# Símbolos equivalentes en TradingView para el botón "Ver Gráfico"
+SIMBOLOS_TRADINGVIEW = {
+    "EURUSD": "FX:EURUSD", "GBPUSD": "FX:GBPUSD", "USDJPY": "FX:USDJPY",
+    "EURJPY": "FX:EURJPY", "AUDUSD": "FX:AUDUSD", "USDCAD": "FX:USDCAD",
+    "USDCHF": "FX:USDCHF", "GBPJPY": "FX:GBPJPY", "XAUUSD": "OANDA:XAUUSD",
+    "WTIUSD": "TVC:USOIL", "BRENTUSD": "TVC:UKOIL", "US30": "TVC:DJI",
+    "SPX500": "FOREXCOM:SPXUSD", "NAS100": "FOREXCOM:NSXUSD",
+    "GER40": "FOREXCOM:GRXEUR", "BTCUSD": "BITSTAMP:BTCUSD",
 }
 
 
@@ -73,6 +81,20 @@ def formato_decimales(simbolo):
     return "%.5f"
 
 
+def mostrar_tarjetas_niveles(niveles, fmt="%.5f"):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(estilos.tarjeta("Resistencia 3", fmt % niveles["R3"]), unsafe_allow_html=True)
+        st.markdown(estilos.tarjeta("Resistencia 2", fmt % niveles["R2"]), unsafe_allow_html=True)
+        st.markdown(estilos.tarjeta("Resistencia 1", fmt % niveles["R1"]), unsafe_allow_html=True)
+    with col2:
+        st.markdown(estilos.tarjeta("PUNTO PIVOTE (PP)", fmt % niveles["PP"]), unsafe_allow_html=True)
+    with col3:
+        st.markdown(estilos.tarjeta("Soporte 1", fmt % niveles["S1"]), unsafe_allow_html=True)
+        st.markdown(estilos.tarjeta("Soporte 2", fmt % niveles["S2"]), unsafe_allow_html=True)
+        st.markdown(estilos.tarjeta("Soporte 3", fmt % niveles["S3"]), unsafe_allow_html=True)
+
+
 # ==========================================
 # CÓDIGO DEL MÓDULO
 # ==========================================
@@ -88,9 +110,16 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-par_activo_pivote = st.selectbox(
-    "Símbolo de Mercado", LISTA_ACTIVOS, key="select_pivote_activo"
-)
+col_sel, col_tv = st.columns([2, 1])
+with col_sel:
+    par_activo_pivote = st.selectbox(
+        "Símbolo de Mercado", LISTA_ACTIVOS, key="select_pivote_activo"
+    )
+with col_tv:
+    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+    simbolo_tv = SIMBOLOS_TRADINGVIEW.get(par_activo_pivote, f"FX:{par_activo_pivote}")
+    url_tv = f"https://es.tradingview.com/chart/?symbol={simbolo_tv}"
+    st.link_button("📈 Ver en TradingView", url_tv, use_container_width=True)
 
 col_btn_pivote, _ = st.columns([1, 2])
 with col_btn_pivote:
@@ -98,45 +127,43 @@ with col_btn_pivote:
         "🔄 Calcular con Datos en Vivo", use_container_width=True
     )
 
-vela = None
 if calcular_en_vivo:
     with st.spinner("Consultando la vela del último día cerrado..."):
         vela = obtener_vela_anterior(par_activo_pivote)
-    if vela is None:
+    if vela:
+        st.session_state["vela_pivote_vivo"] = vela
+        st.session_state["simbolo_pivote_vivo"] = par_activo_pivote
+    else:
         st.error(
             "⚠️ No se pudo obtener la vela en vivo en este momento. Puedes"
             " ingresar los valores manualmente abajo."
         )
 
-if vela:
-    fmt = formato_decimales(par_activo_pivote)
+# Los resultados quedan guardados en la sesión — no desaparecen al navegar
+# ni al interactuar con otras partes de la página.
+if "vela_pivote_vivo" in st.session_state:
+    vela = st.session_state["vela_pivote_vivo"]
+    simbolo_mostrado = st.session_state.get("simbolo_pivote_vivo", par_activo_pivote)
+    fmt = formato_decimales(simbolo_mostrado)
+
     st.success(
-        f"✅ Vela del {vela['fecha']} — Máximo: **{fmt % vela['high']}** |"
-        f" Mínimo: **{fmt % vela['low']}** | Cierre: **{fmt % vela['close']}**"
+        f"✅ {simbolo_mostrado} — Vela del {vela['fecha']} — Máximo:"
+        f" **{fmt % vela['high']}** | Mínimo: **{fmt % vela['low']}** |"
+        f" Cierre: **{fmt % vela['close']}**"
     )
 
     niveles = calcular_pivotes_clasicos(vela["high"], vela["low"], vela["close"])
-
     st.markdown("#### 🎯 Niveles de Pivote")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(estilos.tarjeta("Resistencia 3", fmt % niveles["R3"]), unsafe_allow_html=True)
-        st.markdown(estilos.tarjeta("Resistencia 2", fmt % niveles["R2"]), unsafe_allow_html=True)
-        st.markdown(estilos.tarjeta("Resistencia 1", fmt % niveles["R1"]), unsafe_allow_html=True)
-    with col2:
-        st.markdown(estilos.tarjeta("PUNTO PIVOTE (PP)", fmt % niveles["PP"]), unsafe_allow_html=True)
-    with col3:
-        st.markdown(estilos.tarjeta("Soporte 1", fmt % niveles["S1"]), unsafe_allow_html=True)
-        st.markdown(estilos.tarjeta("Soporte 2", fmt % niveles["S2"]), unsafe_allow_html=True)
-        st.markdown(estilos.tarjeta("Soporte 3", fmt % niveles["S3"]), unsafe_allow_html=True)
+    mostrar_tarjetas_niveles(niveles, fmt)
 
 st.divider()
 
-with st.expander("✍️ O ingresa los valores manualmente"):
+with st.expander("✍️ O ingresa los valores manualmente", expanded=("niveles_pivote_manual" in st.session_state)):
     st.caption(
         "Útil si quieres calcular pivotes de una vela específica (otro"
         " timeframe, un activo no listado, o para practicar el cálculo a"
-        " mano)."
+        " mano). Tus valores se quedan guardados aunque navegues a otra"
+        " sección y regreses."
     )
     col_m1, col_m2, col_m3 = st.columns(3)
     with col_m1:
@@ -146,20 +173,30 @@ with st.expander("✍️ O ingresa los valores manualmente"):
     with col_m3:
         close_manual = st.number_input("Cierre (Close)", value=0.0, format="%.5f", key="pivote_close_manual")
 
-    if st.button("📐 Calcular Pivotes Manuales", key="btn_calcular_manual"):
+    col_calc, col_limpiar = st.columns([2, 1])
+    with col_calc:
+        calcular_manual = st.button(
+            "📐 Calcular Pivotes Manuales", key="btn_calcular_manual", use_container_width=True
+        )
+    with col_limpiar:
+        limpiar_manual = st.button(
+            "🧹 Limpiar Valores", key="btn_limpiar_manual", use_container_width=True
+        )
+
+    if calcular_manual:
         if high_manual > 0 and low_manual > 0 and close_manual > 0 and high_manual >= low_manual:
-            niveles_m = calcular_pivotes_clasicos(high_manual, low_manual, close_manual)
-            st.markdown("#### 🎯 Niveles de Pivote (Manual)")
-            colm1, colm2, colm3 = st.columns(3)
-            with colm1:
-                st.markdown(estilos.tarjeta("Resistencia 3", f"{niveles_m['R3']:.5f}"), unsafe_allow_html=True)
-                st.markdown(estilos.tarjeta("Resistencia 2", f"{niveles_m['R2']:.5f}"), unsafe_allow_html=True)
-                st.markdown(estilos.tarjeta("Resistencia 1", f"{niveles_m['R1']:.5f}"), unsafe_allow_html=True)
-            with colm2:
-                st.markdown(estilos.tarjeta("PUNTO PIVOTE (PP)", f"{niveles_m['PP']:.5f}"), unsafe_allow_html=True)
-            with colm3:
-                st.markdown(estilos.tarjeta("Soporte 1", f"{niveles_m['S1']:.5f}"), unsafe_allow_html=True)
-                st.markdown(estilos.tarjeta("Soporte 2", f"{niveles_m['S2']:.5f}"), unsafe_allow_html=True)
-                st.markdown(estilos.tarjeta("Soporte 3", f"{niveles_m['S3']:.5f}"), unsafe_allow_html=True)
+            st.session_state["niveles_pivote_manual"] = calcular_pivotes_clasicos(
+                high_manual, low_manual, close_manual
+            )
         else:
             st.warning("Ingresa valores válidos (Máximo debe ser mayor o igual al Mínimo).")
+
+    if limpiar_manual:
+        for clave in ["pivote_high_manual", "pivote_low_manual", "pivote_close_manual", "niveles_pivote_manual"]:
+            if clave in st.session_state:
+                del st.session_state[clave]
+        st.rerun()
+
+    if "niveles_pivote_manual" in st.session_state:
+        st.markdown("#### 🎯 Niveles de Pivote (Manual)")
+        mostrar_tarjetas_niveles(st.session_state["niveles_pivote_manual"], "%.5f")
