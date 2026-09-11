@@ -466,6 +466,7 @@ else:
 
     page_avance = st.Page("modulos/avance_academico.py", title="Mi Avance Académico", icon="🎓")
     page_calculadoras = st.Page("modulos/calculadoras.py", title="Calculadoras de Lotes", icon="🧮")
+    page_pivotes = st.Page("modulos/calculadora_pivotes.py", title="Calculadora de Pivotes", icon="📐")
     page_journal = st.Page("modulos/journal.py", title="Trading Journal", icon="✍️")
     page_simulador = st.Page("modulos/simulador.py", title="Terminal ALEMA", icon="📊")
     page_biblioteca = st.Page("modulos/biblioteca.py", title="Biblioteca de Guías", icon="📚")
@@ -477,13 +478,14 @@ else:
         paginas_disponibles = [
             page_avance,
             page_calculadoras,
+            page_pivotes,
             page_journal,
             page_simulador,
             page_biblioteca,
             page_evaluaciones,
         ]
     else:  # SUSCRIPTOR u otros roles con acceso limitado
-        paginas_disponibles = [page_calculadoras, page_biblioteca]
+        paginas_disponibles = [page_calculadoras, page_pivotes, page_biblioteca]
 
     pg = st.navigation(paginas_disponibles)
 
