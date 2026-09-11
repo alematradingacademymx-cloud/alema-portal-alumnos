@@ -110,8 +110,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-estilos.ticker_tradingview()
-
 col_sel, col_tv = st.columns([2, 1])
 with col_sel:
     par_activo_pivote = st.selectbox(
@@ -122,6 +120,8 @@ with col_tv:
     simbolo_tv = SIMBOLOS_TRADINGVIEW.get(par_activo_pivote, f"FX:{par_activo_pivote}")
     url_tv = f"https://es.tradingview.com/chart/?symbol={simbolo_tv}"
     st.link_button("📈 Ver en TradingView", url_tv, use_container_width=True)
+
+estilos.grafico_tradingview(simbolo_tv, altura=500, intervalo="15")
 
 col_btn_pivote, _ = st.columns([1, 2])
 with col_btn_pivote:

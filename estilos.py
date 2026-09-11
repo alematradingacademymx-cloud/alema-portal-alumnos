@@ -28,7 +28,7 @@ def inyectar_estilos():
         .stAppDeployButton {
             display: none !important;
         }
-        
+
         header[data-testid="stHeader"] {
             background: transparent !important;
             box-shadow: none !important;
@@ -152,6 +152,35 @@ def cargar_imagen_base64(nombre_archivo, alternativas_prefijo=None):
 def logo_esquina_superior_derecha(nombre_archivo="alema_iso.png", alto_px=42):
     """Función deshabilitada para evitar la presencia del logo en la esquina derecha."""
     pass
+
+
+def grafico_tradingview(simbolo_tv, altura=500, intervalo="15"):
+    """Muestra el gráfico completo e interactivo de TradingView embebido en la página."""
+    contenedor_id = "tv_grafico_" + simbolo_tv.replace(":", "_").replace("/", "_")
+    grafico_html = f"""
+    <div class="tradingview-widget-container">
+      <div id="{contenedor_id}"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget({{
+        "width": "100%",
+        "height": {altura},
+        "symbol": "{simbolo_tv}",
+        "interval": "{intervalo}",
+        "timezone": "America/Mexico_City",
+        "theme": "dark",
+        "style": "1",
+        "locale": "es",
+        "toolbar_bg": "#131722",
+        "enable_publishing": false,
+        "hide_side_toolbar": false,
+        "allow_symbol_change": true,
+        "container_id": "{contenedor_id}"
+      }});
+      </script>
+    </div>
+    """
+    components.html(grafico_html, height=altura + 20)
 
 
 def ticker_tradingview(altura=78):
