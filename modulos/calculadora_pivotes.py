@@ -110,6 +110,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+estilos.ticker_tradingview()
+
 col_sel, col_tv = st.columns([2, 1])
 with col_sel:
     par_activo_pivote = st.selectbox(
