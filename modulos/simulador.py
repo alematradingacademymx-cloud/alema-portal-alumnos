@@ -312,26 +312,67 @@ def render_simulador_alema_live():
     if "mercado_forex_df" not in st.session_state:
         st.session_state.mercado_forex_df = {}
 
+    @st.cache_data(ttl=300)
+    def obtener_historial_real(simbolo_api_map, api_key_td, intervalo="15min", cantidad=96):
+        """Trae velas reales de Twelvedata (por defecto: 1 jornada completa en velas de 15 min)."""
+        try:
+            url = (
+                "https://api.twelvedata.com/time_series"
+                f"?symbol={simbolo_api_map}&interval={intervalo}&outputsize={cantidad}"
+                f"&apikey={api_key_td}"
+            )
+            res = requests.get(url, timeout=6)
+            data = res.json()
+            valores = data.get("values", [])
+            if not valores:
+                return None
+
+            df_real = pd.DataFrame(valores)
+            df_real["datetime"] = pd.to_datetime(df_real["datetime"])
+            df_real = df_real.sort_values("datetime")
+            for col in ["open", "high", "low", "close"]:
+                df_real[col] = df_real[col].astype(float)
+            df_real = df_real.set_index("datetime")[["open", "high", "low", "close"]]
+            df_real.columns = ["Open", "High", "Low", "Close"]
+            return df_real
+        except Exception:
+            return None
+
     def obtener_dataframe_forex(simbolo, precio_actual):
         if simbolo not in st.session_state.mercado_forex_df:
-            fechas = [
-                datetime.now() - timedelta(minutes=15 * i) for i in range(50)
-            ][::-1]
-            vol = precio_actual * 0.0004
-            np.random.seed(123)
-            closes = np.linspace(
-                precio_actual - (vol * 4), precio_actual, 50
-            ) + np.random.normal(0, vol * 0.2, 50)
-            opens = closes + np.random.normal(0, vol * 0.1, 50)
-            highs = np.maximum(opens, closes) + abs(
-                np.random.normal(0, vol * 0.2, 50)
-            )
-            lows = np.minimum(opens, closes) - abs(np.random.normal(0, vol * 0.2, 50))
+            simbolos_map_historial = {
+                "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY",
+                "EURJPY": "EUR/JPY", "AUDUSD": "AUD/USD", "USDCAD": "USD/CAD",
+                "USDCHF": "USD/CHF", "GBPJPY": "GBP/JPY", "XAUUSD": "XAU/USD",
+                "WTIUSD": "WTI/USD", "BRENTUSD": "BRENT/USD", "US30": "US30",
+                "SPX500": "SPX", "NAS100": "NDX", "GER40": "DAX", "BTCUSD": "BTC/USD",
+            }
+            simbolo_api_hist = simbolos_map_historial.get(simbolo, "EUR/USD")
+            api_key_hist = "6223c6d78f7a43b2872fc3acbb3f578e"
 
-            df_init = pd.DataFrame(
-                {"Open": opens, "High": highs, "Low": lows, "Close": closes},
-                index=fechas,
-            )
+            df_init = obtener_historial_real(simbolo_api_hist, api_key_hist)
+
+            if df_init is None:
+                # Respaldo: si la API falla, se genera un historial aproximado
+                # (mismo comportamiento de antes, solo como último recurso)
+                fechas = [
+                    datetime.now() - timedelta(minutes=15 * i) for i in range(96)
+                ][::-1]
+                vol = precio_actual * 0.0004
+                np.random.seed(123)
+                closes = np.linspace(
+                    precio_actual - (vol * 4), precio_actual, 96
+                ) + np.random.normal(0, vol * 0.2, 96)
+                opens = closes + np.random.normal(0, vol * 0.1, 96)
+                highs = np.maximum(opens, closes) + abs(
+                    np.random.normal(0, vol * 0.2, 96)
+                )
+                lows = np.minimum(opens, closes) - abs(np.random.normal(0, vol * 0.2, 96))
+                df_init = pd.DataFrame(
+                    {"Open": opens, "High": highs, "Low": lows, "Close": closes},
+                    index=fechas,
+                )
+
             st.session_state.mercado_forex_df[simbolo] = df_init
 
         df = st.session_state.mercado_forex_df[simbolo]
@@ -525,12 +566,32 @@ def render_simulador_alema_live():
             plot_bgcolor="#131722",
             height=430,
             margin=dict(l=10, r=10, t=10, b=10),
+            # 🔒 Mantiene tu zoom/paneo aunque el gráfico se actualice solo
+            uirevision=par_activo,
+            hovermode="x",
             xaxis=dict(
                 showgrid=True,
                 gridcolor="#2A2E39",
                 rangeslider=dict(visible=False),
+                showspikes=True,
+                spikemode="across",
+                spikesnap="cursor",
+                spikethickness=1,
+                spikedash="solid",
+                spikecolor="#FF6B00",
             ),
-            yaxis=dict(showgrid=True, gridcolor="#2A2E39", zeroline=False),
+            yaxis=dict(
+                showgrid=True,
+                gridcolor="#2A2E39",
+                zeroline=False,
+                nticks=18,
+                showspikes=True,
+                spikemode="across",
+                spikesnap="cursor",
+                spikethickness=1,
+                spikedash="solid",
+                spikecolor="#FF6B00",
+            ),
             dragmode="pan",
         )
         st.plotly_chart(
@@ -625,9 +686,9 @@ def render_simulador_alema_live():
             st.markdown(
                 f"""
                     <div class="mt5-terminal-card">
-                        <b>{pos['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}">{pos['tipo']}</span> | 
-                        Entrada: <code>{fmt_pos % pos['entrada']}</code> | Salida Actual: <code style="color: #26a69a;">{fmt_pos % p_salida}</code> | 
-                        TP: <span style="color:#26a69a;">{fmt_pos % pos['tp']}</span> | SL: <span style="color:#ef5350;">{fmt_pos % pos['sl']}</span> | 
+                        <b>{pos['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos['tipo']=='BUY' else '#ef5350'}">{pos['tipo']}</span> |
+                        Entrada: <code>{fmt_pos % pos['entrada']}</code> | Salida Actual: <code style="color: #26a69a;">{fmt_pos % p_salida}</code> |
+                        TP: <span style="color:#26a69a;">{fmt_pos % pos['tp']}</span> | SL: <span style="color:#ef5350;">{fmt_pos % pos['sl']}</span> |
                         PnL: <b style="color: {'#26a69a' if pnl_card>=0 else '#ef5350'}">${pnl_card:,.2f} USD</b>
                     </div>
                 """,
@@ -743,9 +804,9 @@ def render_simulador_alema_live():
                             st.markdown(
                                 f"""
                                     <div class="mt5-terminal-card">
-                                        <b>{pos_mon['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos_mon['tipo']=='BUY' else '#ef5350'}">{pos_mon['tipo']}</span> | 
-                                        Entrada: <code>{fmt_mon % pos_mon['entrada']}</code> | Actual: <code style="color: #26a69a;">{fmt_mon % p_salida_mon}</code> | 
-                                        Lotes: {pos_mon['lotes']:.2f} | 
+                                        <b>{pos_mon['activo']}</b> | Tipo: <span style="color: {'#26a69a' if pos_mon['tipo']=='BUY' else '#ef5350'}">{pos_mon['tipo']}</span> |
+                                        Entrada: <code>{fmt_mon % pos_mon['entrada']}</code> | Actual: <code style="color: #26a69a;">{fmt_mon % p_salida_mon}</code> |
+                                        Lotes: {pos_mon['lotes']:.2f} |
                                         PnL: <b style="color: {'#26a69a' if pnl_mon>=0 else '#ef5350'}">${pnl_mon:,.2f} USD</b>
                                     </div>
                                 """,
