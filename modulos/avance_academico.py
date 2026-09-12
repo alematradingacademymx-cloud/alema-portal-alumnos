@@ -83,11 +83,11 @@ else:
         ]
 
         if estudiante_df.empty:
-            st.info("ℹ️ Selecciona la matrícula o alumno para consultar los datos:")
-            matricula_sel = st.selectbox(
-                "Buscar por Matrícula / Alumno:", df["Matricula"].unique()
+            st.info(
+                "ℹ️ Tu información académica todavía no ha sido registrada."
+                " Contacta a Dirección Académica para que la agreguen."
             )
-            estudiante_row = df[df["Matricula"] == matricula_sel].iloc[0]
+            st.stop()
         else:
             estudiante_row = estudiante_df.iloc[0]
 
