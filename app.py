@@ -355,17 +355,19 @@ if not st.session_state.get("usuario_autenticado", False):
             " registro**, créate tu cuenta aquí mismo — eliges tu propio"
             " usuario y contraseña."
         )
-        nuevo_usuario_deseado = (
-            st.text_input("Elige tu usuario", key="registro_usuario").strip().upper()
-        )
-        nueva_password_deseada = st.text_input(
-            "Elige tu contraseña", type="password", key="registro_password"
-        )
-        codigo_registro_ingresado = (
-            st.text_input("Código de registro", key="registro_codigo").strip()
-        )
+        with st.form("form_crear_cuenta", clear_on_submit=True):
+            nuevo_usuario_deseado = (
+                st.text_input("Elige tu usuario", key="registro_usuario").strip().upper()
+            )
+            nueva_password_deseada = st.text_input(
+                "Elige tu contraseña", type="password", key="registro_password"
+            )
+            codigo_registro_ingresado = (
+                st.text_input("Código de registro", key="registro_codigo").strip()
+            )
+            crear_cuenta_enviado = st.form_submit_button("🚀 Crear mi cuenta")
 
-        if st.button("🚀 Crear mi cuenta", key="btn_crear_cuenta"):
+        if crear_cuenta_enviado:
             if not nuevo_usuario_deseado or not nueva_password_deseada or not codigo_registro_ingresado:
                 st.error("Llena los 3 campos para continuar.")
             else:
@@ -590,16 +592,21 @@ else:
     with st.sidebar:
         st.divider()
         with st.expander("🔑 Cambiar mi Contraseña"):
-            pass_actual_sidebar = st.text_input(
-                "Contraseña actual", type="password", key="sidebar_pass_actual"
-            )
-            pass_nueva_sidebar = st.text_input(
-                "Nueva contraseña", type="password", key="sidebar_pass_nueva"
-            )
-            pass_confirmar_sidebar = st.text_input(
-                "Confirmar nueva contraseña", type="password", key="sidebar_pass_confirmar"
-            )
-            if st.button("💾 Guardar Nueva Contraseña", key="btn_cambiar_pass_sidebar", use_container_width=True):
+            with st.form("form_cambiar_password_sidebar", clear_on_submit=True):
+                pass_actual_sidebar = st.text_input(
+                    "Contraseña actual", type="password", key="sidebar_pass_actual"
+                )
+                pass_nueva_sidebar = st.text_input(
+                    "Nueva contraseña", type="password", key="sidebar_pass_nueva"
+                )
+                pass_confirmar_sidebar = st.text_input(
+                    "Confirmar nueva contraseña", type="password", key="sidebar_pass_confirmar"
+                )
+                cambiar_pass_enviado = st.form_submit_button(
+                    "💾 Guardar Nueva Contraseña", use_container_width=True
+                )
+
+            if cambiar_pass_enviado:
                 if not pass_actual_sidebar or not pass_nueva_sidebar or not pass_confirmar_sidebar:
                     st.error("Llena los 3 campos.")
                 elif pass_nueva_sidebar != pass_confirmar_sidebar:
