@@ -540,7 +540,7 @@ else:
             page_evaluaciones,
         ]
     else:  # SUSCRIPTOR u otros roles con acceso limitado
-        paginas_disponibles = [page_calculadoras, page_pivotes, page_biblioteca]
+        paginas_disponibles = [page_calculadoras, page_biblioteca]
 
     pg = st.navigation(paginas_disponibles)
 
