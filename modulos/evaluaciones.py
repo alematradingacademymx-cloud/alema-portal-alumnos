@@ -316,7 +316,7 @@ def actualizar_permisos_sheet(matricula, modulos_habilitados_str, simulador_habi
         return False, str(e)
 
 
-def generar_y_enviar_codigo_sheet(codigo, correo):
+def generar_y_enviar_codigo_sheet(codigo, correo, tipo_cuenta, paquete_guia=""):
     """Registra un código de registro nuevo y lo manda por correo, en un solo paso."""
     try:
         payload = {
@@ -324,12 +324,30 @@ def generar_y_enviar_codigo_sheet(codigo, correo):
             "accion": "generar_y_enviar_codigo",
             "codigo": codigo,
             "correo": correo,
+            "tipo_cuenta": tipo_cuenta,
+            "paquete_guia": paquete_guia,
         }
         resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=15)
         data = resp.json()
         return data.get("success", False), data.get("error", "")
     except Exception as e:
         return False, str(e)
+
+
+@st.cache_data(ttl=60)
+def cargar_lista_paquetes_guias():
+    """Lee los nombres de paquetes distintos de la hoja Guias_Exclusivas."""
+    try:
+        url_guias = (
+            f"https://docs.google.com/spreadsheets/d/{SHEET_ID_USUARIOS}"
+            "/gviz/tq?tqx=out:csv&sheet=Guias_Exclusivas"
+        )
+        df = pd.read_csv(url_guias, dtype=str)
+        df.columns = df.columns.str.strip()
+        paquetes = df["Paquete"].dropna().astype(str).str.strip()
+        return sorted([p for p in paquetes.unique() if p and p.lower() != "nan"])
+    except Exception:
+        return []
 
 
 def reiniciar_sesion_sheet(matricula):
@@ -704,11 +722,39 @@ with tab_historial:
         # PESTAÑA 4: GESTOR DE CANDADOS (ADMIN) — CONECTADO A GOOGLE SHEETS
         # ---------------------------------------------------------
         with tab_permisos:
-            with st.expander("📧 Generar y Enviar Código de Registro (Suscriptor nuevo)"):
+            with st.expander("📧 Generar y Enviar Código de Registro"):
                 st.caption(
-                    "Úsalo cuando confirmes el pago de un suscriptor nuevo — se"
-                    " guarda el código y se le manda por correo en un solo paso."
+                    "Úsalo cuando confirmes un pago — se guarda el código y se"
+                    " le manda por correo en un solo paso."
                 )
+
+                mapa_tipo_cuenta = {
+                    "Suscriptor Mensual ($150 - Calculadoras + Biblioteca)": "SUSCRIPTOR",
+                    "Suscriptor de Guías (solo Biblioteca)": "SUSCRIPTOR_GUIAS",
+                    "Alumno (Programa Académico completo)": "ALUMNO",
+                }
+                tipo_cuenta_elegida = st.selectbox(
+                    "Tipo de cuenta a crear:",
+                    list(mapa_tipo_cuenta.keys()),
+                    key="select_tipo_cuenta_nueva",
+                )
+                tipo_cuenta_valor = mapa_tipo_cuenta[tipo_cuenta_elegida]
+
+                paquete_guia_seleccionado = ""
+                if tipo_cuenta_valor == "SUSCRIPTOR_GUIAS":
+                    lista_paquetes_disponibles = cargar_lista_paquetes_guias()
+                    if lista_paquetes_disponibles:
+                        paquete_guia_seleccionado = st.selectbox(
+                            "¿Qué paquete desbloquear?",
+                            lista_paquetes_disponibles,
+                            key="select_paquete_guia_codigo",
+                        )
+                    else:
+                        st.warning(
+                            "No se encontraron paquetes en la hoja"
+                            " 'Guias_Exclusivas'."
+                        )
+
                 codigo_nuevo_registro = (
                     st.text_input(
                         "Código (tú lo inventas, ej. ALEMA-4X7B):",
@@ -726,9 +772,14 @@ with tab_historial:
                 ):
                     if not codigo_nuevo_registro or not correo_destino_registro:
                         st.error("Escribe el código y el correo del cliente.")
+                    elif tipo_cuenta_valor == "SUSCRIPTOR_GUIAS" and not paquete_guia_seleccionado:
+                        st.error("Selecciona qué paquete desbloquear.")
                     else:
                         exito_cod, error_cod = generar_y_enviar_codigo_sheet(
-                            codigo_nuevo_registro, correo_destino_registro
+                            codigo_nuevo_registro,
+                            correo_destino_registro,
+                            tipo_cuenta_valor,
+                            paquete_guia_seleccionado,
                         )
                         if exito_cod:
                             st.toast(
