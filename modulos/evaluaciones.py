@@ -316,6 +316,22 @@ def actualizar_permisos_sheet(matricula, modulos_habilitados_str, simulador_habi
         return False, str(e)
 
 
+def generar_y_enviar_codigo_sheet(codigo, correo):
+    """Registra un código de registro nuevo y lo manda por correo, en un solo paso."""
+    try:
+        payload = {
+            "token": st.secrets["APPS_SCRIPT_TOKEN"],
+            "accion": "generar_y_enviar_codigo",
+            "codigo": codigo,
+            "correo": correo,
+        }
+        resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=15)
+        data = resp.json()
+        return data.get("success", False), data.get("error", "")
+    except Exception as e:
+        return False, str(e)
+
+
 def reiniciar_sesion_sheet(matricula):
     """Revoca los tokens de sesión activos de un alumno (fuerza a que vuelva a iniciar sesión)."""
     try:
@@ -688,6 +704,40 @@ with tab_historial:
         # PESTAÑA 4: GESTOR DE CANDADOS (ADMIN) — CONECTADO A GOOGLE SHEETS
         # ---------------------------------------------------------
         with tab_permisos:
+            with st.expander("📧 Generar y Enviar Código de Registro (Suscriptor nuevo)"):
+                st.caption(
+                    "Úsalo cuando confirmes el pago de un suscriptor nuevo — se"
+                    " guarda el código y se le manda por correo en un solo paso."
+                )
+                codigo_nuevo_registro = (
+                    st.text_input(
+                        "Código (tú lo inventas, ej. ALEMA-4X7B):",
+                        key="input_codigo_nuevo_registro",
+                    )
+                    .strip()
+                    .upper()
+                )
+                correo_destino_registro = st.text_input(
+                    "Correo del cliente:", key="input_correo_destino_registro"
+                )
+
+                if st.button(
+                    "📤 Generar y Enviar por Correo", key="btn_generar_enviar_codigo"
+                ):
+                    if not codigo_nuevo_registro or not correo_destino_registro:
+                        st.error("Escribe el código y el correo del cliente.")
+                    else:
+                        exito_cod, error_cod = generar_y_enviar_codigo_sheet(
+                            codigo_nuevo_registro, correo_destino_registro
+                        )
+                        if exito_cod:
+                            st.toast(
+                                f"✅ Código enviado a {correo_destino_registro}.",
+                                icon="✅",
+                            )
+                        else:
+                            st.error(f"⚠️ No se pudo enviar: {error_cod}")
+
             st.subheader("🔓 Gestor de Candados por Alumno")
             st.caption(
                 "Los cambios se guardan directo en la base de datos de Google"
