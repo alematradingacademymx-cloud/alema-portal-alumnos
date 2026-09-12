@@ -619,7 +619,12 @@ else:
                     )
                     if exito_pass:
                         st.cache_data.clear()
-                        st.success("✅ Contraseña actualizada. Úsala la próxima vez que inicies sesión.")
+                        st.toast(
+                            "✅ Contraseña actualizada. Úsala la próxima vez que"
+                            " inicies sesión.",
+                            icon="✅",
+                        )
+                        st.rerun()
                     else:
                         st.error(f"⚠️ {error_pass or 'No se pudo cambiar la contraseña.'}")
 
