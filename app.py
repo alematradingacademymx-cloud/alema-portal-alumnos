@@ -216,6 +216,33 @@ def crear_cuenta_con_codigo(codigo, matricula, password_en_texto_plano):
         return False, str(e), ""
 
 
+def cambiar_password_propia(matricula, password_actual, password_nueva):
+    """Permite que un alumno YA autenticado elija su propia contraseña, sin
+    crear una cuenta nueva — la matrícula (y todo su historial) no cambia."""
+    info_usuario = USUARIOS_AUTORIZADOS.get(matricula)
+    if not info_usuario:
+        return False, "No se encontró tu usuario."
+
+    if not verificar_password(password_actual, info_usuario["password"]):
+        return False, "Tu contraseña actual no es correcta."
+
+    try:
+        password_hash = bcrypt.hashpw(
+            password_nueva.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
+        payload = {
+            "token": st.secrets["APPS_SCRIPT_TOKEN"],
+            "accion": "actualizar_password",
+            "matricula": matricula,
+            "nuevo_hash": password_hash,
+        }
+        resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=15)
+        data = resp.json()
+        return data.get("success", False), data.get("error", "")
+    except Exception as e:
+        return False, str(e)
+
+
 def resolver_archivo_logo():
     """Encuentra el archivo del logo aunque el nombre exacto varíe un poco."""
     archivo_iso = "alema_iso.png"
@@ -561,6 +588,34 @@ else:
     pg.run()
 
     with st.sidebar:
+        st.divider()
+        with st.expander("🔑 Cambiar mi Contraseña"):
+            pass_actual_sidebar = st.text_input(
+                "Contraseña actual", type="password", key="sidebar_pass_actual"
+            )
+            pass_nueva_sidebar = st.text_input(
+                "Nueva contraseña", type="password", key="sidebar_pass_nueva"
+            )
+            pass_confirmar_sidebar = st.text_input(
+                "Confirmar nueva contraseña", type="password", key="sidebar_pass_confirmar"
+            )
+            if st.button("💾 Guardar Nueva Contraseña", key="btn_cambiar_pass_sidebar", use_container_width=True):
+                if not pass_actual_sidebar or not pass_nueva_sidebar or not pass_confirmar_sidebar:
+                    st.error("Llena los 3 campos.")
+                elif pass_nueva_sidebar != pass_confirmar_sidebar:
+                    st.error("La nueva contraseña no coincide en ambos campos.")
+                elif len(pass_nueva_sidebar) < 4:
+                    st.error("Usa al menos 4 caracteres.")
+                else:
+                    exito_pass, error_pass = cambiar_password_propia(
+                        nombre_usuario_sesion, pass_actual_sidebar, pass_nueva_sidebar
+                    )
+                    if exito_pass:
+                        st.cache_data.clear()
+                        st.success("✅ Contraseña actualizada. Úsala la próxima vez que inicies sesión.")
+                    else:
+                        st.error(f"⚠️ {error_pass or 'No se pudo cambiar la contraseña.'}")
+
         st.divider()
         if st.button("🚪 Cerrar Sesión", key="btn_logout_main", use_container_width=True):
             cerrar_sesion_usuario()
