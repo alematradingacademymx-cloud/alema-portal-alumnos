@@ -539,8 +539,11 @@ else:
             page_biblioteca,
             page_evaluaciones,
         ]
-    else:  # SUSCRIPTOR u otros roles con acceso limitado
+    elif tipo_usuario_actual == "SUSCRIPTOR":
+        # Membresía mensual: Calculadoras + Biblioteca
         paginas_disponibles = [page_calculadoras, page_biblioteca]
+    else:  # SUSCRIPTOR_GUIAS u otros roles con acceso mínimo: solo Biblioteca
+        paginas_disponibles = [page_biblioteca]
 
     pg = st.navigation(paginas_disponibles)
 
