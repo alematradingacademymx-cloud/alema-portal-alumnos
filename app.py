@@ -196,6 +196,26 @@ def cerrar_sesion_usuario():
     limpiar_sesion_local_storage()
 
 
+def crear_cuenta_con_codigo(codigo, matricula, password_en_texto_plano):
+    """Crea una cuenta de Suscriptor validando un código de registro de un solo uso."""
+    try:
+        password_hash = bcrypt.hashpw(
+            password_en_texto_plano.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
+        payload = {
+            "token": st.secrets["APPS_SCRIPT_TOKEN"],
+            "accion": "crear_cuenta_suscriptor",
+            "codigo": codigo,
+            "matricula": matricula,
+            "password_hash": password_hash,
+        }
+        resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=15)
+        data = resp.json()
+        return data.get("success", False), data.get("error", ""), data.get("vencimiento", "")
+    except Exception as e:
+        return False, str(e), ""
+
+
 def resolver_archivo_logo():
     """Encuentra el archivo del logo aunque el nombre exacto varíe un poco."""
     archivo_iso = "alema_iso.png"
@@ -299,6 +319,41 @@ if not st.session_state.get("usuario_autenticado", False):
                     st.rerun()
             else:
                 st.error("❌ Matrícula o contraseña incorrecta. Verifica con administración.")
+
+    st.markdown("---")
+
+    with st.expander("✅ ¿Ya pagaste tu suscripción? Crea tu cuenta aquí"):
+        st.write(
+            "Si ya realizaste tu pago y Dirección te compartió tu **código de"
+            " registro**, créate tu cuenta aquí mismo — eliges tu propio"
+            " usuario y contraseña."
+        )
+        nuevo_usuario_deseado = (
+            st.text_input("Elige tu usuario", key="registro_usuario").strip().upper()
+        )
+        nueva_password_deseada = st.text_input(
+            "Elige tu contraseña", type="password", key="registro_password"
+        )
+        codigo_registro_ingresado = (
+            st.text_input("Código de registro", key="registro_codigo").strip()
+        )
+
+        if st.button("🚀 Crear mi cuenta", key="btn_crear_cuenta"):
+            if not nuevo_usuario_deseado or not nueva_password_deseada or not codigo_registro_ingresado:
+                st.error("Llena los 3 campos para continuar.")
+            else:
+                exito_reg, error_reg, vencimiento_reg = crear_cuenta_con_codigo(
+                    codigo_registro_ingresado, nuevo_usuario_deseado, nueva_password_deseada
+                )
+                if exito_reg:
+                    st.cache_data.clear()
+                    st.success(
+                        f"✅ ¡Cuenta creada! Tu usuario es **{nuevo_usuario_deseado}**,"
+                        f" vigente hasta **{vencimiento_reg}**. Ya puedes iniciar sesión"
+                        " arriba con tu usuario y contraseña."
+                    )
+                else:
+                    st.error(f"⚠️ No se pudo crear tu cuenta: {error_reg}")
 
     st.markdown("---")
     st.markdown("### ¿Aún no tienes tu acceso al Portal?")
