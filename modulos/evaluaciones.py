@@ -365,6 +365,21 @@ def reiniciar_sesion_sheet(matricula):
         return False, str(e)
 
 
+def renovar_suscripcion_sheet(matricula):
+    """Suma 30 días a la Fecha_Vencimiento actual del alumno (aunque ya haya vencido)."""
+    try:
+        payload = {
+            "token": st.secrets["APPS_SCRIPT_TOKEN"],
+            "accion": "renovar_suscripcion",
+            "matricula": matricula,
+        }
+        resp = requests.post(st.secrets["APPS_SCRIPT_URL"], json=payload, timeout=10)
+        data = resp.json()
+        return data.get("success", False), data.get("error", ""), data.get("nueva_fecha", "")
+    except Exception as e:
+        return False, str(e), ""
+
+
 # ==========================================
 # CÓDIGO DEL MÓDULO RENDERIZADO DIRECTO
 # ==========================================
@@ -514,9 +529,9 @@ with tab_alumnos:
                                         respuestas_evaluadas.append("Correcta")
                                     else:
                                         respuestas_evaluadas.append("Incorrecta")
-                                
+
                                 calificacion = (correctas / total_preguntas) * 10.0 if total_preguntas > 0 else 0.0
-                                
+
                                 nueva_respuesta = {
                                     "id": int(datetime.now().timestamp() * 1000),
                                     "matricula": usuario_actual,
@@ -529,7 +544,7 @@ with tab_alumnos:
                                     "respuestas": respuestas_alumno,
                                     "respuestas_evaluadas": respuestas_evaluadas,
                                 }
-                                
+
                                 exito_resp, error_resp = guardar_respuesta_sheet(
                                     nueva_respuesta
                                 )
@@ -817,11 +832,12 @@ with tab_historial:
                     f" `{alumno_mat_permiso}`"
                 )
 
-                col_sesion_1, col_sesion_2 = st.columns([3, 1])
+                col_sesion_1, col_sesion_2, col_sesion_3 = st.columns([2.5, 1, 1])
                 with col_sesion_1:
                     st.caption(
                         "🔒 Si sospechas que el link de acceso de este alumno se"
-                        " compartió con alguien más, ciérrale la sesión de golpe:"
+                        " compartió con alguien más, ciérrale la sesión de golpe. Si"
+                        " ya confirmaste su pago, renueva 30 días más."
                     )
                 with col_sesion_2:
                     if st.button(
@@ -838,6 +854,23 @@ with tab_historial:
                             )
                         else:
                             st.error(f"⚠️ No se pudo reiniciar la sesión: {error_rs}")
+                with col_sesion_3:
+                    if st.button(
+                        "💳 Renovar 30 días",
+                        key=f"btn_renovar_susc_{alumno_mat_permiso}",
+                        use_container_width=True,
+                    ):
+                        exito_rn, error_rn, nueva_fecha_rn = renovar_suscripcion_sheet(
+                            alumno_mat_permiso
+                        )
+                        if exito_rn:
+                            st.toast(
+                                f"✅ {alumno_mat_permiso} renovado — nuevo"
+                                f" vencimiento: {nueva_fecha_rn}",
+                                icon="✅",
+                            )
+                        else:
+                            st.error(f"⚠️ No se pudo renovar: {error_rn}")
 
                 st.divider()
 
